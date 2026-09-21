@@ -981,6 +981,8 @@ body.dark-theme .level-up-banner {
 
     <div id="comboIndicator" class="combo-indicator" style="display:none;"></div>
 
+    <div id="learnLevelUpBanner" class="level-up-banner" style="display:none;"></div>
+
     <div class="learn-card-area" id="learnCardArea">
       <div class="learn-word-prompt">
         <div id="learnIcon" class="learn-icon">❓</div>
@@ -1920,6 +1922,18 @@ function renderLevelBadge(){
   badge.style.display="flex";
 }
 
+/* Live level-up notice shown mid-round (see checkAnswer). The summary
+   screen's own levelUpBanner still shows again at the end of the round --
+   this one is just for immediate feedback while still playing. */
+function showLevelUpBannerInRound(levelInfo){
+  const el = document.getElementById("learnLevelUpBanner");
+  el.textContent = `🎉 Level Up! Jetzt Level ${levelInfo.level} – ${levelInfo.title}!`;
+  el.classList.remove("level-up-banner");
+  void el.offsetWidth; // force reflow so the pop animation replays
+  el.classList.add("level-up-banner");
+  el.style.display="block";
+}
+
 /* ===========================================================
    AVATAR & FARBTHEMA (Personalisierung pro Profil)
    =========================================================== */
@@ -2117,6 +2131,15 @@ function buildRoundCardsFromVocab(){
   state.currentCombo = 0;
   state.bestCombo = 0;
   state.roundComboBonus = 0;
+
+  // Profile points/level are only saved to the profile when the round ends
+  // (finalizeRoundAndUpdateProfile), so to show a level-up live, mid-round,
+  // we track the level/points the profile was AT before this round started
+  // and compare against banked-total + points-earned-so-far after each
+  // correct answer.
+  const prof = getCurrentProfileObj();
+  state.roundStartTotalPoints = prof ? prof.stats.totalPoints : 0;
+  state.roundLevelAtStart = prof ? computeLevel(prof.stats.totalPoints) : 1;
 }
 
 function normalizeAnswer(str){
@@ -2844,6 +2867,8 @@ function renderCurrentCard(){
   }
   const card = state.roundCards[state.roundIndex];
 
+  document.getElementById("learnLevelUpBanner").style.display="none";
+
   // top info
   document.getElementById("learnTotalPoints").textContent="Gesamt: "+state.roundTotalPoints;
   document.getElementById("learnProgressInfo").textContent=`Wort ${state.roundIndex+1} / ${totalCards}`;
@@ -3009,6 +3034,22 @@ function checkAnswer(){
     state.roundTotalPoints += card.score + comboBonus;
     showAnswerFeedback(pickRandom(CORRECT_MESSAGES), "good");
 
+    // Mid-round level-up check (see roundStartTotalPoints/roundLevelAtStart
+    // in buildRoundCardsFromVocab): the profile itself isn't updated until
+    // the round ends, so level up here is based on banked total + points
+    // earned so far this round.
+    let leveledUpNow = false;
+    const prof = getCurrentProfileObj();
+    if(prof){
+      const effectiveTotal = state.roundStartTotalPoints + state.roundTotalPoints;
+      const newLevel = computeLevel(effectiveTotal);
+      if(newLevel > state.roundLevelAtStart){
+        state.roundLevelAtStart = newLevel;
+        showLevelUpBannerInRound(getLevelInfo(effectiveTotal));
+        leveledUpNow = true;
+      }
+    }
+
     // blink effect
     const area=document.getElementById("learnCardArea");
     area.classList.remove("correct-blink");
@@ -3016,12 +3057,13 @@ function checkAnswer(){
     area.classList.add("correct-blink");
 
     // briefly show the success state before advancing, so it's actually visible
+    // (longer when leveling up, so the banner has time to actually be read)
     setLearnControlsDisabled(true);
     setTimeout(()=>{
       state.roundIndex++;
       setLearnControlsDisabled(false);
       renderCurrentCard();
-    }, 550);
+    }, leveledUpNow ? 2200 : 550);
   } else {
     // wrong -> combo breaks
     state.currentCombo = 0;
