@@ -931,6 +931,10 @@ body.dark-theme .level-up-banner {
       <div class="section-sub">
         Wörter aus deinen gewählten Seiten. Du kannst einzelne Wörter für diese Runde ausschalten.
       </div>
+      <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button id="btnVocabSelectAll" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.5rem 0.8rem;">✔ Alle anwählen</button>
+        <button id="btnVocabDeselectAll" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.5rem 0.8rem;">✖ Alle abwählen</button>
+      </div>
     </div>
 
     <div id="vocabList" class="vocab-list"></div>
@@ -2750,6 +2754,9 @@ function renderVocabPickScreen(){
       listDiv.appendChild(row);
     });
   }
+
+  // Weiter braucht mindestens ein aktives Wort, sonst startet eine leere Runde
+  document.getElementById("btnVocabNext").disabled = !state.vocabPool.some(v=>v.active);
 }
 
 /* ===========================================================
@@ -3329,6 +3336,16 @@ function setupEventListeners(){
   document.getElementById("btnVocabBack").addEventListener("click", ()=>{
     switchScreen("screen-bookpages");
     renderBookPageScreen();
+  });
+
+  document.getElementById("btnVocabSelectAll").addEventListener("click", ()=>{
+    state.vocabPool.forEach(v=>v.active=true);
+    renderVocabPickScreen();
+  });
+
+  document.getElementById("btnVocabDeselectAll").addEventListener("click", ()=>{
+    state.vocabPool.forEach(v=>v.active=false);
+    renderVocabPickScreen();
   });
 
   document.getElementById("btnVocabNext").addEventListener("click", ()=>{
