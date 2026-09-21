@@ -3462,9 +3462,14 @@ function setupEventListeners(){
 
   // Floating stats
   document.getElementById("btn-floating-stats").addEventListener("click", ()=>{
-    // remember current active screen
+    // remember current active screen -- but never overwrite it with
+    // "screen-stats" itself (the floating button stays visible while
+    // already on the stats screen, so a second/accidental tap must not
+    // make "Zurück" point back at the stats screen it's already on).
     const activeScr=document.querySelector(".screen.active");
-    state.backStackBeforeStats = activeScr ? activeScr.id : "screen-start";
+    if(activeScr && activeScr.id!=="screen-stats"){
+      state.backStackBeforeStats = activeScr.id;
+    }
     switchScreen("screen-stats");
     renderStatsScreen();
   });
