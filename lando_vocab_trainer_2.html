@@ -235,6 +235,35 @@ body {
   color:var(--muted);
   word-break:break-word;
 }
+.vocab-history {
+  display:flex;
+  gap:0.4rem;
+  flex-wrap:wrap;
+  margin-top:0.3rem;
+}
+.hist-badge {
+  font-size:0.7rem;
+  font-weight:700;
+  padding:0.1rem 0.45rem;
+  border-radius:999px;
+  white-space:nowrap;
+}
+.hist-badge.correct {
+  background:#dcfce7;
+  color:#065f46;
+}
+.hist-badge.wrong {
+  background:#fee2e2;
+  color:#991b1b;
+}
+body.dark-theme .hist-badge.correct {
+  background:rgba(16,185,129,0.18);
+  color:#6ee7b7;
+}
+body.dark-theme .hist-badge.wrong {
+  background:rgba(239,68,68,0.15);
+  color:#fca5a5;
+}
 .vocab-toggle {
   flex-shrink:0;
 }
@@ -1767,6 +1796,7 @@ function createProfile(name){
         totalPoints:0,
         totalTimeSec:0,
         wrongCounts:{},
+        correctCounts:{},
         streak:{current:0, longest:0, lastActiveDate:null}
       },
       progress:{
@@ -2323,16 +2353,21 @@ function finalizeRoundAndUpdateProfile(){
     streakChanged = updateStreak(prof);
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
+    if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
     for(const card of state.roundCards){
       // only a genuine wrong-typed attempt counts against the long-term
       // "Problemwörter" stat -- skipping or revealing without trying
       // still marks the card as !firstTry (for the round summary and page
       // progress), but shouldn't make a word look harder than it is.
+      // canonical key = the German word, stable no matter which direction was tested
+      const key = card.de;
       if(card.attemptedWrong){
-        // canonical key = the German word, stable no matter which direction was tested
-        const key = card.de;
         if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
         prof.stats.wrongCounts[key]+=1;
+      } else if(card.done && card.firstTry){
+        // answered right on the first try, no skip/reveal involved
+        if(!prof.stats.correctCounts[key]) prof.stats.correctCounts[key]=0;
+        prof.stats.correctCounts[key]+=1;
       }
     }
 
@@ -2715,6 +2750,9 @@ function renderVocabPickScreen(){
   if(state.vocabPool.length===0){
     listDiv.innerHTML="<div style='padding:1rem;font-size:0.9rem;color:var(--muted);'>Keine Vokabeln gefunden 🤔</div>";
   } else {
+    const prof = getCurrentProfileObj();
+    const wrongCounts = (prof && prof.stats.wrongCounts) || {};
+    const correctCounts = (prof && prof.stats.correctCounts) || {};
     state.vocabPool.forEach((voc,idx)=>{
       const row=document.createElement("div");
       row.className="vocab-row";
@@ -2735,6 +2773,26 @@ function renderVocabPickScreen(){
 
       texts.appendChild(d);
       texts.appendChild(f);
+
+      const correctCount = correctCounts[voc.de] || 0;
+      const wrongCount = wrongCounts[voc.de] || 0;
+      if(correctCount>0 || wrongCount>0){
+        const histDiv=document.createElement("div");
+        histDiv.className="vocab-history";
+        if(correctCount>0){
+          const c=document.createElement("span");
+          c.className="hist-badge correct";
+          c.textContent=`✅ ${correctCount}×`;
+          histDiv.appendChild(c);
+        }
+        if(wrongCount>0){
+          const w=document.createElement("span");
+          w.className="hist-badge wrong";
+          w.textContent=`❌ ${wrongCount}×`;
+          histDiv.appendChild(w);
+        }
+        texts.appendChild(histDiv);
+      }
 
       const togWrap=document.createElement("div");
       togWrap.className="vocab-toggle";
