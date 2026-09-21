@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Vokabeltrainer" />
+<meta name="theme-color" content="#2563eb" />
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAI3klEQVR4nO3d23MU1RbH8dVzTbgEQZG7csREUAwKIYA3wGMBFSFY/gWnyofz6MN5sPxf/BtIQqJgIXqOAiGBhIsEkKsYLpLEQLiY9Fy6fcipqSCzIFmre7L35vd5n0pn8k3v3Xt3z3i1nw0SQDmJ6T4AMBfiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiABbiAFZqug/g7z54M/PV5zWy14Yhbf1i+OZwEO0hTdJ/Pp3576Zq2WtvDBU//PJOGEZ7RFrGnTkO9+UGR4R/Xc+jXRuz0R7P5H/0zg3yH93S6ZtWBhkYRzGg9i5f/PLmjVURHszkrXs1veR5+ZvZ1in/leNjXBxEtOeI/J2qXZxctWwaxsrdm+Snjd5L+WsDxQgPJiomxnHheuFcf0H8cs3fSSadoh3rFGOK4p8hVibGQUStivdrZ2M24UV4LE+3+c3MnJnCH+nnw33HEcdU7D3qF6XXHC8+l9iwMh3p4TxFs2IWfPBk7t6f5s1FicjYOP64H/x0Jid++e4KXrPMrva21mfELzd2TCFj4yDdu7ZtbTabrtDQsn2d/GcN3QsO9cn/B+Jmbhya8+2sau+fb8n/m6dEM6a0K0bPCjA3jlwh/OaYZsGjEiPLgrmJxtfk85sWI5c3SsyNg3TXLB+szjw3K/aRZdcG+ZXR+f7CecUVewUYHUfv5fyvt4WrQ6kkNTXEfvJo1i2ZR3gkcTA6DtKtKzfHvBpWuzi5UroaWwyo/Sji0GntHBPvSK1dkV76QjLSw3lE8yb5Ps6hvtzQPYPnokRkfhw3/giOXciLXx7ftNTzaJdmTDF4eaPE9DhI9z7GF0dDbXrxPOG7d+/P8OBJc5c3SiyIY3+PP5oTDi2vLEyufjmWTVrNIuy+476fN3TJfCIL4ng4Fh7olf+fxXHySKdou+JSqOWwBWMKWREHEbV2jolf+3FjNhn1b7mlPjNnhnB949pAsfeyfBZVSXbEceRs/vYd4dx+/pzEplURb9Jqljc0K3sVZkccQUh7jbl3cHa1t0W6DRuG1Gr88kaJHXEQUcsR+ciybW2mOhPZUvqOBvk27LEL+RtDJt4RWJY1cVy6WTxzTbgTMSMb5SatZobbavyS+UTWxEG6BY+obixdODexvk44gxnNmXtHYFk2xdHR5Rekp+T33sjMmx3BL6vZhv3uRO7hmAXLGyU2xXHnQfC/n4ULHskENa2PYGTRjCmaadO0sCkO0r2/u9XXLHVLkq8tFa63DtwNjpy1Y3mjxLI4fjidG3koPDOveSX18ouqTVrNJXHbUT+waUghsi6OfIE6uqdnH075NGyrbWMKWRcH6ZbSNZvs6+vk27BnrhUu3rRmeaPEvjhOXSlc+V34Ri9fkKz/h3DSoNmGteLujcfZFwfplpJkf+N0irZLn4YtFKlDsfY/jayMo61zTDy5axJt0m6tz9RIt2H/+3PuzgPT7wgsy8o4bg0H3b8ILwufn514940pL3horlNsnIqOszIOItqjWvCY2gBRM8PbUi9cMh95GP5w2oI7AsuyNY5ve3KjvnBo+eitTHV2CmPE9nXZTEo4pnR0+3mjH1x6ElvjGPXDb3uE/5HVWW/b21MYWXTXKbaOKWRvHETUoljwmPzzTppt2Ku/F09ftfa8YXUcXefzt6SfKvnOqswLNZP63Zs3Zj3pNqxmYmQCi+MIQtorveUumaCPGyd18hDfLqo5PENYHAfFf81StzRVJ92G1ZzYDGF3HJpBffXy1PIFT9mkVU1FFVMiQ9gdBynv8HjitNTzaOfkhp7HaS6mzGF9HJqFhCfPJxrr0ouk27CaZRhzWB+HZgly2fzk2yvYKYXm5g/br1PGWR8H6TYvuE2TTMoTb8PeGg66pFs/RnEhDs22Z9P6TKrcrHTrGvk2bJviA2eM4kIcmhsm5s5KvF9uk9btD/uaJBfioKifd6qZ4W2WbsOeulK4Kr1RzTSOxKG5SfPDNZmZVY+MIDsa5NuwVu+0/Y0jcZBiWlqV8batfWRkEa995Qv0teKDdU3jThyaB0MmPu+0aF6ioVY4pnx/yhc/VmMgd+IYuBt0nhNeQG5clZ4/5/9vRfMG+TasXQ/RP5U7cZBivE9MeGBpl/R20eH78kd5zeRUHAd65Y+xj88zVi5L1S0RPjLZ0S3/EAAzORXHaC7c3yM8sb/+UmrFoqRqecPOJ5eewKk4SPdxbJ+8UyV+GvbizWKf9IOHjOVaHN2KD93610dVC+cK3xCXljdKXIsjDKlNenOe+GPgHLgjsCzX4qDpuJ48fDY3cNfuOwLLcjCOX28XT1yu6PBv0efOTomDcVBlZwAPRsMDJ5xa3ihxM45vjvm5QoWWsfcd98ekX+pgODfjqOQXmji2ZD6Rm3FQpeYB14eKxy+6cEdgWc7G8eOZSnyJWmun78YdgWU5G0cxqMSHLbl6nTLO2Tgo/s2O3kv53wbd2mp7lMtxnOsvXLge44LHHqdPG+R2HBTn38/Ph/scuiOwLMfjaO/yi/HMSg+ezN0fdXcuSkTOxzE4Ehzui2XBw727Nx7neBwUzyNGgyPBoXiaM4r7cXx3Ivrzf0dso5VR3I/Dz4f7o/7yLOevU8a5HwdF/bc831/4Jc4rZHM8E3H0XMz3R7da9SxMRcc9E3FQdHunxYDa7fwKBAGv9rPB6T4GMNSzcuYAAcQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBLMQBrL8AwgPYdJp2zlEAAAAASUVORK5CYII=" />
 <title>Vokabeltrainer</title>
 <style>
 :root {
@@ -816,7 +822,7 @@ body.dark-theme .level-up-banner {
     <div class="section-block">
       <div class="section-title">2. Sprache wählen</div>
       <div id="languageList" class="flex-row-wrap"></div>
-      <div class="section-sub">Im Moment ist nur Englisch mit Vokabeln hinterlegt.</div>
+      <div class="section-sub">Englisch bringt fertige Vokabeln mit. Für Latein legst du deine eigenen Bücher/Seiten/Vokabeln an.</div>
     </div>
 
     <div class="btn-row">
@@ -833,16 +839,77 @@ body.dark-theme .level-up-banner {
     <div class="section-block">
       <div class="section-title">Buch</div>
       <div id="bookList" class="flex-row-wrap"></div>
+      <div style="margin-top:0.6rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+          <input type="checkbox" id="chkShowArchivedBooks" /> Archivierte Bücher anzeigen
+        </label>
+      </div>
+      <div style="margin-top:0.6rem;">
+        <button id="btnShowNewBookForm" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.5rem 0.8rem;">+ Neues Buch/Schuljahr anlegen</button>
+      </div>
+      <div id="newBookForm" style="display:none;margin-top:0.6rem;">
+        <div class="inline-input-btn">
+          <input id="newBookName" type="text" placeholder="Name, z.B. Camden Town 6. Klasse" />
+          <button id="btnCreateBook" class="btn btn-secondary" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">Anlegen</button>
+        </div>
+      </div>
     </div>
 
     <div class="section-block">
       <div class="section-title">Seiten (Mehrfachauswahl möglich)</div>
       <div id="pagesList" class="flex-col"></div>
+      <div id="newPageFormWrap" style="display:none;margin-top:0.6rem;">
+        <div class="inline-input-btn">
+          <input id="newPageName" type="text" placeholder="Seitenname, z.B. Kapitel 1" />
+          <button id="btnCreatePage" class="btn btn-secondary" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">+ Seite anlegen</button>
+        </div>
+      </div>
     </div>
 
     <div class="btn-row">
       <button id="btnPagesBack" class="btn-secondary btn">⬅ Zurück</button>
       <button id="btnPagesNext" class="btn" disabled>Weiter ➡</button>
+    </div>
+  </div>
+
+  <!-- VOCAB ADD SCREEN -->
+  <div id="screen-vocab-add" class="screen">
+    <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>➕ Vokabeln hinzufügen</span>
+    </h2>
+    <div class="section-sub" id="vocabAddTargetInfo" style="margin-bottom:1rem;"></div>
+
+    <div class="section-block">
+      <div class="section-title">Neues Wort</div>
+      <div class="flex-col" style="gap:0.5rem;">
+        <input id="newWordDe" type="text" placeholder="Deutsch, z.B. Haus" />
+        <input id="newWordForeign" type="text" placeholder="Fremdsprache, z.B. house" />
+        <div class="inline-input-btn">
+          <input id="newWordIcon" type="text" placeholder="Icon (Emoji), optional" style="max-width:120px;flex:none;" />
+          <button id="btnAddWord" class="btn" style="min-width:auto;">+ Hinzufügen</button>
+        </div>
+        <div id="iconPicker" class="flex-row-wrap"></div>
+        <div id="wordDuplicateWarning" class="answer-feedback close" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">Aus CSV-Datei importieren</div>
+      <div class="section-sub" style="margin-bottom:0.5rem;">Eine Zeile pro Wort: Deutsch;Fremdsprache;Icon (Icon optional)</div>
+      <div class="inline-input-btn">
+        <input id="csvFileInput" type="file" accept=".csv,text/csv,text/plain" />
+        <button id="btnImportCsv" class="btn-secondary btn" style="min-width:auto;">Importieren</button>
+      </div>
+      <div id="csvImportResult" class="section-sub" style="margin-top:0.4rem;"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-title">Wörter auf dieser Seite (<span id="vocabAddCount">0</span>)</div>
+      <div id="vocabAddList" class="vocab-list"></div>
+    </div>
+
+    <div class="btn-row">
+      <button id="btnVocabAddDone" class="btn">Fertig ✅</button>
     </div>
   </div>
 
@@ -1456,6 +1523,163 @@ const BOOKS = {
 };
 
 /* ===========================================================
+   CUSTOM BOOKS (vom Nutzer selbst angelegte Bücher/Seiten/Vokabeln)
+   Gespeichert getrennt von den fest hinterlegten BOOKS, damit die
+   mitgelieferten Vokabellisten nie überschrieben werden.
+   =========================================================== */
+
+let customBooks = {}; // bookKey -> {lang, name, pages:{pageId:[{de,foreign,icon}]}, archived}
+
+function loadCustomBooks(){
+  try {
+    const raw = localStorage.getItem("vocabCustomBooks");
+    customBooks = raw ? JSON.parse(raw) : {};
+  } catch(e){
+    console.error("loadCustomBooks error", e);
+    customBooks = {};
+  }
+}
+
+function saveCustomBooks(){
+  try { localStorage.setItem("vocabCustomBooks", JSON.stringify(customBooks)); }
+  catch(e){ console.error("saveCustomBooks error", e); }
+}
+
+function getBookDef(bookKey){
+  return BOOKS[bookKey] || customBooks[bookKey] || null;
+}
+
+function isCustomBook(bookKey){
+  return Object.prototype.hasOwnProperty.call(customBooks, bookKey);
+}
+
+/* Returns [{key, book, custom}] for the given language, built-in books first. */
+function getBooksForLang(lang, includeArchived){
+  const list=[];
+  for(const [key,book] of Object.entries(BOOKS)){
+    if(book.lang===lang) list.push({key, book, custom:false});
+  }
+  for(const [key,book] of Object.entries(customBooks)){
+    if(book.lang===lang && (includeArchived || !book.archived)) list.push({key, book, custom:true});
+  }
+  return list;
+}
+
+function slugify(str){
+  const map = {ä:"ae",ö:"oe",ü:"ue",Ä:"ae",Ö:"oe",Ü:"ue",ß:"ss"};
+  return str.trim().toLowerCase()
+    .replace(/[äöüÄÖÜß]/g, m=>map[m]||m)
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/(^-+|-+$)/g,"");
+}
+
+function generateBookKey(name){
+  const base = "custom_" + (slugify(name) || "buch");
+  let key = base, i = 2;
+  while(getBookDef(key)){
+    key = `${base}-${i}`;
+    i++;
+  }
+  return key;
+}
+
+function generatePageKey(bookKey, label){
+  const book = getBookDef(bookKey);
+  const base = slugify(label) || "seite";
+  let key = base, i = 2;
+  while(book && book.pages[key]){
+    key = `${base}-${i}`;
+    i++;
+  }
+  return key;
+}
+
+function createCustomBook(name){
+  const trimmed = (name||"").trim();
+  if(!trimmed) return null;
+  const key = generateBookKey(trimmed);
+  customBooks[key] = { lang: state.currentLang, name: trimmed, pages: {}, archived:false };
+  saveCustomBooks();
+  return key;
+}
+
+function createCustomPage(bookKey, label){
+  const trimmed = (label||"").trim();
+  if(!trimmed) return null;
+  const book = getBookDef(bookKey);
+  if(!book) return null;
+  const pageId = generatePageKey(bookKey, trimmed);
+  book.pages[pageId] = [];
+  saveCustomBooks();
+  return pageId;
+}
+
+function toggleArchiveBook(bookKey, archived){
+  const book = customBooks[bookKey];
+  if(!book) return;
+  book.archived = archived;
+  saveCustomBooks();
+}
+
+function deleteCustomPage(bookKey, pageId){
+  const book = customBooks[bookKey];
+  if(!book || !book.pages[pageId]) return;
+  delete book.pages[pageId];
+  state.selectedPages = state.selectedPages.filter(p=>p!==pageId);
+  saveCustomBooks();
+}
+
+/* Looks for a word with the same German or foreign text anywhere in the
+   book (across all its pages), so a parent doesn't accidentally add the
+   same word twice under a slightly different chapter. */
+function findDuplicateVocab(bookKey, de, foreign){
+  const book = getBookDef(bookKey);
+  if(!book) return null;
+  const normDe = normalizeAnswer(de);
+  const normForeign = normalizeAnswer(foreign);
+  for(const [pid, arr] of Object.entries(book.pages)){
+    for(const v of arr){
+      if(normalizeAnswer(v.de)===normDe || normalizeAnswer(v.foreign)===normForeign){
+        return {pageId:pid, entry:v};
+      }
+    }
+  }
+  return null;
+}
+
+function addVocabWord(bookKey, pageId, de, foreign, icon, force){
+  const book = getBookDef(bookKey);
+  if(!book || !book.pages[pageId]) return {ok:false, reason:"no-page"};
+  const trimmedDe = (de||"").trim();
+  const trimmedForeign = (foreign||"").trim();
+  if(!trimmedDe || !trimmedForeign) return {ok:false, reason:"empty"};
+  if(!force){
+    const dup = findDuplicateVocab(bookKey, trimmedDe, trimmedForeign);
+    if(dup) return {ok:false, reason:"duplicate", dup};
+  }
+  book.pages[pageId].push({
+    de:trimmedDe,
+    foreign:trimmedForeign,
+    icon: icon && icon.trim() ? icon.trim() : "📘"
+  });
+  saveCustomBooks();
+  return {ok:true};
+}
+
+/* Minimal CSV parsing: one word per line, comma- or semicolon-separated
+   (semicolon wins if both appear, since German number formats and some
+   Excel exports use commas inside fields). Good enough for simple word
+   lists; not a full RFC-4180 parser. */
+function parseCsvLine(line){
+  const delim = line.includes(";") ? ";" : ",";
+  return line.split(delim).map(s=>s.trim().replace(/^"|"$/g,""));
+}
+
+function parseCsvText(text){
+  return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0).map(parseCsvLine);
+}
+
+/* ===========================================================
    STATE
    =========================================================== */
 
@@ -1475,6 +1699,7 @@ let state = {
   bestCombo: 0,          // highest combo reached this round
   roundComboBonus: 0,    // total bonus points earned from combos this round
   backStackBeforeStats: "screen-start", // remember last screen before going to stats
+  vocabAddTarget: null, // {bookKey, pageId} while on screen-vocab-add
 };
 
 /* Profile schema:
@@ -1864,7 +2089,10 @@ function buildRoundCardsFromVocab(){
       answer:answerText,
       score:10,
       firstTry:true,
-      done:false
+      done:false,
+      attemptedWrong:false // true only once the user actually typed a wrong answer
+                           // (kept separate from firstTry so skip/reveal without a
+                           // real attempt don't pollute the long-term "Problemwörter" stat)
     });
   }
 
@@ -2060,7 +2288,11 @@ function finalizeRoundAndUpdateProfile(){
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
     for(const card of state.roundCards){
-      if(!card.firstTry){
+      // only a genuine wrong-typed attempt counts against the long-term
+      // "Problemwörter" stat -- skipping or revealing without trying
+      // still marks the card as !firstTry (for the round summary and page
+      // progress), but shouldn't make a word look harder than it is.
+      if(card.attemptedWrong){
         // canonical key = the German word, stable no matter which direction was tested
         const key = card.de;
         if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
@@ -2159,6 +2391,11 @@ function renderStartScreen(){
   const profDiv=document.getElementById("profileList");
   profDiv.innerHTML="";
   for(const name of Object.keys(state.profiles)){
+    const wrap=document.createElement("div");
+    wrap.style.display="flex";
+    wrap.style.alignItems="center";
+    wrap.style.gap="0.3rem";
+
     const btn=document.createElement("button");
     btn.className="select-pill";
     if(state.currentProfile===name){
@@ -2170,7 +2407,27 @@ function renderStartScreen(){
       state.currentProfile=name;
       renderStartScreen();
     });
-    profDiv.appendChild(btn);
+    wrap.appendChild(btn);
+
+    const delBtn=document.createElement("button");
+    delBtn.className="btn-secondary btn";
+    delBtn.style.minWidth="auto";
+    delBtn.style.fontSize="0.75rem";
+    delBtn.style.padding="0.45rem 0.6rem";
+    delBtn.title="Profil löschen";
+    delBtn.textContent="🗑";
+    delBtn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      if(confirm(`Profil "${name}" wirklich löschen? Alle Punkte und Fortschritte gehen verloren.`)){
+        delete state.profiles[name];
+        if(state.currentProfile===name) state.currentProfile=null;
+        saveProfiles();
+        renderStartScreen();
+      }
+    });
+    wrap.appendChild(delBtn);
+
+    profDiv.appendChild(wrap);
   }
 
   // languages
@@ -2190,20 +2447,30 @@ function renderStartScreen(){
   });
   langDiv.appendChild(enBtn);
 
-  // Französisch (noch ohne Daten)
+  // Französisch (noch ohne Daten) -- deaktiviert, damit es keine Sackgasse ohne Bücher ergibt
   const frBtn=document.createElement("button");
   frBtn.className="select-pill";
-  if(state.currentLang==="fr"){
-    frBtn.classList.add("active");
-  }
+  frBtn.disabled=true;
+  frBtn.style.opacity="0.6";
+  frBtn.style.cursor="not-allowed";
   frBtn.innerHTML=`<span>🇫🇷 Französisch</span> <span class="small-note">(bald)</span>`;
-  frBtn.addEventListener("click",()=>{
-    state.currentLang="fr";
-    // kein Buch hinterlegt, aber wir merken die Wahl
+  langDiv.appendChild(frBtn);
+
+  // Latein -- kein festes Lehrbuch hinterlegt, aber sofort nutzbar: Bücher/Seiten/
+  // Vokabeln werden über "+ Neues Buch anlegen" auf dem nächsten Screen selbst angelegt
+  // (genau der Mechanismus, der für eigene Bücher bei Englisch schon existiert).
+  const laBtn=document.createElement("button");
+  laBtn.className="select-pill";
+  if(state.currentLang==="la"){
+    laBtn.classList.add("active");
+  }
+  laBtn.innerHTML=`<span>🏛️ Latein</span> <span class="small-note">(eigene Vokabeln)</span>`;
+  laBtn.addEventListener("click",()=>{
+    state.currentLang="la";
     state.currentBookKey=null;
     renderStartScreen();
   });
-  langDiv.appendChild(frBtn);
+  langDiv.appendChild(laBtn);
 
   // enable weiter?
   const btnStartToPages=document.getElementById("btnStartToPages");
@@ -2211,32 +2478,69 @@ function renderStartScreen(){
 }
 
 function renderBookPageScreen(){
-  // book list (based on chosen language)
+  // book list (based on chosen language) — built-in books + the user's own
   const blist=document.getElementById("bookList");
   blist.innerHTML="";
-  // Only English book right now: en_5
-  if(state.currentLang==="en"){
+  const showArchived = document.getElementById("chkShowArchivedBooks").checked;
+  const books = getBooksForLang(state.currentLang, showArchived);
+  for(const {key, book, custom} of books){
+    const wrap=document.createElement("div");
+    wrap.style.display="flex";
+    wrap.style.alignItems="center";
+    wrap.style.gap="0.3rem";
+
     const bBtn=document.createElement("button");
     bBtn.className="select-pill";
-    if(state.currentBookKey==="en_5"){
+    if(state.currentBookKey===key){
       bBtn.classList.add("active");
     }
-    bBtn.innerHTML=`<div style="text-align:left;">
-      <div style="font-weight:600;">${BOOKS.en_5.name}</div>
-      <div class="small-note">(${Object.keys(BOOKS.en_5.pages).length} Seiten)</div>
-    </div>`;
+    if(book.archived){
+      bBtn.style.opacity="0.6";
+    }
+    const bInner=document.createElement("div");
+    bInner.style.textAlign="left";
+    const bNameDiv=document.createElement("div");
+    bNameDiv.style.fontWeight="600";
+    bNameDiv.textContent = book.name + (book.archived ? " (archiviert)" : "");
+    const bCountDiv=document.createElement("div");
+    bCountDiv.className="small-note";
+    bCountDiv.textContent = `(${Object.keys(book.pages).length} Seiten)`;
+    bInner.appendChild(bNameDiv);
+    bInner.appendChild(bCountDiv);
+    bBtn.appendChild(bInner);
     bBtn.addEventListener("click",()=>{
-      state.currentBookKey="en_5";
+      state.currentBookKey=key;
+      state.selectedPages=[];
       renderBookPageScreen();
     });
-    blist.appendChild(bBtn);
+    wrap.appendChild(bBtn);
+
+    if(custom){
+      const archBtn=document.createElement("button");
+      archBtn.className="btn-secondary btn";
+      archBtn.style.minWidth="auto";
+      archBtn.style.fontSize="0.75rem";
+      archBtn.style.padding="0.45rem 0.6rem";
+      archBtn.title = book.archived ? "Wiederherstellen" : "Archivieren (Fortschritt bleibt erhalten)";
+      archBtn.textContent = book.archived ? "↩" : "🗄";
+      archBtn.addEventListener("click",(e)=>{
+        e.stopPropagation();
+        toggleArchiveBook(key, !book.archived);
+        renderBookPageScreen();
+      });
+      wrap.appendChild(archBtn);
+    }
+
+    blist.appendChild(wrap);
   }
 
   // pages list
   const pagesList=document.getElementById("pagesList");
   pagesList.innerHTML="";
+  const currentIsCustom = state.currentBookKey && isCustomBook(state.currentBookKey);
   if(state.currentBookKey){
-    const pgObj = BOOKS[state.currentBookKey].pages;
+    const book = getBookDef(state.currentBookKey);
+    const pgObj = book ? book.pages : {};
     for(const pid of Object.keys(pgObj)){
       const row=document.createElement("div");
       row.className="page-row";
@@ -2254,6 +2558,54 @@ function renderBookPageScreen(){
       prog.textContent=computePageProgressDisplay(pid);
       main.appendChild(t);
       main.appendChild(prog);
+      if(currentIsCustom){
+        const wc=(pgObj[pid]||[]).length;
+        const wcDiv=document.createElement("div");
+        wcDiv.className="page-progress";
+        wcDiv.textContent=`${wc} Wort${wc===1?"":"e"}`;
+        main.appendChild(wcDiv);
+      }
+
+      const rightWrap=document.createElement("div");
+      rightWrap.style.display="flex";
+      rightWrap.style.alignItems="center";
+      rightWrap.style.gap="0.4rem";
+
+      if(currentIsCustom){
+        const addBtn=document.createElement("button");
+        addBtn.className="btn-secondary btn";
+        addBtn.style.minWidth="auto";
+        addBtn.style.fontSize="0.75rem";
+        addBtn.style.padding="0.4rem 0.6rem";
+        addBtn.textContent="+ Vokabeln";
+        addBtn.addEventListener("click",(e)=>{
+          e.stopPropagation();
+          state.vocabAddTarget = {bookKey: state.currentBookKey, pageId: pid};
+          switchScreen("screen-vocab-add");
+          renderVocabAddScreen();
+        });
+        rightWrap.appendChild(addBtn);
+
+        const delPageBtn=document.createElement("button");
+        delPageBtn.className="btn-secondary btn";
+        delPageBtn.style.minWidth="auto";
+        delPageBtn.style.fontSize="0.75rem";
+        delPageBtn.style.padding="0.4rem 0.6rem";
+        delPageBtn.title="Seite löschen";
+        delPageBtn.textContent="🗑";
+        delPageBtn.addEventListener("click",(e)=>{
+          e.stopPropagation();
+          const wordCount=(pgObj[pid]||[]).length;
+          const msg = wordCount>0
+            ? `Seite "${formatPageLabel(pid)}" mit ${wordCount} Wort${wordCount===1?"":"ern"} wirklich löschen?`
+            : `Seite "${formatPageLabel(pid)}" wirklich löschen?`;
+          if(confirm(msg)){
+            deleteCustomPage(state.currentBookKey, pid);
+            renderBookPageScreen();
+          }
+        });
+        rightWrap.appendChild(delPageBtn);
+      }
 
       const check=document.createElement("div");
       check.className="page-check";
@@ -2264,9 +2616,10 @@ function renderBookPageScreen(){
       } else {
         check.textContent="＋";
       }
+      rightWrap.appendChild(check);
 
       row.appendChild(main);
-      row.appendChild(check);
+      row.appendChild(rightWrap);
 
       row.setAttribute("tabindex","0");
       row.setAttribute("role","button");
@@ -2291,23 +2644,31 @@ function renderBookPageScreen(){
       pagesList.appendChild(row);
     }
   }
+  document.getElementById("newPageFormWrap").style.display = currentIsCustom ? "block" : "none";
 
   // enable Weiter?
   document.getElementById("btnPagesNext").disabled = (state.selectedPages.length===0);
 }
 
 function renderVocabPickScreen(){
-  // gather vocab from selected pages
+  // gather vocab from selected pages, keeping any earlier on/off choices
+  // for words that are still part of the selection (so going back to fix
+  // the page selection doesn't silently re-enable everything)
+  const previousActive = new Map();
+  for(const v of state.vocabPool){
+    previousActive.set(`${v.pageId}|${v.de}|${v.foreign}`, v.active);
+  }
   state.vocabPool = [];
+  const currentBook = getBookDef(state.currentBookKey);
   for(const pid of state.selectedPages){
-    const arr = BOOKS[state.currentBookKey].pages[pid]||[];
+    const arr = (currentBook && currentBook.pages[pid]) || [];
     for(const v of arr){
-      // push copy
+      const key = `${pid}|${v.de}|${v.foreign}`;
       state.vocabPool.push({
         de:v.de,
         foreign:v.foreign,
         icon:v.icon,
-        active:true,
+        active: previousActive.has(key) ? previousActive.get(key) : true,
         pageId:pid
       });
     }
@@ -2357,6 +2718,99 @@ function renderVocabPickScreen(){
       listDiv.appendChild(row);
     });
   }
+}
+
+/* ===========================================================
+   VOCAB ADD SCREEN (neue Wörter für eine eigene Seite anlegen)
+   =========================================================== */
+
+let pendingDuplicateForce = false; // true after a duplicate warning, so the next click force-adds
+
+const VOCAB_ICON_CHOICES = [
+  "📘","🏠","🚗","🚌","🚲","✈️","🐱","🐶","🐘","🐦","🐟","🍎","🍞","🥛","🍕",
+  "☀️","🌧️","❄️","⚽","🎨","📚","✏️","🎒","👦","👧","👨","👩","👶","🕐",
+  "1️⃣","2️⃣","3️⃣","🔴","🔵","🟢","🟡","😀","😢","❤️","🎂","🎁","🚀","⭐",
+  "🌳","🌍","🏫","💬","👋","👍","👀","💡","📍"
+];
+
+function renderIconPicker(){
+  const div = document.getElementById("iconPicker");
+  div.innerHTML="";
+  VOCAB_ICON_CHOICES.forEach(icon=>{
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="select-pill avatar-pill";
+    btn.textContent=icon;
+    btn.addEventListener("click",()=>{
+      document.getElementById("newWordIcon").value = icon;
+    });
+    div.appendChild(btn);
+  });
+}
+
+function renderVocabAddList(){
+  const target = state.vocabAddTarget || {};
+  const book = getBookDef(target.bookKey);
+  const listDiv = document.getElementById("vocabAddList");
+  listDiv.innerHTML="";
+  const arr = (book && book.pages[target.pageId]) || [];
+  document.getElementById("vocabAddCount").textContent = String(arr.length);
+  if(arr.length===0){
+    listDiv.innerHTML="<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Noch keine Wörter auf dieser Seite.</div>";
+    return;
+  }
+  arr.forEach((v, idx)=>{
+    const row=document.createElement("div");
+    row.className="vocab-row";
+    const ic=document.createElement("div");
+    ic.className="vocab-icon";
+    ic.textContent=v.icon||"📘";
+    const texts=document.createElement("div");
+    texts.className="vocab-texts";
+    const dDiv=document.createElement("div");
+    dDiv.className="vocab-de";
+    dDiv.textContent=v.de;
+    const fDiv=document.createElement("div");
+    fDiv.className="vocab-foreign";
+    fDiv.textContent=v.foreign;
+    texts.appendChild(dDiv);
+    texts.appendChild(fDiv);
+
+    const delBtn=document.createElement("button");
+    delBtn.className="btn-secondary btn";
+    delBtn.style.minWidth="auto";
+    delBtn.style.fontSize="0.75rem";
+    delBtn.style.padding="0.4rem 0.6rem";
+    delBtn.style.flexShrink="0";
+    delBtn.title="Wort löschen";
+    delBtn.textContent="🗑";
+    delBtn.addEventListener("click",()=>{
+      if(confirm(`"${v.de}" wirklich löschen?`)){
+        arr.splice(idx,1);
+        saveCustomBooks();
+        renderVocabAddList();
+      }
+    });
+
+    row.appendChild(ic);
+    row.appendChild(texts);
+    row.appendChild(delBtn);
+    listDiv.appendChild(row);
+  });
+}
+
+function renderVocabAddScreen(){
+  const target = state.vocabAddTarget || {};
+  const book = getBookDef(target.bookKey);
+  document.getElementById("wordDuplicateWarning").style.display="none";
+  document.getElementById("csvImportResult").textContent="";
+  if(!book || !book.pages[target.pageId]){
+    document.getElementById("vocabAddTargetInfo").textContent="Keine Seite ausgewählt.";
+  } else {
+    document.getElementById("vocabAddTargetInfo").textContent = `${book.name} – ${formatPageLabel(target.pageId)}`;
+  }
+  renderIconPicker();
+  renderVocabAddList();
 }
 
 function renderDirectionScreen(){
@@ -2558,6 +3012,7 @@ function checkAnswer(){
     updateComboIndicator();
 
     card.firstTry=false;
+    card.attemptedWrong=true;
     if(card.score>0) card.score=card.score-1;
     document.getElementById("cardScore").textContent=String(card.score);
     markAnswerComparison(inputVal, correct);
@@ -2632,7 +3087,10 @@ function setupEventListeners(){
   });
 
   document.getElementById("btnExportData").addEventListener("click", ()=>{
-    const dataStr = JSON.stringify(state.profiles, null, 2);
+    // include customBooks (eigene Bücher/Seiten/Vokabeln), not just profile stats --
+    // otherwise "Daten sichern" silently drops everything a parent/child typed in themselves.
+    const backup = { profiles: state.profiles, customBooks: customBooks };
+    const dataStr = JSON.stringify(backup, null, 2);
     const blob = new Blob([dataStr], {type:"application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2659,10 +3117,23 @@ function setupEventListeners(){
         if(typeof imported !== "object" || imported===null){
           throw new Error("Ungültiges Format");
         }
-        for(const name of Object.keys(imported)){
-          state.profiles[name] = imported[name];
+        // new backup format: {profiles, customBooks}. Older backups (before
+        // custom books were included) are just a flat name->profile map,
+        // so fall back to treating the whole thing as profiles for those.
+        const isNewFormat = imported.profiles || imported.customBooks;
+        const importedProfiles = isNewFormat ? (imported.profiles||{}) : imported;
+        const importedCustomBooks = isNewFormat ? (imported.customBooks||{}) : {};
+
+        for(const name of Object.keys(importedProfiles)){
+          state.profiles[name] = importedProfiles[name];
         }
         saveProfiles();
+
+        for(const key of Object.keys(importedCustomBooks)){
+          customBooks[key] = importedCustomBooks[key];
+        }
+        saveCustomBooks();
+
         renderStartScreen();
         alert("Daten erfolgreich importiert.");
       } catch(err){
@@ -2690,6 +3161,110 @@ function setupEventListeners(){
   document.getElementById("btnPagesNext").addEventListener("click", ()=>{
     switchScreen("screen-vocabpick");
     renderVocabPickScreen();
+  });
+
+  document.getElementById("chkShowArchivedBooks").addEventListener("change", ()=>{
+    renderBookPageScreen();
+  });
+
+  document.getElementById("btnShowNewBookForm").addEventListener("click", ()=>{
+    const form = document.getElementById("newBookForm");
+    form.style.display = form.style.display==="none" ? "block" : "none";
+    if(form.style.display==="block") document.getElementById("newBookName").focus();
+  });
+
+  document.getElementById("btnCreateBook").addEventListener("click", ()=>{
+    const inp = document.getElementById("newBookName");
+    const key = createCustomBook(inp.value);
+    if(key){
+      inp.value="";
+      document.getElementById("newBookForm").style.display="none";
+      state.currentBookKey = key;
+      state.selectedPages = [];
+      renderBookPageScreen();
+    }
+  });
+
+  document.getElementById("btnCreatePage").addEventListener("click", ()=>{
+    const inp = document.getElementById("newPageName");
+    if(!state.currentBookKey || !isCustomBook(state.currentBookKey)) return;
+    const pageId = createCustomPage(state.currentBookKey, inp.value);
+    if(pageId){
+      inp.value="";
+      renderBookPageScreen();
+    }
+  });
+
+  // Vocab add screen
+  document.getElementById("newWordDe").addEventListener("input", ()=>{
+    pendingDuplicateForce=false;
+    document.getElementById("wordDuplicateWarning").style.display="none";
+  });
+  document.getElementById("newWordForeign").addEventListener("input", ()=>{
+    pendingDuplicateForce=false;
+    document.getElementById("wordDuplicateWarning").style.display="none";
+  });
+
+  document.getElementById("btnAddWord").addEventListener("click", ()=>{
+    const target = state.vocabAddTarget || {};
+    const de = document.getElementById("newWordDe").value;
+    const foreign = document.getElementById("newWordForeign").value;
+    const icon = document.getElementById("newWordIcon").value;
+    const warnEl = document.getElementById("wordDuplicateWarning");
+    const result = addVocabWord(target.bookKey, target.pageId, de, foreign, icon, pendingDuplicateForce);
+    if(result.ok){
+      pendingDuplicateForce = false;
+      warnEl.style.display="none";
+      document.getElementById("newWordDe").value="";
+      document.getElementById("newWordForeign").value="";
+      document.getElementById("newWordIcon").value="";
+      document.getElementById("newWordDe").focus();
+      renderVocabAddList();
+    } else if(result.reason==="duplicate"){
+      warnEl.textContent = `⚠️ Gibt es schon auf "${formatPageLabel(result.dup.pageId)}": ${result.dup.entry.de} – ${result.dup.entry.foreign}. Nochmal auf "Hinzufügen" klicken, um es trotzdem hinzuzufügen.`;
+      warnEl.style.display="block";
+      pendingDuplicateForce = true;
+    } else if(result.reason==="empty"){
+      warnEl.textContent = "Bitte beide Felder (Deutsch und Fremdsprache) ausfüllen.";
+      warnEl.style.display="block";
+      pendingDuplicateForce = false;
+    }
+  });
+
+  document.getElementById("btnImportCsv").addEventListener("click", ()=>{
+    const fileInput = document.getElementById("csvFileInput");
+    const resultEl = document.getElementById("csvImportResult");
+    const file = fileInput.files[0];
+    if(!file){
+      resultEl.textContent = "Bitte zuerst eine CSV-Datei auswählen.";
+      return;
+    }
+    const target = state.vocabAddTarget || {};
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCsvText(String(reader.result));
+      let added=0, duplicates=0, invalid=0;
+      for(const row of rows){
+        const [de, foreign, icon] = row;
+        if(!de || !foreign){ invalid++; continue; }
+        const res = addVocabWord(target.bookKey, target.pageId, de, foreign, icon, false);
+        if(res.ok) added++;
+        else if(res.reason==="duplicate") duplicates++;
+        else invalid++;
+      }
+      resultEl.textContent = `${added} Wörter hinzugefügt, ${duplicates} Duplikate übersprungen, ${invalid} ungültige Zeilen übersprungen.`;
+      fileInput.value="";
+      renderVocabAddList();
+    };
+    reader.onerror = () => {
+      resultEl.textContent = "Datei konnte nicht gelesen werden.";
+    };
+    reader.readAsText(file, "UTF-8");
+  });
+
+  document.getElementById("btnVocabAddDone").addEventListener("click", ()=>{
+    switchScreen("screen-bookpages");
+    renderBookPageScreen();
   });
 
   // Vocab pick
@@ -2737,6 +3312,10 @@ function setupEventListeners(){
 
   // Learn screen
   document.getElementById("btnAbortRound").addEventListener("click", ()=>{
+    // save whatever progress was made so far, unless nothing was answered yet
+    if(state.roundCards.length>0 && state.roundIndex>0){
+      finalizeRoundAndUpdateProfile();
+    }
     // abort -> direction screen
     switchScreen("screen-direction");
     renderDirectionScreen();
@@ -2821,6 +3400,8 @@ function setupEventListeners(){
       renderStartScreen();
     } else if(target==="screen-bookpages"){
       renderBookPageScreen();
+    } else if(target==="screen-vocab-add"){
+      renderVocabAddScreen();
     } else if(target==="screen-vocabpick"){
       renderVocabPickScreen();
     } else if(target==="screen-direction"){
@@ -2846,6 +3427,7 @@ function applyDarkMode(on){
 
 function initApp(){
   loadProfiles();
+  loadCustomBooks();
   let darkOn = false;
   try { darkOn = localStorage.getItem("vocabDarkMode")==="1"; } catch(e){ /* ignore */ }
   applyDarkMode(darkOn);
