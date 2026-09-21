@@ -2925,7 +2925,14 @@ function applyHint(){
 }
 
 function setLearnControlsDisabled(disabled){
-  document.getElementById("answerInput").disabled = disabled;
+  // The text field uses readOnly here, not disabled: disabling a focused
+  // field forces an immediate blur, which on iOS/iPadOS dismisses the
+  // on-screen keyboard -- and a later focus() call from inside the
+  // setTimeout that follows (see checkAnswer/revealSolution) happens
+  // outside the original tap gesture, so iOS refuses to reopen it. readOnly
+  // still blocks typing during the brief pause but keeps the field (and
+  // keyboard) focused throughout, so the keyboard never has to be reopened.
+  document.getElementById("answerInput").readOnly = disabled;
   document.getElementById("btnCheck").disabled = disabled;
   document.getElementById("btnHint").disabled = disabled;
   document.getElementById("btnSkipCard").disabled = disabled;
@@ -3320,6 +3327,16 @@ function setupEventListeners(){
     switchScreen("screen-direction");
     renderDirectionScreen();
   });
+  // Tapping any of these learn-screen buttons would otherwise steal focus
+  // from #answerInput -- on iOS/iPadOS that dismisses the on-screen
+  // keyboard, and it can't be reopened programmatically for the next card
+  // (see setLearnControlsDisabled). Blocking the default mousedown action
+  // keeps the input focused (and the keyboard up) through every tap; the
+  // click handler still fires normally afterward.
+  [ "btnHint", "btnSkipCard", "btnReveal", "btnCheck" ].forEach(id=>{
+    document.getElementById(id).addEventListener("mousedown",(e)=>e.preventDefault());
+  });
+
   document.getElementById("btnHint").addEventListener("click", ()=>{
     const card = state.roundCards[state.roundIndex];
     if(!card) return;
@@ -3349,6 +3366,10 @@ function setupEventListeners(){
   document.getElementById("answerInput").addEventListener("keydown",(e)=>{
     if(e.key==="Enter"){
       e.preventDefault();
+      // readOnly (see setLearnControlsDisabled) still lets keydown fire,
+      // unlike the old disabled state -- guard against re-submitting the
+      // same card while the correct/reveal pause animation is running.
+      if(document.getElementById("answerInput").readOnly) return;
       checkAnswer();
     }
   });
