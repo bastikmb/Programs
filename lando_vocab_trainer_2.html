@@ -1079,9 +1079,10 @@ body.dark-theme .level-up-banner {
 
   <!-- STATS SCREEN -->
   <div id="screen-stats" class="screen">
-    <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>📊 Statistik</span>
     </h2>
+    <div id="statsProfileLabel" class="section-sub" style="margin-bottom:1rem;"></div>
 
     <div class="stats-row">
       <div class="stats-card">
@@ -2414,12 +2415,16 @@ function finalizeRoundAndUpdateProfile(){
 /* render stats screen */
 function renderStatsScreen(){
   const prof=getCurrentProfileObj();
+  const labelEl = document.getElementById("statsProfileLabel");
   if(!prof){
+    labelEl.textContent = "";
     document.getElementById("statTotalPoints").textContent="0";
     document.getElementById("statTotalTime").textContent="0";
     document.getElementById("problemList").innerHTML="<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Keine Daten.</div>";
     return;
   }
+  const avatarPrefix = prof.avatar ? prof.avatar+" " : "";
+  labelEl.textContent = `Profil: ${avatarPrefix}${state.currentProfile}`;
   document.getElementById("statTotalPoints").textContent = String(prof.stats.totalPoints);
   const minTotal = (prof.stats.totalTimeSec/60).toFixed(1);
   document.getElementById("statTotalTime").textContent = String(minTotal);
