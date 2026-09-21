@@ -1028,6 +1028,7 @@ body.dark-theme .level-up-banner {
     </div>
 
     <div class="btn-row">
+      <button id="btnSameRoundAgain" class="btn">🔄 Gleiche Runde nochmal</button>
       <button id="btnOnlyHard" class="btn">Nur schwierige Wörter üben 🔁</button>
       <button id="btnSummaryToStart" class="btn-secondary btn">Zur Startseite 🏠</button>
     </div>
@@ -3379,6 +3380,15 @@ function setupEventListeners(){
     // go home
     switchScreen("screen-start");
     renderStartScreen();
+  });
+
+  document.getElementById("btnSameRoundAgain").addEventListener("click", ()=>{
+    // Replay the exact same word selection + direction as the round that
+    // just finished. state.vocabPool still holds it untouched -- only
+    // btnOnlyHard below overwrites it.
+    switchScreen("screen-learn");
+    buildRoundCardsFromVocab();
+    renderCurrentCard();
   });
 
   document.getElementById("btnOnlyHard").addEventListener("click", ()=>{
