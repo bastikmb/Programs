@@ -982,12 +982,12 @@ body.dark-theme .level-up-banner {
 
     <div class="dir-grid" id="directionOptions">
       <div class="dir-btn" data-dir="deToEn" tabindex="0" role="button" aria-pressed="false">
-        <div class="bold">Deutsch → Englisch</div>
-        <div class="muted">Du siehst Deutsch und musst Englisch tippen</div>
+        <div class="bold" id="dirLabelDeToForeign">Deutsch → Englisch</div>
+        <div class="muted" id="dirDescDeToForeign">Du siehst Deutsch und musst Englisch tippen</div>
       </div>
       <div class="dir-btn" data-dir="enToDe" tabindex="0" role="button" aria-pressed="false">
-        <div class="bold">Englisch → Deutsch</div>
-        <div class="muted">Du siehst Englisch und musst Deutsch tippen</div>
+        <div class="bold" id="dirLabelForeignToDe">Englisch → Deutsch</div>
+        <div class="muted" id="dirDescForeignToDe">Du siehst Englisch und musst Deutsch tippen</div>
       </div>
       <div class="dir-btn" data-dir="mixed" tabindex="0" role="button" aria-pressed="false">
         <div class="bold">Gemischt</div>
@@ -2840,6 +2840,11 @@ function isCustomBook(bookKey){
 }
 
 /* Returns [{key, book, custom}] for the given language, built-in books first. */
+const LANG_DISPLAY_NAMES = { en:"Englisch", la:"Latein", fr:"Französisch" };
+function getLangDisplayName(lang){
+  return LANG_DISPLAY_NAMES[lang] || lang;
+}
+
 function getBooksForLang(lang, includeArchived){
   const list=[];
   for(const [key,book] of Object.entries(BOOKS)){
@@ -3420,7 +3425,16 @@ function buildRoundCardsFromVocab(){
 }
 
 function normalizeAnswer(str){
-  return str.trim().toLowerCase().replace(/\s+/g," ");
+  return str.trim().toLowerCase().replace(/\s+/g," ")
+    // Latin macrons (long vowels) aren't on any keyboard, so they must not
+    // be required to get an answer right -- strip them for comparison only,
+    // the stored/displayed vocab keeps the macron for correct pronunciation.
+    .replace(/[āăâàáä]/g,"a")
+    .replace(/[ēĕêèéë]/g,"e")
+    .replace(/[īĭîìíï]/g,"i")
+    .replace(/[ōŏôòóö]/g,"o")
+    .replace(/[ūŭûùúü]/g,"u")
+    .replace(/[ȳŷỳýÿ]/g,"y");
 }
 
 /* Some vocab entries store alternative phrasings as "A / B".
@@ -4160,6 +4174,12 @@ function renderVocabAddScreen(){
 }
 
 function renderDirectionScreen(){
+  const langName = getLangDisplayName(state.currentLang);
+  document.getElementById("dirLabelDeToForeign").textContent = `Deutsch → ${langName}`;
+  document.getElementById("dirDescDeToForeign").textContent = `Du siehst Deutsch und musst ${langName} tippen`;
+  document.getElementById("dirLabelForeignToDe").textContent = `${langName} → Deutsch`;
+  document.getElementById("dirDescForeignToDe").textContent = `Du siehst ${langName} und musst Deutsch tippen`;
+
   const dirDiv=document.getElementById("directionOptions");
   // highlight selection
   Array.from(dirDiv.querySelectorAll(".dir-btn")).forEach(btn=>{
