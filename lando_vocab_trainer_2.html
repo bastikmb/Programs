@@ -365,7 +365,7 @@ body.dark-theme .hist-badge.wrong {
 .learn-expected-wrapper {
   display:flex;
   flex-wrap:wrap;
-  gap:0.5rem;
+  gap:1.1rem;
   margin:1rem 0;
 }
 .word-block {
@@ -915,17 +915,21 @@ body.dark-theme .level-up-banner {
     </div>
 
     <div id="profileCustomizeBlock" class="section-block" style="display:none;">
-      <div class="section-title">Dein Profil anpassen</div>
-      <div class="section-sub" style="margin-bottom:0.5rem;">Avatar</div>
-      <div id="avatarPicker" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
-      <div class="section-sub" style="margin-bottom:0.5rem;">Farbe</div>
-      <div id="themePicker" class="flex-row-wrap"></div>
+      <details>
+        <summary class="section-title" style="cursor:pointer;">🎨 Profil anpassen (Avatar &amp; Farbe)</summary>
+        <div style="margin-top:0.75rem;">
+          <div class="section-sub" style="margin-bottom:0.5rem;">Avatar</div>
+          <div id="avatarPicker" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
+          <div class="section-sub" style="margin-bottom:0.5rem;">Farbe</div>
+          <div id="themePicker" class="flex-row-wrap"></div>
+        </div>
+      </details>
     </div>
 
     <div class="section-block">
       <div class="section-title">2. Sprache wählen</div>
       <div id="languageList" class="flex-row-wrap"></div>
-      <div class="section-sub">Englisch bringt fertige Vokabeln mit. Für Latein legst du deine eigenen Bücher/Seiten/Vokabeln an.</div>
+      <div class="section-sub">Englisch und Latein bringen fertige Vokabeln mit. Du kannst dir aber auch jederzeit eigene Bücher/Seiten/Vokabeln anlegen.</div>
     </div>
 
     <div class="btn-row">
@@ -960,6 +964,10 @@ body.dark-theme .level-up-banner {
 
     <div class="section-block">
       <div class="section-title">Seiten (Mehrfachauswahl möglich)</div>
+      <div class="btn-row" style="margin-bottom:0.6rem;">
+        <button id="btnPagesSelectAll" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.5rem 0.8rem;">✔ Alle anwählen</button>
+        <button id="btnPagesDeselectAll" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.5rem 0.8rem;">✖ Alle abwählen</button>
+      </div>
       <div id="pagesList" class="flex-col"></div>
       <div id="newPageFormWrap" style="display:none;margin-top:0.6rem;">
         <div class="inline-input-btn">
@@ -1095,7 +1103,7 @@ body.dark-theme .level-up-banner {
 
       <div class="learn-input-row">
         <input id="answerInput" type="text" autocomplete="off" />
-        <button id="btnFocusInput" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">Tastatur</button>
+        <button id="btnFocusInput" class="btn-secondary btn" title="Tastatur wieder einblenden" aria-label="Tastatur wieder einblenden" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.7rem;opacity:0.55;">⌨️</button>
         <button id="btnHint" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">Tipp (-1)</button>
         <button id="btnReveal" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">🔎 Lösung zeigen</button>
         <button id="btnCheck" class="btn btn-check">✓ Prüfen</button>
@@ -1150,6 +1158,7 @@ body.dark-theme .level-up-banner {
       <span>📊 Statistik</span>
     </h2>
     <div id="statsProfileLabel" class="section-sub" style="margin-bottom:1rem;"></div>
+    <div id="statsRoundInProgressNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
 
     <div class="stats-row">
       <div class="stats-card">
@@ -1644,7 +1653,7 @@ const BOOKS = {
     lang: "en",
     name: "Camden Town 6. Klasse (Gymnasium)",
     pages: {
-      "CamdenTown6-222-226": [
+      "CamdenTown6-222": [
         {de:"Postkarte", foreign:"postcard", icon:"💌", example:"Let's write Jo a postcard from our holiday."},
         {de:"arbeiten", foreign:"to work", icon:"💼", example:"Mrs Brown works from 9 to 5."},
         {de:"bleiben", foreign:"to stay", icon:"🏠", example:"We are staying at a hotel."},
@@ -1675,7 +1684,9 @@ const BOOKS = {
         {de:"Stell dir vor!", foreign:"Guess what!", icon:"❗"},
         {de:"regnerisch", foreign:"rainy", icon:"🌧️"},
         {de:"trocken", foreign:"dry", icon:"☀️"},
-        {de:"Spaß", foreign:"fun (no pl)", icon:"🎉", example:"Hope you're having fun!"},
+        {de:"Spaß", foreign:"fun (no pl)", icon:"🎉", example:"Hope you're having fun!"}
+      ],
+      "CamdenTown6-223": [
         {de:"absuchen (nach)", foreign:"to scan (for)", icon:"🔍"},
         {de:"(etw etw) hinzufügen", foreign:"to add (sth to sth)", icon:"➕"},
         {de:"Burg / Schloss", foreign:"castle", icon:"🏰", example:"My parents want to visit an old castle."},
@@ -1709,7 +1720,9 @@ const BOOKS = {
         {de:"Drehort", foreign:"filming location", icon:"🎬"},
         {de:"Römer/in / römisch", foreign:"Roman", icon:"🏛️"},
         {de:"Schwärmerei", foreign:"crush (informal)", icon:"💘"},
-        {de:"sehen", foreign:"to see", icon:"👀", example:"Sorry, I can't come to your party because I have to work. – I see."},
+        {de:"sehen", foreign:"to see", icon:"👀", example:"Sorry, I can't come to your party because I have to work. – I see."}
+      ],
+      "CamdenTown6-224": [
         {de:"Küste", foreign:"coast", icon:"🏖️", example:"Dover is on the coast."},
         {de:"jdm eine Nachricht schicken", foreign:"to message sb", icon:"💬", example:"Is Lea coming to the party? – I don't know. I can message her."},
         {de:"war / waren", foreign:"was, were", icon:"⏳", example:"Jo was happy. Tia and Leo were happy, too."},
@@ -1748,7 +1761,9 @@ const BOOKS = {
         {de:"Was für ein(e) ...!", foreign:"What a/an ...!", icon:"❗"},
         {de:"jubeln", foreign:"to cheer", icon:"🎉"},
         {de:"beide", foreign:"both", icon:"✌️", example:"John and Anna both wanted to go swimming."},
-        {de:"aus etw herauskommen", foreign:"to get out of sth", icon:"🚪"},
+        {de:"aus etw herauskommen", foreign:"to get out of sth", icon:"🚪"}
+      ],
+      "CamdenTown6-225": [
         {de:"alles", foreign:"everything", icon:"🌍", example:"Everything was fine but then something went wrong."},
         {de:"schiefgehen", foreign:"to go wrong", icon:"❌"},
         {de:"plötzlich", foreign:"suddenly", icon:"⚡", example:"Suddenly Lara lost her balance."},
@@ -1789,7 +1804,9 @@ const BOOKS = {
         {de:"Nachricht", foreign:"message", icon:"✉️", example:"Did you read my message?"},
         {de:"dumm", foreign:"stupid", icon:"🙄"},
         {de:"verlassen", foreign:"to leave", icon:"🚪", example:"You mustn't leave the classroom during the lesson."},
-        {de:"(die) meisten", foreign:"most", icon:"📊", example:"Most people like chocolate."},
+        {de:"(die) meisten", foreign:"most", icon:"📊", example:"Most people like chocolate."}
+      ],
+      "CamdenTown6-226": [
         {de:"(um etw) bitten", foreign:"to ask (for sth)", icon:"🙏", example:"Can I ask you for some help?"},
         {de:"umher / um", foreign:"around", icon:"🔄", example:"Pia played around with her phone in class."},
         {de:"online gehen", foreign:"to go online", icon:"💻", example:"I can use my phone to go online."},
@@ -1812,7 +1829,7 @@ const BOOKS = {
         {de:"(jdm etw) präsentieren", foreign:"to present (sth to sb)", icon:"📊", example:"Would you like to present your ideas in class?"},
         {de:"ernst", foreign:"serious", icon:"😐", example:"We forgot our tickets. – That's a serious problem."}
       ],
-      "CamdenTown6-227-231": [
+      "CamdenTown6-227": [
         {de:"Feier", foreign:"celebration", icon:"🎉", example:"Everything is ready for the big celebration."},
         {de:"Fest", foreign:"festival", icon:"🎊", example:"My favourite festival is Easter."},
         {de:"(er)raten", foreign:"to guess", icon:"🤔", example:"Guess what happened at my birthday party!"},
@@ -1854,7 +1871,9 @@ const BOOKS = {
         {de:"jüdisch", foreign:"Jewish", icon:"✡️"},
         {de:"Volk", foreign:"people", icon:"👥", example:"The Jewish people fought for their land."},
         {de:"(be)kämpfen", foreign:"to fight", icon:"⚔️"},
-        {de:"danken", foreign:"to thank", icon:"🙏", example:"Don't forget to thank your grandparents for your present."},
+        {de:"danken", foreign:"to thank", icon:"🙏", example:"Don't forget to thank your grandparents for your present."}
+      ],
+      "CamdenTown6-228": [
         {de:"Gott", foreign:"God", icon:"🙏"},
         {de:"Tempel", foreign:"temple", icon:"🛕"},
         {de:"beten", foreign:"to pray", icon:"🙏"},
@@ -1892,7 +1911,9 @@ const BOOKS = {
         {de:"könnte", foreign:"might", icon:"💭"},
         {de:"scheinen", foreign:"to seem", icon:"🙂", example:"He seems happy."},
         {de:"erröten", foreign:"to blush", icon:"😳"},
-        {de:"versprechen", foreign:"to promise", icon:"🤞", example:"I promise not to tell anyone."},
+        {de:"versprechen", foreign:"to promise", icon:"🤞", example:"I promise not to tell anyone."}
+      ],
+      "CamdenTown6-229": [
         {de:"süß / niedlich", foreign:"cute", icon:"🥰"},
         {de:"auf etw scharf sein", foreign:"to be keen on sth", icon:"😍"},
         {de:"Angeber/in", foreign:"showoff", icon:"😎"},
@@ -1929,7 +1950,9 @@ const BOOKS = {
         {de:"Struktur", foreign:"structure", icon:"🏗️"},
         {de:"(jdn) grüßen", foreign:"to say hello (to sb)", icon:"👋", example:"Say hello to your parents from me."},
         {de:"Vorschlag", foreign:"suggestion", icon:"💡", example:"These are my ideas. Do you have any suggestions?"},
-        {de:"sich verabschieden", foreign:"to say goodbye (to sb)", icon:"👋", example:"They are saying goodbye."},
+        {de:"sich verabschieden", foreign:"to say goodbye (to sb)", icon:"👋", example:"They are saying goodbye."}
+      ],
+      "CamdenTown6-230": [
         {de:"denken an", foreign:"to think of", icon:"🤔", example:"What do you think of the film?"},
         {de:"nervig", foreign:"annoying", icon:"😠", example:"My little sister can be really annoying."},
         {de:"peinlich", foreign:"embarrassing", icon:"😳", example:"I forgot your birthday. How embarrassing!"},
@@ -1964,7 +1987,9 @@ const BOOKS = {
         {de:"weinen", foreign:"to cry", icon:"😢", example:"The baby cried all night."},
         {de:"Türklingel", foreign:"doorbell", icon:"🔔"},
         {de:"üblich", foreign:"usual", icon:"🔁"},
-        {de:"in Richtung", foreign:"toward(s)", icon:"➡️", example:"Hamida was more friendly than usual towards Rajiv."},
+        {de:"in Richtung", foreign:"toward(s)", icon:"➡️", example:"Hamida was more friendly than usual towards Rajiv."}
+      ],
+      "CamdenTown6-231": [
         {de:"explodieren", foreign:"to go off", icon:"💥"},
         {de:"sofort", foreign:"at once", icon:"⚡"},
         {de:"am Anfang", foreign:"(in the) beginning", icon:"🏁"},
@@ -1975,7 +2000,7 @@ const BOOKS = {
         {de:"zeichnen", foreign:"to draw", icon:"🎨", example:"My little sister drew a picture for our parents."},
         {de:"Ende", foreign:"ending", icon:"🔚", example:"Many stories have a happy ending."}
       ],
-      "CamdenTown6-232-236": [
+      "CamdenTown6-232": [
         {de:"Sehenswürdigkeit", foreign:"sight", icon:"🏛️", example:"Big Ben is a famous London sight."},
         {de:"Führung", foreign:"tour", icon:"🚌", example:"We went on a tour of the castle."},
         {de:"Glocke", foreign:"bell", icon:"🔔"},
@@ -2015,7 +2040,9 @@ const BOOKS = {
         {de:"atemberaubend", foreign:"spectacular", icon:"🤩", example:"The show was spectacular! I really enjoyed it."},
         {de:"Tabelle", foreign:"grid", icon:"🔢", example:"Fill in the grid."},
         {de:"jede(r,s)", foreign:"each", icon:"☑️", example:"Each pupil gets a textbook."},
-        {de:"Mitglied", foreign:"member", icon:"🪪"},
+        {de:"Mitglied", foreign:"member", icon:"🪪"}
+      ],
+      "CamdenTown6-233": [
         {de:"Eröffnung", foreign:"opening", icon:"🔓", example:"The café has different opening times on Sunday."},
         {de:"Überraschung", foreign:"surprise", icon:"🎉", example:"Don't tell Susan about the party. It's a surprise."},
         {de:"Gehen", foreign:"walking", icon:"🚶"},
@@ -2044,7 +2071,9 @@ const BOOKS = {
         {de:"sich verirren", foreign:"to get lost", icon:"🗺️", example:"Tom got lost on his way to the museum."},
         {de:"zerstören", foreign:"to ruin", icon:"💔"},
         {de:"laut vorlesen", foreign:"to read out", icon:"📖", example:"The teacher asked Robert to read out his work in class."},
-        {de:"jemals", foreign:"ever", icon:"⏳", example:"Have you ever been to Buckingham Palace?"},
+        {de:"jemals", foreign:"ever", icon:"⏳", example:"Have you ever been to Buckingham Palace?"}
+      ],
+      "CamdenTown6-234": [
         {de:"Geheimnis", foreign:"secret", icon:"🤫"},
         {de:"verschenken / verraten", foreign:"to give away", icon:"🎁"},
         {de:"Redner/in / Anrufer/in", foreign:"speaker", icon:"🗣️"},
@@ -2082,7 +2111,9 @@ const BOOKS = {
         {de:"bis", foreign:"till (= until)", icon:"⏳", example:"Wait there till I find you."},
         {de:"Zeichen / Schild", foreign:"sign", icon:"🪧"},
         {de:"Anweisungen / Wegbeschreibung", foreign:"directions", icon:"🧭"},
-        {de:"Strecke / Route", foreign:"route", icon:"🗺️", example:"Is this the fastest route to the museum?"},
+        {de:"Strecke / Route", foreign:"route", icon:"🗺️", example:"Is this the fastest route to the museum?"}
+      ],
+      "CamdenTown6-235": [
         {de:"(Land)karte / (Stadt)plan", foreign:"map", icon:"🗺️", example:"I followed the map but I still got lost."},
         {de:"mindestens", foreign:"at least", icon:"➕", example:"It's raining. At least we can watch a film."},
         {de:"(Fernseh)serie", foreign:"series", icon:"📺"},
@@ -2113,13 +2144,15 @@ const BOOKS = {
         {de:"positiv", foreign:"positive", icon:"➕"},
         {de:"negativ", foreign:"negative", icon:"➖"},
         {de:"Punkt", foreign:"point", icon:"📍"},
-        {de:"Meinung", foreign:"opinion", icon:"💭", example:"Give reasons for your opinion."},
+        {de:"Meinung", foreign:"opinion", icon:"💭", example:"Give reasons for your opinion."}
+      ],
+      "CamdenTown6-236": [
         {de:"(egal) ob", foreign:"whether", icon:"❓"},
         {de:"Dorf", foreign:"village", icon:"🏘️"},
         {de:"beinhalten", foreign:"to include", icon:"➕", example:"The tour includes Big Ben and the London Eye."},
         {de:"redigieren / bearbeiten", foreign:"to edit", icon:"✏️", example:"Please edit your text to make it better."}
       ],
-      "CamdenTown6-237-241": [
+      "CamdenTown6-237": [
         {de:"mitmachen", foreign:"to join in", icon:"🙋", example:"Join in our game!"},
         {de:"von / per", foreign:"by", icon:"✉️", example:"Send us your article by email."},
         {de:"Turnhalle", foreign:"gym", icon:"🏋️", example:"We play basketball in the gym."},
@@ -2154,7 +2187,9 @@ const BOOKS = {
         {de:"Wohltätigkeitsorganisation", foreign:"charity", icon:"❤️"},
         {de:"Chor", foreign:"choir", icon:"🎶"},
         {de:"werden", foreign:"will", icon:"➡️", example:"I will help you with your homework."},
-        {de:"(Kranken)schwester", foreign:"nurse", icon:"👩‍⚕️", example:"My brother works at a hospital. He is a nurse."},
+        {de:"(Kranken)schwester", foreign:"nurse", icon:"👩‍⚕️", example:"My brother works at a hospital. He is a nurse."}
+      ],
+      "CamdenTown6-238": [
         {de:"Architekt/in", foreign:"architect", icon:"📐", example:"Architects plan buildings."},
         {de:"Bauarbeiter/in", foreign:"builder", icon:"👷", example:"Fiona's father is a builder."},
         {de:"Koch/Köchin", foreign:"cook", icon:"👨‍🍳", example:"A cook makes delicious food for other people."},
@@ -2197,7 +2232,9 @@ const BOOKS = {
         {de:"Zigarette", foreign:"cigarette", icon:"🚬"},
         {de:"(be)folgen", foreign:"to follow", icon:"👣", example:"Carl never follows the rules."},
         {de:"Aufgabe", foreign:"task", icon:"📋", example:"This task is really difficult."},
-        {de:"Paar", foreign:"pair", icon:"👫"},
+        {de:"Paar", foreign:"pair", icon:"👫"}
+      ],
+      "CamdenTown6-239": [
         {de:"(irgend)etwas", foreign:"anything", icon:"❓"},
         {de:"unten", foreign:"below", icon:"⬇️", example:"Listen again and complete the sentences below."},
         {de:"fast", foreign:"almost", icon:"➰", example:"Have you finished your homework? – Almost. I need five more minutes."},
@@ -2238,7 +2275,9 @@ const BOOKS = {
         {de:"die Augen verdrehen", foreign:"to roll one's eyes", icon:"🙄"},
         {de:"nett", foreign:"kind", icon:"😊", example:"Be kind to others."},
         {de:"Schatten", foreign:"shadow", icon:"🌑"},
-        {de:"ewig", foreign:"forever", icon:"♾️", example:"I like this place. I could stay here forever."},
+        {de:"ewig", foreign:"forever", icon:"♾️", example:"I like this place. I could stay here forever."}
+      ],
+      "CamdenTown6-240": [
         {de:"flüstern", foreign:"to whisper", icon:"🤫", example:"You can't talk in the library, but you can whisper."},
         {de:"nach oben", foreign:"up", icon:"⬆️", example:"Sam ran up to the stage."},
         {de:"Arm", foreign:"arm", icon:"💪", example:"Gillian put her arm around Anastasia."},
@@ -2277,7 +2316,9 @@ const BOOKS = {
         {de:"anprobieren", foreign:"to try on", icon:"👕", example:"I always try on clothes before I buy them."},
         {de:"angespannt", foreign:"tense", icon:"😬"},
         {de:"in der Nähe sein", foreign:"to be around", icon:"📍", example:"Where's Linda? – She isn't around."},
-        {de:"schließlich", foreign:"finally", icon:"🏁", example:"Finally, everyone was ready."},
+        {de:"schließlich", foreign:"finally", icon:"🏁", example:"Finally, everyone was ready."}
+      ],
+      "CamdenTown6-241": [
         {de:"verärgert", foreign:"annoyed", icon:"😠", example:"Toby broke my pen. I'm really annoyed."},
         {de:"Mikrofon", foreign:"microphone", icon:"🎤"},
         {de:"verschieben", foreign:"to postpone", icon:"📅"},
@@ -2290,7 +2331,7 @@ const BOOKS = {
         {de:"(sich) verbessern", foreign:"to improve", icon:"📈"},
         {de:"nötig / notwendig", foreign:"necessary", icon:"❗", example:"You don't have to help me. It's not necessary."}
       ],
-      "CamdenTown6-242-246": [
+      "CamdenTown6-242": [
         {de:"Jahr", foreign:"year", icon:"📅", example:"Secondary school lasts for five years."},
         {de:"einen Ausflug machen", foreign:"to go on a trip", icon:"🚌", example:"Many people go on a trip during the summer holidays."},
         {de:"Heideland", foreign:"moor", icon:"🌾"},
@@ -2329,7 +2370,9 @@ const BOOKS = {
         {de:"Verschwendung / Abfall", foreign:"waste (no pl)", icon:"🗑️"},
         {de:"organisch / Bio-", foreign:"organic", icon:"🌱", example:"Organic food is usually more expensive."},
         {de:"Natur", foreign:"nature (no pl)", icon:"🌳", example:"Animals and plants are part of nature."},
-        {de:"Plastik", foreign:"plastic", icon:"♻️", example:"Sam doesn't use plastic bottles."},
+        {de:"Plastik", foreign:"plastic", icon:"♻️", example:"Sam doesn't use plastic bottles."}
+      ],
+      "CamdenTown6-243": [
         {de:"Umwelt", foreign:"environment", icon:"🌍", example:"What can we do to help the environment?"},
         {de:"Mahlzeit", foreign:"meal", icon:"🍽️", example:"Dinner is my favourite meal."},
         {de:"Gemüse", foreign:"vegetable", icon:"🥕", example:"You can't have dessert until you have eaten your vegetables."},
@@ -2369,7 +2412,9 @@ const BOOKS = {
         {de:"studieren / erforschen", foreign:"to study", icon:"📚", example:"Study the pictures to find out how the story ends."},
         {de:"retten / sparen", foreign:"to save", icon:"💾", example:"Switch off the lights to save energy."},
         {de:"Energie", foreign:"energy (no pl)", icon:"⚡"},
-        {de:"Verwendung / Verbrauch", foreign:"use", icon:"🔧", example:"We should try to reduce the use of energy."},
+        {de:"Verwendung / Verbrauch", foreign:"use", icon:"🔧", example:"We should try to reduce the use of energy."}
+      ],
+      "CamdenTown6-244": [
         {de:"am Abend", foreign:"in the evening", icon:"🌆", example:"In the evening we like to watch films."},
         {de:"am Anfang", foreign:"at the beginning", icon:"🏁", example:"Let's start at the beginning."},
         {de:"auf dem Weg sein", foreign:"to be on one's way", icon:"🚶", example:"Sorry I'm late, I'm on my way now!"},
@@ -2410,7 +2455,9 @@ const BOOKS = {
         {de:"Medizin", foreign:"medicine (no pl)", icon:"💊", example:"When you are sick, you have to take medicine."},
         {de:"Taschenmesser", foreign:"pocket knife", icon:"🔪", example:"You are not allowed to bring a pocket knife on a school trip."},
         {de:"abholen", foreign:"to pick up", icon:"🚗", example:"Harry has to pick up the kids from school."},
-        {de:"Getränk", foreign:"drink", icon:"🥤", example:"Would you like a drink of water?"},
+        {de:"Getränk", foreign:"drink", icon:"🥤", example:"Would you like a drink of water?"}
+      ],
+      "CamdenTown6-245": [
         {de:"Taschengeld", foreign:"pocket money", icon:"💰", example:"Zoe gives her children pocket money every week."},
         {de:"sich verhalten / benehmen", foreign:"to behave", icon:"🙂", example:"Don't behave like a child."},
         {de:"Erfolg", foreign:"success (no pl)", icon:"🏆", example:"My plan was a success."},
@@ -2442,7 +2489,9 @@ const BOOKS = {
         {de:"dreckig", foreign:"dirty", icon:"🟤", example:"After the football game my shoes were dirty."},
         {de:"Mülleimer", foreign:"bin", icon:"🗑️"},
         {de:"jdm einen Streich spielen", foreign:"to play a trick on sb", icon:"🃏"},
-        {de:"scheußlich / übel", foreign:"nasty", icon:"🤢", example:"Don't be nasty to your brother."},
+        {de:"scheußlich / übel", foreign:"nasty", icon:"🤢", example:"Don't be nasty to your brother."}
+      ],
+      "CamdenTown6-246": [
         {de:"halten", foreign:"to hold", icon:"✋", example:"What are you holding in your hands?"},
         {de:"grausam", foreign:"cruel", icon:"😈", example:"That was a cruel and mean joke."},
         {de:"Lachen", foreign:"laugh (no pl)", icon:"😂"},
@@ -2455,7 +2504,7 @@ const BOOKS = {
         {de:"Anfang / Beginn", foreign:"start", icon:"🏁"},
         {de:"letzte(r,s) / entscheidend", foreign:"final", icon:"🏁"}
       ],
-      "CamdenTown6-247-251": [
+      "CamdenTown6-247": [
         {de:"Kurs", foreign:"course", icon:"📚", example:"My grandpa is taking a computer course."},
         {de:"Spaß", foreign:"fun (no pl)", icon:"🎉", example:"It was a fun party!"},
         {de:"ausprobieren", foreign:"to try out", icon:"🧪", example:"Can I try it out before I buy it?"},
@@ -2494,7 +2543,9 @@ const BOOKS = {
         {de:"stolz", foreign:"proud", icon:"😌", example:"Tia won the race. She is very proud."},
         {de:"Krebs(geschwulst)", foreign:"cancer", icon:"🎗️"},
         {de:"(ein)sammeln", foreign:"to raise", icon:"💰", example:"The students are raising money to help fight cancer."},
-        {de:"direkt / sofort", foreign:"directly", icon:"➡️"},
+        {de:"direkt / sofort", foreign:"directly", icon:"➡️"}
+      ],
+      "CamdenTown6-248": [
         {de:"Startlinie", foreign:"starting line", icon:"🏁"},
         {de:"Ziellinie", foreign:"finishing line", icon:"🏁"},
         {de:"Läufer/in", foreign:"runner", icon:"🏃", example:"Lisa is a very fast runner."},
@@ -2535,7 +2586,9 @@ const BOOKS = {
         {de:"Rakete", foreign:"rocket", icon:"🚀"},
         {de:"jedoch", foreign:"however", icon:"↔️"},
         {de:"vorbeigehen / vergehen", foreign:"to go by", icon:"⏳", example:"Ten minutes went by."},
-        {de:"erscheinen", foreign:"to show up", icon:"👋", example:"He wanted to come to the party but he didn't show up."},
+        {de:"erscheinen", foreign:"to show up", icon:"👋", example:"He wanted to come to the party but he didn't show up."}
+      ],
+      "CamdenTown6-249": [
         {de:"sich beklagen (über)", foreign:"to complain (about)", icon:"😤", example:"Emily complained about the terrible food."},
         {de:"verteidigen", foreign:"to defend", icon:"🛡️", example:"Gillian defended her friend Rajiv."},
         {de:"falsch", foreign:"wrong", icon:"❌", example:"What you did was wrong."},
@@ -2574,7 +2627,9 @@ const BOOKS = {
         {de:"Taschendieb/in", foreign:"pickpocket", icon:"🕵️"},
         {de:"hell", foreign:"bright", icon:"☀️", example:"It was a bright and sunny morning."},
         {de:"Schmetterling", foreign:"butterfly", icon:"🦋"},
-        {de:"exotisch", foreign:"exotic", icon:"🌺", example:"We are going on an exotic holiday."},
+        {de:"exotisch", foreign:"exotic", icon:"🌺", example:"We are going on an exotic holiday."}
+      ],
+      "CamdenTown6-250": [
         {de:"Insel", foreign:"island", icon:"🏝️", example:"It feels like we are on an exotic island."},
         {de:"sich fühlen", foreign:"to feel", icon:"🙂", example:"It feels like we are on an exotic island."},
         {de:"Ich bin am Verhungern!", foreign:"I'm starving!", icon:"🍽️"},
@@ -2620,7 +2675,7 @@ const BOOKS = {
     lang: "la",
     name: "Pontes (Gesamtband) – Salve bis Lektion 7",
     pages: {
-      "Pontes-002-004": [
+      "Pontes-002": [
         {de:"Sei gegrüßt!", foreign:"Salvē!", icon:"👋"},
         {de:"der Vater", foreign:"pater", icon:"👨"},
         {de:"die Mutter", foreign:"māter", icon:"👩"},
@@ -2632,7 +2687,9 @@ const BOOKS = {
         {de:"das Hündchen", foreign:"catella", icon:"🐶"},
         {de:"hier", foreign:"hīc", icon:"📍"},
         {de:"sein; es gibt", foreign:"esse", icon:"🟰"},
-        {de:"der Herr, der Hausherr", foreign:"dominus", icon:"🎩"},
+        {de:"der Herr, der Hausherr", foreign:"dominus", icon:"🎩"}
+      ],
+      "Pontes-003": [
         {de:"rufen", foreign:"clāmāre", icon:"📣"},
         {de:"kommen", foreign:"venīre", icon:"🚶"},
         {de:"die Hausherrin", foreign:"domina", icon:"👑"},
@@ -2650,7 +2707,9 @@ const BOOKS = {
         {de:"der Lärm, das Geschrei, der Ruf", foreign:"clāmor", icon:"📢"},
         {de:"hören, zuhören", foreign:"audīre", icon:"👂"},
         {de:"fragen", foreign:"rogāre", icon:"❓"},
-        {de:"was?", foreign:"quid?", icon:"❔"},
+        {de:"was?", foreign:"quid?", icon:"❔"}
+      ],
+      "Pontes-004": [
         {de:"suchen", foreign:"quaerere", icon:"🔍"},
         {de:"nicht", foreign:"nōn", icon:"🚫"},
         {de:"sehen", foreign:"vidēre", icon:"👀"},
@@ -2665,7 +2724,7 @@ const BOOKS = {
         {de:"lachen", foreign:"rīdēre", icon:"😂"},
         {de:"halten", foreign:"tenēre", icon:"✋"}
       ],
-      "Pontes-005-007": [
+      "Pontes-005": [
         {de:"lieben, mögen", foreign:"amāre", icon:"❤️"},
         {de:"die Schwester", foreign:"soror", icon:"👧"},
         {de:"antworten", foreign:"respondēre", icon:"💬"},
@@ -2675,7 +2734,9 @@ const BOOKS = {
         {de:"das Mädchen", foreign:"puella", icon:"👧"},
         {de:"der Bruder", foreign:"frāter", icon:"👦"},
         {de:"deshalb", foreign:"itaque", icon:"➡️"},
-        {de:"die Küche", foreign:"culīna", icon:"🍳"},
+        {de:"die Küche", foreign:"culīna", icon:"🍳"}
+      ],
+      "Pontes-006": [
         {de:"müssen", foreign:"dēbēre", icon:"✅"},
         {de:"nicht dürfen", foreign:"nōn dēbēre", icon:"🚫"},
         {de:"bis jetzt, noch", foreign:"adhūc", icon:"⏳"},
@@ -2697,7 +2758,7 @@ const BOOKS = {
         {de:"vernachlässigen, nicht beachten", foreign:"neglegere", icon:"🙈"},
         {de:"etw. weiter tun, fortsetzen", foreign:"pergere", icon:"⏩"}
       ],
-      "Pontes-008-009": [
+      "Pontes-008": [
         {de:"das Pferd", foreign:"equus", icon:"🐴"},
         {de:"ich / mich", foreign:"ego / mē", icon:"🙋"},
         {de:"du / dich", foreign:"tū / tē", icon:"👉"},
@@ -2718,7 +2779,9 @@ const BOOKS = {
         {de:"in ... hinein", foreign:"in", icon:"➡️"},
         {de:"eilen, sich beeilen", foreign:"properāre", icon:"🏃"},
         {de:"anweisen, unterrichten", foreign:"instruere", icon:"📋"},
-        {de:"vor", foreign:"ante", icon:"⏮️"},
+        {de:"vor", foreign:"ante", icon:"⏮️"}
+      ],
+      "Pontes-009": [
         {de:"tun, handeln", foreign:"agere", icon:"🎬"},
         {de:"zu ... hin", foreign:"ad", icon:"➡️"},
         {de:"gut", foreign:"bene", icon:"👍"},
@@ -2731,7 +2794,7 @@ const BOOKS = {
         {de:"anflehen", foreign:"obsecrāre", icon:"🙏"},
         {de:"also", foreign:"igitur", icon:"➡️"}
       ],
-      "Pontes-010-012": [
+      "Pontes-010": [
         {de:"die Schule", foreign:"schola", icon:"🏫"},
         {de:"führen", foreign:"dūcere", icon:"🧭"},
         {de:"rufen", foreign:"vocāre", icon:"📣"},
@@ -2740,7 +2803,9 @@ const BOOKS = {
         {de:"sich hinsetzen", foreign:"cōnsīdere", icon:"🪑"},
         {de:"und (angehängt)", foreign:"-que", icon:"➕"},
         {de:"haben, halten", foreign:"habēre", icon:"🤲"},
-        {de:"(zeigt eine Frage an)", foreign:"-ne?", icon:"❔"},
+        {de:"(zeigt eine Frage an)", foreign:"-ne?", icon:"❔"}
+      ],
+      "Pontes-011": [
         {de:"das Wachstäfelchen", foreign:"tabula", icon:"📝"},
         {de:"der Schüler", foreign:"discipulus", icon:"🧑‍🎓"},
         {de:"die Schülerin", foreign:"discipula", icon:"🧑‍🎓"},
@@ -2759,12 +2824,14 @@ const BOOKS = {
         {de:"wer?", foreign:"quis?", icon:"❓"},
         {de:"zeigen", foreign:"mōnstrāre", icon:"👉"},
         {de:"nach Hause", foreign:"domum", icon:"🏠"},
-        {de:"bestrafen", foreign:"pūnīre", icon:"⚡"},
+        {de:"bestrafen", foreign:"pūnīre", icon:"⚡"}
+      ],
+      "Pontes-012": [
         {de:"tragen", foreign:"portāre", icon:"🎒"},
         {de:"unterrichten, lehren", foreign:"docēre", icon:"🧑‍🏫"},
         {de:"deshalb, also", foreign:"ergō", icon:"➡️"}
       ],
-      "Pontes-013-014": [
+      "Pontes-013": [
         {de:"das Forum, der Marktplatz", foreign:"forum", icon:"🏛️"},
         {de:"römisch", foreign:"Rōmānus", icon:"🏛️"},
         {de:"viele", foreign:"multī", icon:"👥"},
@@ -2776,7 +2843,9 @@ const BOOKS = {
         {de:"nahe bei", foreign:"prope", icon:"📍"},
         {de:"der Mensch, der Mann", foreign:"homō", icon:"🧑"},
         {de:"erblicken, sehen", foreign:"cōnspicere", icon:"👀"},
-        {de:"sich nähern, herbeikommen", foreign:"accēdere", icon:"🚶"},
+        {de:"sich nähern, herbeikommen", foreign:"accēdere", icon:"🚶"}
+      ],
+      "Pontes-014": [
         {de:"zornig, wütend", foreign:"īrātus", icon:"😠"},
         {de:"der Freund", foreign:"amīcus", icon:"🧑‍🤝‍🧑"},
         {de:"die Freundin", foreign:"amīca", icon:"🧑‍🤝‍🧑"},
@@ -2802,7 +2871,7 @@ const BOOKS = {
         {de:"tatsächlich", foreign:"profectō", icon:"❗"},
         {de:"sicher", foreign:"tūtus", icon:"🛡️"}
       ],
-      "Pontes-015-017": [
+      "Pontes-015": [
         {de:"der Circus Maximus", foreign:"Circus Maximus", icon:"🏟️"},
         {de:"der Zuschauer", foreign:"spectātor", icon:"👀"},
         {de:"die Freude", foreign:"gaudium", icon:"😄"},
@@ -2814,7 +2883,9 @@ const BOOKS = {
         {de:"dein(e)", foreign:"tuus", icon:"👤"},
         {de:"unser(e)", foreign:"noster", icon:"👥"},
         {de:"euer, eure", foreign:"vester", icon:"👥"},
-        {de:"sein(e), ihr(e)", foreign:"suus", icon:"👤"},
+        {de:"sein(e), ihr(e)", foreign:"suus", icon:"👤"}
+      ],
+      "Pontes-016": [
         {de:"sein(e), ihr(e), dessen", foreign:"eius", icon:"👤"},
         {de:"deren", foreign:"eōrum", icon:"👥"},
         {de:"siegen, besiegen", foreign:"vincere", icon:"🏆"},
@@ -2831,7 +2902,9 @@ const BOOKS = {
         {de:"abwehren, fernhalten", foreign:"arcēre", icon:"🛑"},
         {de:"aufstehen, sich erheben", foreign:"surgere", icon:"⬆️"},
         {de:"zwischen, unter", foreign:"inter", icon:"↔️"},
-        {de:"sich hervortun, sich auszeichnen, besser sein", foreign:"praestāre", icon:"🏆"},
+        {de:"sich hervortun, sich auszeichnen, besser sein", foreign:"praestāre", icon:"🏆"}
+      ],
+      "Pontes-017": [
         {de:"wachsen", foreign:"crēscere", icon:"📈"},
         {de:"gleichzeitig, zugleich", foreign:"simul", icon:"🕰️"},
         {de:"fast, etwa", foreign:"ferē", icon:"≈"},
@@ -2843,7 +2916,7 @@ const BOOKS = {
         {de:"der Zuhörer", foreign:"audītor", icon:"👂"},
         {de:"der Sieger", foreign:"victor", icon:"🏆"}
       ],
-      "Pontes-018-020": [
+      "Pontes-018": [
         {de:"mit, zusammen mit", foreign:"cum", icon:"🤝"},
         {de:"die Thermen", foreign:"thermae", icon:"♨️"},
         {de:"zunächst, zuerst", foreign:"prīmum", icon:"1️⃣"},
@@ -2852,7 +2925,9 @@ const BOOKS = {
         {de:"ablegen", foreign:"dēpōnere", icon:"👕"},
         {de:"die Kleidung", foreign:"vestis", icon:"👗"},
         {de:"oft", foreign:"saepe", icon:"🔁"},
-        {de:"der siebte", foreign:"septimus", icon:"7️⃣"},
+        {de:"der siebte", foreign:"septimus", icon:"7️⃣"}
+      ],
+      "Pontes-019": [
         {de:"die Stunde", foreign:"hōra", icon:"🕐"},
         {de:"aus (...heraus), von", foreign:"ē / ex", icon:"⬅️"},
         {de:"die Stille, das Schweigen", foreign:"silentium", icon:"🤫"},
@@ -2869,7 +2944,9 @@ const BOOKS = {
         {de:"der Rat, die Beratung", foreign:"cōnsilium", icon:"🧠"},
         {de:"hervorragend, ausgezeichnet", foreign:"ēgregius", icon:"🌟"},
         {de:"beschäftigt", foreign:"occupātus", icon:"⏳"},
-        {de:"gehen", foreign:"īre", icon:"🚶"},
+        {de:"gehen", foreign:"īre", icon:"🚶"}
+      ],
+      "Pontes-020": [
         {de:"lästig, unangenehm", foreign:"molestus", icon:"😒"},
         {de:"bei sich", foreign:"sēcum", icon:"🪞"},
         {de:"der Sommer", foreign:"aestās", icon:"☀️"},
@@ -3417,9 +3494,13 @@ function renderStreakBadge(){
 }
 
 function formatPageLabel(pageId){
-  const m = pageId.match(/^(.*?)-(\d+)-(\d+)$/);
-  if(m){
-    return `Seite ${m[2]}–${m[3]}`;
+  const range = pageId.match(/^(.*?)-(\d+)-(\d+)$/);
+  if(range){
+    return `Seite ${range[2]}–${range[3]}`;
+  }
+  const single = pageId.match(/^(.*?)-(\d+)$/);
+  if(single){
+    return `Seite ${parseInt(single[2],10)}`;
   }
   return pageId;
 }
@@ -3599,20 +3680,27 @@ function markAnswerComparison(card, userAns){
   const correctAns = card.hintTarget || pickDisplayAlternative(card.answer, userAns);
   const expWrap = document.getElementById("expectedAnswerBoxes");
   expWrap.innerHTML="";
-  // split into words
   const correctWords = correctAns.split(" ");
-  const userWords = userAns.split(" ");
   const hinted = card.hintedChars;
+
+  // Compare a flattened (space-free) character stream instead of aligning
+  // word-by-word: if the child's answer has a different number of "words"
+  // than the correct one (typically a missing/extra space), word-by-word
+  // alignment used to dump every one of their typed characters into the
+  // first word's block, producing a long wall of red boxes while the
+  // other words stayed empty. The word BLOCKS still follow the correct
+  // answer's own word lengths -- only which typed character lands in
+  // which box ignores where the child put their spaces.
+  const userFlat = userAns.replace(/ /g, "");
+  let flatIdx = 0;
 
   for(let wi=0; wi<correctWords.length; wi++){
     const wordBlock=document.createElement("div");
     wordBlock.className="word-block";
     const cWord=correctWords[wi];
-    const uWord=userWords[wi] || "";
-    const maxLen=Math.max(cWord.length,uWord.length);
-    for(let ci=0;ci<maxLen;ci++){
-      const cChar=cWord[ci]||"";
-      const uChar=uWord[ci]||"";
+    for(let ci=0; ci<cWord.length; ci++){
+      const cChar=cWord[ci];
+      const uChar=userFlat[flatIdx]||"";
       const box=document.createElement("div");
       box.className="letter-box";
       if(uChar){
@@ -3629,8 +3717,24 @@ function markAnswerComparison(card, userAns){
         box.textContent="";
       }
       wordBlock.appendChild(box);
+      flatIdx++;
     }
     expWrap.appendChild(wordBlock);
+  }
+
+  // any characters typed beyond the correct answer's total length (e.g. a
+  // typo that made the answer too long) still show up, in their own block,
+  // instead of silently vanishing
+  if(flatIdx < userFlat.length){
+    const extraBlock=document.createElement("div");
+    extraBlock.className="word-block";
+    for(let i=flatIdx; i<userFlat.length; i++){
+      const box=document.createElement("div");
+      box.className="letter-box letter-wrong";
+      box.textContent=userFlat[i];
+      extraBlock.appendChild(box);
+    }
+    expWrap.appendChild(extraBlock);
   }
 }
 
@@ -3642,20 +3746,23 @@ function renderAnswerBoxesLive(card, currentInput){
   const expWrap = document.getElementById("expectedAnswerBoxes");
   expWrap.innerHTML="";
   const expWords = expected.split(" ");
-  const inpWords = currentInput.split(" ");
   const hinted = card.hintedChars;
+
+  // see markAnswerComparison: compare a flattened (space-free) stream so a
+  // missing/extra space while typing doesn't shove every later character
+  // into the wrong word's boxes.
+  const inputFlat = currentInput.replace(/ /g, "");
+  let flatIdx = 0;
 
   for(let wi=0; wi<expWords.length; wi++){
     const wordBlock=document.createElement("div");
     wordBlock.className="word-block";
     const expW=expWords[wi];
-    const inpW=inpWords[wi]||"";
-    const maxLen=Math.max(expW.length, inpW.length);
 
-    for(let ci=0; ci<maxLen; ci++){
+    for(let ci=0; ci<expW.length; ci++){
       const box=document.createElement("div");
       box.className="letter-box";
-      const ch = inpW[ci] || "";
+      const ch = inputFlat[flatIdx] || "";
       if(ch){
         box.textContent = ch;
       } else if(hinted && hinted.has(`${wi}:${ci}`)){
@@ -3665,8 +3772,23 @@ function renderAnswerBoxesLive(card, currentInput){
         box.textContent = "";
       }
       wordBlock.appendChild(box);
+      flatIdx++;
     }
     expWrap.appendChild(wordBlock);
+  }
+
+  // extra typed characters beyond the expected length get their own
+  // trailing block instead of being silently dropped
+  if(flatIdx < inputFlat.length){
+    const extraBlock=document.createElement("div");
+    extraBlock.className="word-block";
+    for(let i=flatIdx; i<inputFlat.length; i++){
+      const box=document.createElement("div");
+      box.className="letter-box";
+      box.textContent=inputFlat[i];
+      extraBlock.appendChild(box);
+    }
+    expWrap.appendChild(extraBlock);
   }
 }
 
@@ -3763,6 +3885,20 @@ function renderStatsScreen(){
   }
   const avatarPrefix = prof.avatar ? prof.avatar+" " : "";
   labelEl.textContent = `Profil: ${avatarPrefix}${state.currentProfile}`;
+
+  // A round in progress (reached via the floating 📊 button, not "Abbrechen")
+  // isn't saved to the profile yet -- say so, instead of just showing a
+  // total that looks like the round's points vanished.
+  const noteEl = document.getElementById("statsRoundInProgressNote");
+  const roundInProgress = state.backStackBeforeStats==="screen-learn"
+    && state.roundCards.length>0 && state.roundIndex<state.roundCards.length;
+  if(roundInProgress){
+    noteEl.textContent = `ℹ️ Du bist gerade mitten in einer Runde (${state.roundTotalPoints} Punkte bisher) -- die zählen erst dazu, wenn die Runde fertig ist oder du "Abbrechen" drückst.`;
+    noteEl.style.display="block";
+  } else {
+    noteEl.style.display="none";
+  }
+
   document.getElementById("statTotalPoints").textContent = String(prof.stats.totalPoints);
   const minTotal = (prof.stats.totalTimeSec/60).toFixed(1);
   document.getElementById("statTotalTime").textContent = String(minTotal);
@@ -3829,6 +3965,7 @@ function renderStartScreen(){
     delBtn.style.fontSize="0.75rem";
     delBtn.style.padding="0.45rem 0.6rem";
     delBtn.title="Profil löschen";
+    delBtn.setAttribute("aria-label", `Profil ${name} löschen`);
     delBtn.textContent="🗑";
     delBtn.addEventListener("click",(e)=>{
       e.stopPropagation();
@@ -3870,18 +4007,19 @@ function renderStartScreen(){
   frBtn.innerHTML=`<span>🇫🇷 Französisch</span> <span class="small-note">(bald)</span>`;
   langDiv.appendChild(frBtn);
 
-  // Latein -- kein festes Lehrbuch hinterlegt, aber sofort nutzbar: Bücher/Seiten/
-  // Vokabeln werden über "+ Neues Buch anlegen" auf dem nächsten Screen selbst angelegt
-  // (genau der Mechanismus, der für eigene Bücher bei Englisch schon existiert).
+  // Latein -- kommt mit dem festen Buch "pontes" mit; eigene Bücher/Seiten/
+  // Vokabeln lassen sich zusätzlich über "+ Neues Buch anlegen" auf dem
+  // nächsten Screen anlegen (genau der Mechanismus, der für eigene Bücher
+  // bei Englisch schon existiert).
   const laBtn=document.createElement("button");
   laBtn.className="select-pill";
   if(state.currentLang==="la"){
     laBtn.classList.add("active");
   }
-  laBtn.innerHTML=`<span>🏛️ Latein</span> <span class="small-note">(eigene Vokabeln)</span>`;
+  laBtn.innerHTML=`<span>🏛️ Latein</span>`;
   laBtn.addEventListener("click",()=>{
     state.currentLang="la";
-    state.currentBookKey=null;
+    state.currentBookKey="pontes";
     renderStartScreen();
   });
   langDiv.appendChild(laBtn);
@@ -3972,13 +4110,13 @@ function renderBookPageScreen(){
       prog.textContent=computePageProgressDisplay(pid);
       main.appendChild(t);
       main.appendChild(prog);
-      if(currentIsCustom){
-        const wc=(pgObj[pid]||[]).length;
-        const wcDiv=document.createElement("div");
-        wcDiv.className="page-progress";
-        wcDiv.textContent=`${wc} Wort${wc===1?"":"e"}`;
-        main.appendChild(wcDiv);
-      }
+      // word count shown for every book (not just custom ones) -- helpful
+      // context for the "% gelernt" figure right above it
+      const wc=(pgObj[pid]||[]).length;
+      const wcDiv=document.createElement("div");
+      wcDiv.className="page-progress";
+      wcDiv.textContent=`${wc} Wort${wc===1?"":"e"}`;
+      main.appendChild(wcDiv);
 
       const rightWrap=document.createElement("div");
       rightWrap.style.display="flex";
@@ -4713,6 +4851,17 @@ function setupEventListeners(){
   document.getElementById("btnPagesNext").addEventListener("click", ()=>{
     switchScreen("screen-vocabpick");
     renderVocabPickScreen();
+  });
+
+  document.getElementById("btnPagesSelectAll").addEventListener("click", ()=>{
+    const book = getBookDef(state.currentBookKey);
+    state.selectedPages = book ? Object.keys(book.pages) : [];
+    renderBookPageScreen();
+  });
+
+  document.getElementById("btnPagesDeselectAll").addEventListener("click", ()=>{
+    state.selectedPages = [];
+    renderBookPageScreen();
   });
 
   document.getElementById("chkShowArchivedBooks").addEventListener("change", ()=>{
