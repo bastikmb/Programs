@@ -537,6 +537,50 @@ body.dark-theme .answer-feedback.far {
   color:var(--muted);
 }
 
+/* feedback overlay -- shown after a correct answer or "Lösung zeigen" instead
+   of a brief auto-hiding message, so there's no time pressure to read it;
+   a tap/click (or Enter/Space) advances to the next card. */
+.feedback-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  padding:1.5rem;
+  cursor:pointer;
+}
+.feedback-overlay-inner {
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--card-shadow);
+  padding:1.75rem 1.5rem;
+  max-width:420px;
+  width:100%;
+  text-align:center;
+}
+.feedback-overlay-msg {
+  font-size:1.4rem;
+  font-weight:700;
+  margin-bottom:0.5rem;
+}
+.feedback-overlay-msg.good { color:#065f46; }
+.feedback-overlay-msg.far { color:var(--ink); }
+body.dark-theme .feedback-overlay-msg.good { color:#6ee7b7; }
+body.dark-theme .feedback-overlay-msg.far { color:var(--ink); }
+.feedback-overlay-example {
+  font-size:1.05rem;
+  font-style:italic;
+  color:var(--muted);
+  margin-top:0.75rem;
+}
+.feedback-overlay-hint {
+  font-size:0.8rem;
+  color:var(--muted);
+  margin-top:1.25rem;
+}
+
 /* level-up banner (summary screen) */
 .level-up-banner {
   background:linear-gradient(135deg,#fef9c3,#fde68a);
@@ -1104,6 +1148,14 @@ body.dark-theme .level-up-banner {
     </div>
   </div>
 
+</div>
+
+<div id="feedbackOverlay" class="feedback-overlay" style="display:none;" role="button" tabindex="0" aria-label="Weiter zur nächsten Aufgabe">
+  <div class="feedback-overlay-inner">
+    <div id="feedbackOverlayMsg" class="feedback-overlay-msg"></div>
+    <div id="feedbackOverlayExample" class="feedback-overlay-example" style="display:none;"></div>
+    <div class="feedback-overlay-hint">👉 Antippen zum Weitermachen</div>
+  </div>
 </div>
 
 <button id="btn-floating-theme">🌙</button>
@@ -4360,6 +4412,44 @@ function showExampleSentence(example){
   el.style.display = "block";
 }
 
+/* Shows the feedback message (+ example sentence, if any) in a full-screen
+   overlay that stays open until the user taps/clicks it (or presses
+   Enter/Space) -- replaces the old fixed-duration auto-advance, which hid
+   the message again before it could actually be read. */
+function showContinueOverlay(message, kind, example, onContinue){
+  const overlay = document.getElementById("feedbackOverlay");
+  const msgEl = document.getElementById("feedbackOverlayMsg");
+  const exampleEl = document.getElementById("feedbackOverlayExample");
+
+  msgEl.textContent = message;
+  msgEl.className = "feedback-overlay-msg " + kind;
+
+  if(example){
+    exampleEl.textContent = `📖 ${example}`;
+    exampleEl.style.display = "block";
+  } else {
+    exampleEl.style.display = "none";
+  }
+
+  overlay.style.display = "flex";
+
+  function continueOnce(){
+    overlay.style.display = "none";
+    overlay.removeEventListener("click", continueOnce);
+    overlay.removeEventListener("keydown", onKeydown);
+    onContinue();
+  }
+  function onKeydown(e){
+    if(e.key==="Enter" || e.key===" "){
+      e.preventDefault();
+      continueOnce();
+    }
+  }
+  overlay.addEventListener("click", continueOnce);
+  overlay.addEventListener("keydown", onKeydown);
+  overlay.focus();
+}
+
 function checkAnswer(){
   const card = state.roundCards[state.roundIndex];
   const inputVal=document.getElementById("answerInput").value;
@@ -4379,14 +4469,11 @@ function checkAnswer(){
 
     // add score (+ combo bonus)
     state.roundTotalPoints += card.score + comboBonus;
-    showAnswerFeedback(pickRandom(CORRECT_MESSAGES), "good");
-    showExampleSentence(card.example);
 
     // Mid-round level-up check (see roundStartTotalPoints/roundLevelAtStart
     // in buildRoundCardsFromVocab): the profile itself isn't updated until
     // the round ends, so level up here is based on banked total + points
     // earned so far this round.
-    let leveledUpNow = false;
     const prof = getCurrentProfileObj();
     if(prof){
       const effectiveTotal = state.roundStartTotalPoints + state.roundTotalPoints;
@@ -4394,7 +4481,6 @@ function checkAnswer(){
       if(newLevel > state.roundLevelAtStart){
         state.roundLevelAtStart = newLevel;
         showLevelUpBannerInRound(getLevelInfo(effectiveTotal));
-        leveledUpNow = true;
       }
     }
 
@@ -4404,14 +4490,15 @@ function checkAnswer(){
     void area.offsetWidth; // force reflow
     area.classList.add("correct-blink");
 
-    // briefly show the success state before advancing, so it's actually visible
-    // (longer when leveling up, so the banner has time to actually be read)
+    // show success message + example sentence in an overlay the child has
+    // to actively dismiss, instead of a fixed pause that hid it again
+    // before it could be read
     setLearnControlsDisabled(true);
-    setTimeout(()=>{
+    showContinueOverlay(pickRandom(CORRECT_MESSAGES), "good", card.example, ()=>{
       state.roundIndex++;
       setLearnControlsDisabled(false);
       renderCurrentCard();
-    }, leveledUpNow ? 2200 : 550);
+    });
   } else {
     // wrong -> combo breaks
     state.currentCombo = 0;
@@ -4464,17 +4551,15 @@ function revealSolution(){
 
   // show the revealed word in the letter boxes (all green, since it now matches itself)
   markAnswerComparison(target, card.answer);
-  showAnswerFeedback("Hier ist die Lösung 👀", "far");
-  showExampleSentence(card.example);
 
-  // double the normal reveal pause (was 1600ms) -- there's more to read now
-  // (the solution plus, when available, its example sentence)
+  // show the solution + example sentence in an overlay the child has to
+  // actively dismiss, instead of a fixed pause that hid it again too soon
   setLearnControlsDisabled(true);
-  setTimeout(()=>{
+  showContinueOverlay("Hier ist die Lösung 👀", "far", card.example, ()=>{
     state.roundIndex++;
     setLearnControlsDisabled(false);
     renderCurrentCard();
-  }, 3200);
+  });
 }
 
 /* ===========================================================
