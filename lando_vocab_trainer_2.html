@@ -1025,6 +1025,7 @@ body.dark-theme .level-up-banner {
       <div class="learn-expected-wrapper" id="expectedAnswerBoxes"></div>
 
       <div id="answerFeedbackMsg" class="answer-feedback" style="display:none;"></div>
+      <div id="exampleSentence" class="muted" style="display:none;margin:0.3rem 0 0.5rem;font-style:italic;"></div>
 
       <div class="learn-input-row">
         <input id="answerInput" type="text" autocomplete="off" />
@@ -3119,6 +3120,7 @@ function buildRoundCardsFromVocab(){
       de:v.de,
       foreign:v.foreign,
       pageId:v.pageId,
+      example:v.example||null,
       prompt:promptText,
       answer:answerText,
       score:10,
@@ -3929,6 +3931,7 @@ function renderCurrentCard(){
   ansInp.focus();
 
   hideAnswerFeedback();
+  showExampleSentence(null);
   renderAnswerBoxesLive(card.answer, "");
 }
 
@@ -4059,6 +4062,18 @@ function hideAnswerFeedback(){
   el.style.display = "none";
 }
 
+/* Shows the book's example sentence for the current word, if it has one --
+   only after the answer is known (correct answer, or "Lösung zeigen"). */
+function showExampleSentence(example){
+  const el = document.getElementById("exampleSentence");
+  if(!example){
+    el.style.display = "none";
+    return;
+  }
+  el.textContent = `📖 ${example}`;
+  el.style.display = "block";
+}
+
 function checkAnswer(){
   const card = state.roundCards[state.roundIndex];
   const inputVal=document.getElementById("answerInput").value;
@@ -4079,6 +4094,7 @@ function checkAnswer(){
     // add score (+ combo bonus)
     state.roundTotalPoints += card.score + comboBonus;
     showAnswerFeedback(pickRandom(CORRECT_MESSAGES), "good");
+    showExampleSentence(card.example);
 
     // Mid-round level-up check (see roundStartTotalPoints/roundLevelAtStart
     // in buildRoundCardsFromVocab): the profile itself isn't updated until
@@ -4163,14 +4179,16 @@ function revealSolution(){
   // show the revealed word in the letter boxes (all green, since it now matches itself)
   markAnswerComparison(target, card.answer);
   showAnswerFeedback("Hier ist die Lösung 👀", "far");
+  showExampleSentence(card.example);
 
-  // give a bit more time than a normal correct answer, so it can actually be read
+  // double the normal reveal pause (was 1600ms) -- there's more to read now
+  // (the solution plus, when available, its example sentence)
   setLearnControlsDisabled(true);
   setTimeout(()=>{
     state.roundIndex++;
     setLearnControlsDisabled(false);
     renderCurrentCard();
-  }, 1600);
+  }, 3200);
 }
 
 /* ===========================================================
