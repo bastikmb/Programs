@@ -3061,12 +3061,8 @@ let state = {
   stats:{
     totalPoints: number,
     totalTimeSec: number,
-    wrongCounts: { [word: string]: number }
-  },
-  progress:{
-    [bookKey]:{
-      [pageId]: number   // 0..100
-    }
+    wrongCounts: { [word: string]: number },
+    correctCounts: { [word: string]: number }
   }
 }
 */
@@ -3108,9 +3104,6 @@ function createProfile(name){
         wrongCounts:{},
         correctCounts:{},
         streak:{current:0, longest:0, lastActiveDate:null}
-      },
-      progress:{
-        // bookKey -> {pageId: pct}
       }
     };
     saveProfiles();
@@ -3137,12 +3130,6 @@ function isStartContinueEnabled(){
 function getCurrentProfileObj(){
   if(!state.currentProfile) return null;
   return state.profiles[state.currentProfile] || null;
-}
-
-function ensureProgressObj(profile, bookKey){
-  if(!profile.progress[bookKey]){
-    profile.progress[bookKey]={};
-  }
 }
 
 /* ===========================================================
@@ -3416,15 +3403,26 @@ function formatPageLabel(pageId){
   return pageId;
 }
 
+/* Percentage of this page's own vocabulary that has ever been answered
+   correctly on the first try (profile.stats.correctCounts, keyed by the
+   German word) -- NOT the score of whichever subset of words happened to
+   be selected in the last round. Using the round's own subset as the
+   denominator made picking e.g. just 1 of a page's 40 words and getting
+   it right show "100% gelernt", which was misleading. */
 function computePageProgressDisplay(pageId){
-  // read from profile.progress[bookKey][pageId]
   const profile = getCurrentProfileObj();
   if(!profile || !state.currentBookKey) return "0% gelernt";
-  ensureProgressObj(profile, state.currentBookKey);
-  const val = profile.progress[state.currentBookKey][pageId];
-  if(val == null) return "0% gelernt";
-  if(val>=100) return "✅ 100%";
-  return Math.round(val)+"% gelernt";
+  const book = getBookDef(state.currentBookKey);
+  const words = book ? book.pages[pageId] : null;
+  if(!words || words.length===0) return "0% gelernt";
+  const correctCounts = profile.stats.correctCounts || {};
+  let learned = 0;
+  for(const w of words){
+    if(correctCounts[w.de] > 0) learned++;
+  }
+  const pct = learned/words.length*100;
+  if(pct>=100) return "✅ 100%";
+  return Math.round(pct)+"% gelernt";
 }
 
 function buildRoundCardsFromVocab(){
@@ -3708,25 +3706,8 @@ function finalizeRoundAndUpdateProfile(){
       }
     }
 
-    // progress update per selected page: use each card's own pageId directly.
-    // (Previously this matched cards back to pages by comparing de/foreign/icon text,
-    // which broke whenever the same word appeared on two selected pages.)
-    ensureProgressObj(prof, state.currentBookKey);
-    const pageStats = {}; // pageId -> {total, firstTryDone}
-    for(const card of state.roundCards){
-      if(!pageStats[card.pageId]) pageStats[card.pageId] = {total:0, firstTryDone:0};
-      pageStats[card.pageId].total++;
-      if(card.done && card.firstTry) pageStats[card.pageId].firstTryDone++;
-    }
-    for(const pageId of state.selectedPages){
-      const st = pageStats[pageId];
-      // if no cards from this page were actually played this round
-      // (e.g. all were deactivated), leave the stored progress untouched
-      if(st && st.total>0){
-        const pct = st.firstTryDone/st.total*100;
-        prof.progress[state.currentBookKey][pageId]=Math.round(pct);
-      }
-    }
+    // Page progress (computePageProgressDisplay) is derived live from
+    // correctCounts above, so there's nothing further to persist here.
 
     saveProfiles();
   }
