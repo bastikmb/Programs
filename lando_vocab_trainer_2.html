@@ -57,6 +57,11 @@ body.dark-theme .letter-wrong {
   border-color:#f87171;
   color:#fca5a5;
 }
+body.dark-theme .letter-hint {
+  background:rgba(245,158,11,0.18);
+  border-color:#fbbf24;
+  color:#fcd34d;
+}
 body.dark-theme .toggle-btn.off {
   background:rgba(239,68,68,0.15);
   border-color:#f87171;
@@ -396,6 +401,12 @@ body.dark-theme .hist-badge.wrong {
   border-width:3px;
   border-style:dashed;
   color:#991b1b;
+}
+.letter-hint {
+  background:#fef9c3;
+  border-color:#f59e0b;
+  border-style:dashed;
+  color:#92400e;
 }
 .streak-badge {
   align-items:center;
@@ -3562,14 +3573,17 @@ function pickDisplayAlternative(correctRaw, currentInput){
   return best;
 }
 
-/* Highlight correct/wrong letters in boxes */
-function markAnswerComparison(userAns, correctRaw){
-  const correctAns = pickDisplayAlternative(correctRaw, userAns);
+/* Highlight correct/wrong letters in boxes. Positions the child hasn't
+   typed yet but that were revealed via the hint button (card.hintedChars,
+   see applyHint) show that hinted letter instead of staying blank. */
+function markAnswerComparison(card, userAns){
+  const correctAns = card.hintTarget || pickDisplayAlternative(card.answer, userAns);
   const expWrap = document.getElementById("expectedAnswerBoxes");
   expWrap.innerHTML="";
   // split into words
   const correctWords = correctAns.split(" ");
   const userWords = userAns.split(" ");
+  const hinted = card.hintedChars;
 
   for(let wi=0; wi<correctWords.length; wi++){
     const wordBlock=document.createElement("div");
@@ -3589,6 +3603,9 @@ function markAnswerComparison(userAns, correctRaw){
         } else {
           box.classList.add("letter-wrong");
         }
+      } else if(hinted && hinted.has(`${wi}:${ci}`)){
+        box.textContent=cChar;
+        box.classList.add("letter-hint");
       } else {
         box.textContent="";
       }
@@ -3598,13 +3615,16 @@ function markAnswerComparison(userAns, correctRaw){
   }
 }
 
-/* Render expected answer boxes based on current input live */
-function renderAnswerBoxesLive(expectedRaw, currentInput){
-  const expected = pickDisplayAlternative(expectedRaw, currentInput);
+/* Render expected answer boxes based on current input live. Untyped
+   positions that were revealed via the hint button (card.hintedChars,
+   see applyHint) show that hinted letter instead of staying blank. */
+function renderAnswerBoxesLive(card, currentInput){
+  const expected = card.hintTarget || pickDisplayAlternative(card.answer, currentInput);
   const expWrap = document.getElementById("expectedAnswerBoxes");
   expWrap.innerHTML="";
   const expWords = expected.split(" ");
   const inpWords = currentInput.split(" ");
+  const hinted = card.hintedChars;
 
   for(let wi=0; wi<expWords.length; wi++){
     const wordBlock=document.createElement("div");
@@ -3617,7 +3637,14 @@ function renderAnswerBoxesLive(expectedRaw, currentInput){
       const box=document.createElement("div");
       box.className="letter-box";
       const ch = inpW[ci] || "";
-      box.textContent = ch || "";
+      if(ch){
+        box.textContent = ch;
+      } else if(hinted && hinted.has(`${wi}:${ci}`)){
+        box.textContent = expW[ci] || "";
+        box.classList.add("letter-hint");
+      } else {
+        box.textContent = "";
+      }
       wordBlock.appendChild(box);
     }
     expWrap.appendChild(wordBlock);
@@ -4270,7 +4297,7 @@ function renderCurrentCard(){
 
   hideAnswerFeedback();
   showExampleSentence(null);
-  renderAnswerBoxesLive(card.answer, "");
+  renderAnswerBoxesLive(card, "");
 }
 
 function showSummaryScreen(){
@@ -4318,31 +4345,61 @@ function showSummaryScreen(){
    ROUND LOGIC (CHECK, HINT, NEXT)
    =========================================================== */
 
+/* Reveals several letters at once, at random positions within the answer,
+   instead of just the next letter in sequence -- the number revealed
+   scales with the answer's length (longer words/phrases get more letters
+   per hint press). Revealed letters show up as hint-styled boxes in
+   expectedAnswerBoxes; the input field itself is left untouched, so the
+   child still has to type the whole answer themselves. */
 function applyHint(){
   const card = state.roundCards[state.roundIndex];
   const inputEl = document.getElementById("answerInput");
-  let currentVal = inputEl.value;
-  const correct = card.answer;
-  // resolve which alternative to reveal (closest to what's already typed)
-  const target = pickDisplayAlternative(correct, currentVal);
-  const normCurrent = normalizeAnswer(currentVal);
-  const normTarget = normalizeAnswer(target);
+  const currentVal = inputEl.value;
 
-  // find first differing position
-  let i=0;
-  while(i<normCurrent.length && i<normTarget.length && normCurrent[i]===normTarget[i]){
-    i++;
+  // lock onto one alternative for this card's whole hinting session, so
+  // revealed positions stay meaningful even if "/" alternatives differ in
+  // length or the child's typing would otherwise make pickDisplayAlternative
+  // switch to a different one mid-hint
+  if(!card.hintTarget){
+    card.hintTarget = pickDisplayAlternative(card.answer, currentVal);
   }
-  if(i<normTarget.length){
-    // rebuild the input up to and including the revealed character,
-    // discarding any wrong tail rather than appending onto it
-    currentVal = target.substring(0, i+1);
-    inputEl.value = currentVal;
-    // reduce score
-    if(card.score>0) card.score = card.score-1;
-    document.getElementById("cardScore").textContent=String(card.score);
-    renderAnswerBoxesLive(correct, currentVal);
+  if(!card.hintedChars){
+    card.hintedChars = new Set();
   }
+  const targetWords = card.hintTarget.split(" ");
+  const inputWords = currentVal.split(" ");
+
+  // collect every position that isn't hinted yet and isn't already typed correctly
+  const candidates = [];
+  for(let wi=0; wi<targetWords.length; wi++){
+    const tWord = targetWords[wi];
+    const iWord = inputWords[wi] || "";
+    for(let ci=0; ci<tWord.length; ci++){
+      const key = `${wi}:${ci}`;
+      if(card.hintedChars.has(key)) continue;
+      const typedChar = iWord[ci] || "";
+      const alreadyCorrect = typedChar && typedChar.toLowerCase()===tWord[ci].toLowerCase();
+      if(!alreadyCorrect) candidates.push(key);
+    }
+  }
+  if(candidates.length===0) return; // nothing left to reveal
+
+  // more letters per press for longer answers
+  const totalLen = targetWords.reduce((sum,w)=>sum+w.length, 0);
+  const revealCount = Math.min(candidates.length, Math.max(1, Math.ceil(totalLen/4)));
+
+  // Fisher-Yates shuffle, then take the first revealCount as the random positions
+  for(let i=candidates.length-1; i>0; i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [candidates[i],candidates[j]] = [candidates[j],candidates[i]];
+  }
+  for(let k=0; k<revealCount; k++){
+    card.hintedChars.add(candidates[k]);
+  }
+
+  if(card.score>0) card.score = card.score-1;
+  document.getElementById("cardScore").textContent=String(card.score);
+  renderAnswerBoxesLive(card, currentVal);
 }
 
 function setLearnControlsDisabled(disabled){
@@ -4508,7 +4565,7 @@ function checkAnswer(){
     card.attemptedWrong=true;
     if(card.score>0) card.score=card.score-1;
     document.getElementById("cardScore").textContent=String(card.score);
-    markAnswerComparison(inputVal, correct);
+    markAnswerComparison(card, inputVal);
 
     // friendly feedback based on how close the answer was
     const target = pickDisplayAlternative(correct, inputVal);
@@ -4550,7 +4607,7 @@ function revealSolution(){
   updateComboIndicator();
 
   // show the revealed word in the letter boxes (all green, since it now matches itself)
-  markAnswerComparison(target, card.answer);
+  markAnswerComparison(card, target);
 
   // show the solution + example sentence in an overlay the child has to
   // actively dismiss, instead of a fixed pause that hid it again too soon
@@ -4856,7 +4913,7 @@ function setupEventListeners(){
     const card = state.roundCards[state.roundIndex];
     if(!card) return;
     const v=document.getElementById("answerInput").value;
-    renderAnswerBoxesLive(card.answer, v);
+    renderAnswerBoxesLive(card, v);
   });
 
   document.getElementById("answerInput").addEventListener("keydown",(e)=>{
