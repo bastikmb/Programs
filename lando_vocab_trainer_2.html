@@ -418,8 +418,19 @@ body.dark-theme .hist-badge.wrong {
   margin-bottom:1rem;
 }
 .streak-badge .flame {
-  font-size:1.9rem;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:0.05rem;
+  max-width:8rem;
+  font-size:1.4rem;
   line-height:1;
+}
+.streak-badge .flame-extra {
+  font-size:0.85rem;
+  font-weight:700;
+  color:var(--muted);
+  margin-left:0.15rem;
 }
 .streak-badge .streak-num {
   font-size:1.05rem;
@@ -3385,8 +3396,18 @@ function renderStreakBadge(){
   const sub = trainedToday
     ? `Rekord: ${streak.longest} Tage`
     : `Heute noch nicht gelernt – Serie retten!`;
+
+  // one flame per streak day, capped so a long streak doesn't fill the
+  // whole badge with emoji -- the remaining days are shown as "+N" instead
+  const MAX_FLAMES = 10;
+  const flameCount = Math.min(streak.current, MAX_FLAMES);
+  let flamesHtml = "🔥".repeat(flameCount);
+  if(streak.current > MAX_FLAMES){
+    flamesHtml += `<span class="flame-extra">+${streak.current-MAX_FLAMES}</span>`;
+  }
+
   badge.innerHTML = `
-    <div class="flame">🔥</div>
+    <div class="flame">${flamesHtml}</div>
     <div>
       <div class="streak-num">${streak.current} Tag${streak.current===1?"":"e"} in Folge</div>
       <div class="streak-text">${sub}</div>
