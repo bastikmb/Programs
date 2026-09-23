@@ -194,6 +194,41 @@ body {
   font-size:0.8rem;
   color:var(--muted);
 }
+.page-progress-bars {
+  margin:0.35rem 0;
+  display:flex;
+  flex-direction:column;
+  gap:0.25rem;
+}
+.page-progress-row {
+  display:flex;
+  align-items:center;
+  gap:0.4rem;
+  font-size:0.75rem;
+  color:var(--muted);
+}
+.page-progress-row .page-progress-label {
+  flex-shrink:0;
+  width:3.4rem;
+}
+.page-progress-bar-outer {
+  flex:1;
+  background:var(--border);
+  border-radius:999px;
+  height:0.4rem;
+  overflow:hidden;
+}
+.page-progress-bar-inner {
+  height:100%;
+  background:var(--accent);
+  border-radius:999px;
+  transition:width 0.3s ease;
+}
+.page-progress-row .page-progress-pct {
+  flex-shrink:0;
+  width:2.6rem;
+  text-align:right;
+}
 .page-check {
   flex-shrink:0;
   font-size:1.2rem;
@@ -2995,6 +3030,10 @@ const LANG_DISPLAY_NAMES = { en:"Englisch", la:"Latein", fr:"Französisch" };
 function getLangDisplayName(lang){
   return LANG_DISPLAY_NAMES[lang] || lang;
 }
+const LANG_EMOJI = { en:"🇬🇧", la:"🏛️", fr:"🇫🇷" };
+function getLangEmoji(lang){
+  return LANG_EMOJI[lang] || "🌍";
+}
 
 function getBooksForLang(lang, includeArchived){
   const list=[];
@@ -3150,7 +3189,11 @@ let state = {
     totalPoints: number,
     totalTimeSec: number,
     wrongCounts: { [word: string]: number },
-    correctCounts: { [word: string]: number }
+    correctCounts: { [word: string]: number },
+    correctByDirection: {
+      deToEn: { [word: string]: number },
+      enToDe: { [word: string]: number }
+    }
   }
 }
 */
@@ -3191,6 +3234,7 @@ function createProfile(name){
         totalTimeSec:0,
         wrongCounts:{},
         correctCounts:{},
+        correctByDirection:{deToEn:{}, enToDe:{}},
         streak:{current:0, longest:0, lastActiveDate:null}
       }
     };
@@ -3506,25 +3550,28 @@ function formatPageLabel(pageId){
 }
 
 /* Percentage of this page's own vocabulary that has ever been answered
-   correctly on the first try (profile.stats.correctCounts, keyed by the
-   German word) -- NOT the score of whichever subset of words happened to
-   be selected in the last round. Using the round's own subset as the
-   denominator made picking e.g. just 1 of a page's 40 words and getting
-   it right show "100% gelernt", which was misleading. */
-function computePageProgressDisplay(pageId){
+   correctly on the first try, separately for each learning direction
+   (profile.stats.correctByDirection, keyed by the German word) -- NOT
+   the score of whichever subset of words happened to be selected in the
+   last round. Using the round's own subset as the denominator made
+   picking e.g. just 1 of a page's 40 words and getting it right show
+   "100% gelernt", which was misleading. Returns null if there's nothing
+   to show a bar for (no profile, no book, or an empty page). */
+function computePageProgressByDirection(pageId){
   const profile = getCurrentProfileObj();
-  if(!profile || !state.currentBookKey) return "0% gelernt";
+  if(!profile || !state.currentBookKey) return null;
   const book = getBookDef(state.currentBookKey);
   const words = book ? book.pages[pageId] : null;
-  if(!words || words.length===0) return "0% gelernt";
-  const correctCounts = profile.stats.correctCounts || {};
-  let learned = 0;
-  for(const w of words){
-    if(correctCounts[w.de] > 0) learned++;
-  }
-  const pct = learned/words.length*100;
-  if(pct>=100) return "✅ 100%";
-  return Math.round(pct)+"% gelernt";
+  if(!words || words.length===0) return null;
+  const byDir = profile.stats.correctByDirection || {deToEn:{}, enToDe:{}};
+  const pctFor = (counts)=>{
+    let learned = 0;
+    for(const w of words){
+      if(counts[w.de] > 0) learned++;
+    }
+    return Math.round(learned/words.length*100);
+  };
+  return { deToEn: pctFor(byDir.deToEn||{}), enToDe: pctFor(byDir.enToDe||{}) };
 }
 
 /* Vocab entries carry grammar/register notes copied straight from the
@@ -3573,6 +3620,7 @@ function buildRoundCardsFromVocab(){
       foreign:v.foreign,
       pageId:v.pageId,
       example:v.example||null,
+      direction:directionForCard, // 'deToEn' | 'enToDe' -- which way THIS card asked, even in mixed mode
       prompt:promptText,
       answer:answerText,
       score:10,
@@ -3852,6 +3900,7 @@ function finalizeRoundAndUpdateProfile(){
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
+    if(!prof.stats.correctByDirection) prof.stats.correctByDirection={deToEn:{}, enToDe:{}};
     for(const card of state.roundCards){
       // only a genuine wrong-typed attempt counts against the long-term
       // "Problemwörter" stat -- skipping or revealing without trying
@@ -3866,11 +3915,19 @@ function finalizeRoundAndUpdateProfile(){
         // answered right on the first try, no skip/reveal involved
         if(!prof.stats.correctCounts[key]) prof.stats.correctCounts[key]=0;
         prof.stats.correctCounts[key]+=1;
+        // also tracked per direction, for the two per-page progress bars
+        // (deToEn = Deutsch->Fremdsprache, enToDe = Fremdsprache->Deutsch,
+        // named after the original English book despite now covering any language)
+        const dirBucket = prof.stats.correctByDirection[card.direction];
+        if(dirBucket){
+          if(!dirBucket[key]) dirBucket[key]=0;
+          dirBucket[key]+=1;
+        }
       }
     }
 
-    // Page progress (computePageProgressDisplay) is derived live from
-    // correctCounts above, so there's nothing further to persist here.
+    // Page progress (computePageProgressByDirection) is derived live from
+    // correctByDirection above, so there's nothing further to persist here.
 
     saveProfiles();
   }
@@ -4125,13 +4182,46 @@ function renderBookPageScreen(){
       const t=document.createElement("div");
       t.className="page-title";
       t.textContent=formatPageLabel(pid);
-      const prog=document.createElement("div");
-      prog.className="page-progress";
-      prog.textContent=computePageProgressDisplay(pid);
       main.appendChild(t);
-      main.appendChild(prog);
+
+      // one progress bar per learning direction, instead of a single
+      // combined percentage -- a word learned de->foreign isn't
+      // necessarily learned foreign->de yet, and vice versa
+      const progress = computePageProgressByDirection(pid);
+      if(progress){
+        const deEmoji = "🇩🇪", foreignEmoji = getLangEmoji(book.lang);
+        const barsWrap=document.createElement("div");
+        barsWrap.className="page-progress-bars";
+        const dirRows=[
+          {pct:progress.deToEn, label:`${deEmoji}→${foreignEmoji}`, title:`Deutsch → ${getLangDisplayName(book.lang)}`},
+          {pct:progress.enToDe, label:`${foreignEmoji}→${deEmoji}`, title:`${getLangDisplayName(book.lang)} → Deutsch`}
+        ];
+        for(const {pct, label, title} of dirRows){
+          const rowDiv=document.createElement("div");
+          rowDiv.className="page-progress-row";
+          rowDiv.title=title;
+          const labelSpan=document.createElement("span");
+          labelSpan.className="page-progress-label";
+          labelSpan.textContent=label;
+          const barOuter=document.createElement("div");
+          barOuter.className="page-progress-bar-outer";
+          const barInner=document.createElement("div");
+          barInner.className="page-progress-bar-inner";
+          barInner.style.width=pct+"%";
+          barOuter.appendChild(barInner);
+          const pctSpan=document.createElement("span");
+          pctSpan.className="page-progress-pct";
+          pctSpan.textContent=pct+"%";
+          rowDiv.appendChild(labelSpan);
+          rowDiv.appendChild(barOuter);
+          rowDiv.appendChild(pctSpan);
+          barsWrap.appendChild(rowDiv);
+        }
+        main.appendChild(barsWrap);
+      }
+
       // word count shown for every book (not just custom ones) -- helpful
-      // context for the "% gelernt" figure right above it
+      // context for the progress bars above it
       const wc=(pgObj[pid]||[]).length;
       const wcDiv=document.createElement("div");
       wcDiv.className="page-progress";
