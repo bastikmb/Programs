@@ -3574,26 +3574,6 @@ function computePageProgressByDirection(pageId){
   return { deToEn: pctFor(byDir.deToEn||{}), enToDe: pctFor(byDir.enToDe||{}) };
 }
 
-/* Vocab entries carry grammar/register notes copied straight from the
-   textbook, e.g. "sunshine (no pl)", "spooky (informal)", "OMG (= oh my
-   God)" -- useful context to read, but a child can't know they're not
-   supposed to type "(no pl)" as part of the answer, and it isn't
-   explained anywhere in the app. Strip that kind of pure annotation
-   before a word becomes something the child actually has to type; the
-   full text (with the note) still shows wherever it's just read, e.g.
-   the vocab-pick list and the prompt when this word is what's shown
-   rather than what's typed. */
-function stripTypingAnnotations(str){
-  return str.replace(/\s*\(([^)]*)\)/g, (whole, inner)=>{
-    const isPureMetadata = inner.split(",").map(p=>p.trim().toLowerCase()).every(p=>
-      p==="no pl" || p==="pl" || p.startsWith("pl ") ||
-      p==="informal" || p==="formal" || p==="be" || p==="ae" ||
-      p.startsWith("=")
-    );
-    return isPureMetadata ? "" : whole;
-  }).trim();
-}
-
 function buildRoundCardsFromVocab(){
   // direction modes applied per card
   state.roundCards = [];
@@ -3605,10 +3585,16 @@ function buildRoundCardsFromVocab(){
       directionForCard = (Math.random()<0.5) ? "deToEn" : "enToDe";
     }
 
+    // Bracketed notes copied straight from the textbook -- grammar/register
+    // labels like "(no pl)"/"(informal)"/"(= oh my God)" as well as
+    // genuine phrasal-verb complements like "to wait (for)" or
+    // "(Great) Britain" -- are never stripped here. getAlternatives()
+    // turns any "(...)" into both a with-and-without variant, both
+    // counted as correct (see its comment for why and how).
     let promptText, answerText;
     if(directionForCard==="deToEn"){
       promptText = v.de;
-      answerText = stripTypingAnnotations(v.foreign);
+      answerText = v.foreign;
     } else {
       promptText = v.foreign;
       answerText = v.de;
@@ -3668,11 +3654,50 @@ function normalizeAnswer(str){
     .replace(/[ȳŷỳýÿ]/g,"y");
 }
 
-/* Some vocab entries store alternative phrasings as "A / B".
-   These must be treated as alternatives, not as one literal string
-   the user has to type in full (including the slash). */
+/* Some vocab entries store alternative phrasings as "A / B" -- these must
+   be treated as alternatives, not as one literal string the user has to
+   type in full (including the slash). The "/" is only treated as a
+   separator outside of "(...)" groups, so an entry like
+   "to apologize (to/for)" isn't corrupted into "to apologize (to" and
+   "for)" (that "/" belongs to the bracket's own content, handled below).
+
+   Vocab entries also carry bracketed notes copied straight from the
+   textbook -- pure grammar/register labels like "sunshine (no pl)",
+   "spooky (informal)", "OMG (= oh my God)", and genuine phrasal-verb
+   complements like "to wait (for)" or "(Great) Britain" alike. A child
+   has no way to know they're not supposed to type "(no pl)", and for
+   the rest it's just as reasonable to type the word with or without the
+   bracket's content. So for any "(...)" group, BOTH the variant with it
+   omitted entirely and the variant with its content spelled out inline
+   count as valid alternatives -- the omitted (shorter, plainer) one is
+   listed first, so it's what hints/letter-boxes show by default. */
 function getAlternatives(str){
-  return str.split("/").map(s=>s.trim()).filter(s=>s.length>0);
+  const topLevel = [];
+  let depth=0, current="";
+  for(const ch of str){
+    if(ch==="(") depth++;
+    if(ch===")") depth=Math.max(0, depth-1);
+    if(ch==="/" && depth===0){
+      topLevel.push(current);
+      current="";
+    } else {
+      current+=ch;
+    }
+  }
+  topLevel.push(current);
+
+  const result=[];
+  for(const part of topLevel.map(s=>s.trim()).filter(s=>s.length>0)){
+    if(part.includes("(")){
+      const omitted = part.replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim();
+      const spelledOut = part.replace(/\(([^)]*)\)/g,"$1").replace(/\s+/g," ").trim();
+      if(omitted) result.push(omitted);
+      if(spelledOut && spelledOut!==omitted) result.push(spelledOut);
+    } else {
+      result.push(part);
+    }
+  }
+  return result;
 }
 
 function answerMatches(inputVal, correctRaw){
