@@ -3527,6 +3527,26 @@ function computePageProgressDisplay(pageId){
   return Math.round(pct)+"% gelernt";
 }
 
+/* Vocab entries carry grammar/register notes copied straight from the
+   textbook, e.g. "sunshine (no pl)", "spooky (informal)", "OMG (= oh my
+   God)" -- useful context to read, but a child can't know they're not
+   supposed to type "(no pl)" as part of the answer, and it isn't
+   explained anywhere in the app. Strip that kind of pure annotation
+   before a word becomes something the child actually has to type; the
+   full text (with the note) still shows wherever it's just read, e.g.
+   the vocab-pick list and the prompt when this word is what's shown
+   rather than what's typed. */
+function stripTypingAnnotations(str){
+  return str.replace(/\s*\(([^)]*)\)/g, (whole, inner)=>{
+    const isPureMetadata = inner.split(",").map(p=>p.trim().toLowerCase()).every(p=>
+      p==="no pl" || p==="pl" || p.startsWith("pl ") ||
+      p==="informal" || p==="formal" || p==="be" || p==="ae" ||
+      p.startsWith("=")
+    );
+    return isPureMetadata ? "" : whole;
+  }).trim();
+}
+
 function buildRoundCardsFromVocab(){
   // direction modes applied per card
   state.roundCards = [];
@@ -3541,7 +3561,7 @@ function buildRoundCardsFromVocab(){
     let promptText, answerText;
     if(directionForCard==="deToEn"){
       promptText = v.de;
-      answerText = v.foreign;
+      answerText = stripTypingAnnotations(v.foreign);
     } else {
       promptText = v.foreign;
       answerText = v.de;
