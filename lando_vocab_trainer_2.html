@@ -3289,6 +3289,23 @@ function ensureStreakObj(prof){
   return prof.stats.streak;
 }
 
+/* Profiles from before per-direction tracking existed only have the
+   combined correctCounts. The first time correctByDirection is needed for
+   such a profile, seed BOTH directions from correctCounts instead of
+   starting at zero -- otherwise words the child already knew well would
+   suddenly show 0% on both new progress bars, looking like all progress
+   had been wiped. There's no way to know which direction each past
+   correct answer was actually tested in, so crediting both is the
+   least-wrong assumption (and self-corrects over time as new rounds fill
+   in the real per-direction picture). */
+function ensureCorrectByDirection(prof){
+  if(!prof.stats.correctByDirection){
+    const seed = prof.stats.correctCounts || {};
+    prof.stats.correctByDirection = { deToEn:{...seed}, enToDe:{...seed} };
+  }
+  return prof.stats.correctByDirection;
+}
+
 /* Call once per finished round. Returns true if today's session actually
    changed the streak count (i.e. this was the first round played today),
    so the caller can show a little "Serie verlängert!" moment. */
@@ -3563,7 +3580,7 @@ function computePageProgressByDirection(pageId){
   const book = getBookDef(state.currentBookKey);
   const words = book ? book.pages[pageId] : null;
   if(!words || words.length===0) return null;
-  const byDir = profile.stats.correctByDirection || {deToEn:{}, enToDe:{}};
+  const byDir = ensureCorrectByDirection(profile);
   const pctFor = (counts)=>{
     let learned = 0;
     for(const w of words){
@@ -3925,7 +3942,7 @@ function finalizeRoundAndUpdateProfile(){
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
-    if(!prof.stats.correctByDirection) prof.stats.correctByDirection={deToEn:{}, enToDe:{}};
+    ensureCorrectByDirection(prof); // older profiles predate this field too -- seeds it from correctCounts, see comment on ensureCorrectByDirection
     for(const card of state.roundCards){
       // only a genuine wrong-typed attempt counts against the long-term
       // "Problemwörter" stat -- skipping or revealing without trying
