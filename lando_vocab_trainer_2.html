@@ -3687,14 +3687,42 @@ function normalizeAnswer(str){
    bracket's content. So for any "(...)" group, BOTH the variant with it
    omitted entirely and the variant with its content spelled out inline
    count as valid alternatives -- the omitted (shorter, plainer) one is
-   listed first, so it's what hints/letter-boxes show by default. */
+   listed first, so it's what hints/letter-boxes show by default.
+
+   Latin vocab (and some German glosses in general) often store a comma-
+   separated list of synonyms as the answer, e.g. "lieben, mögen" for
+   "amare" -- typing the whole list is unreasonable, so each item should
+   count on its own. But not every comma is a synonym separator: e.g.
+   "Sorry, ich bin zu spät." and "Ich würde gern hingehen, weil ..." are
+   single sentences that merely contain a comma. To tell these apart
+   without understanding the grammar, a comma is only treated as an
+   alternative separator when the whole string isn't a single punctuated
+   sentence -- i.e. either it has no sentence-ending punctuation (.!?…)
+   at all ("lieben, mögen"), or every such punctuation mark sits right
+   before a comma, meaning the string is itself a list of separately
+   punctuated alternatives ("sieh(e)!, sieh(e) da!", "denn?, etwa?").
+   A comma inside "(...)" is never a separator, same as "/". */
 function getAlternatives(str){
+  let scanDepth=0, terminalSeen=false, commaAfterTerminal=false, prevChar="";
+  for(const ch of str){
+    if(ch==="("){ scanDepth++; continue; }
+    if(ch===")"){ scanDepth=Math.max(0, scanDepth-1); continue; }
+    if(scanDepth>0) continue;
+    if(ch===","){
+      if(/[.!?…]/.test(prevChar)) commaAfterTerminal=true;
+    } else if(/[.!?…]/.test(ch)){
+      terminalSeen=true;
+    }
+    if(ch!==" ") prevChar=ch;
+  }
+  const commaSplittable = commaAfterTerminal || !terminalSeen;
+
   const topLevel = [];
   let depth=0, current="";
   for(const ch of str){
     if(ch==="(") depth++;
     if(ch===")") depth=Math.max(0, depth-1);
-    if(ch==="/" && depth===0){
+    if(depth===0 && (ch==="/" || (ch==="," && commaSplittable))){
       topLevel.push(current);
       current="";
     } else {
