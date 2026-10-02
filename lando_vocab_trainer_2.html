@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -94,6 +94,9 @@ body {
   width:100%;
   max-width:900px;
   padding:1.5rem;
+  padding-top:calc(1.5rem + env(safe-area-inset-top));
+  padding-left:calc(1.5rem + env(safe-area-inset-left));
+  padding-right:calc(1.5rem + env(safe-area-inset-right));
   box-sizing:border-box;
 }
 .screen {
@@ -795,7 +798,7 @@ body.dark-theme .level-up-banner {
 #btn-floating-stats {
   position:fixed;
   right:1rem;
-  bottom:1rem;
+  bottom:calc(1rem + env(safe-area-inset-bottom));
   z-index:9999;
   border:none;
   background:#1f2937;
@@ -813,7 +816,7 @@ body.dark-theme .level-up-banner {
 #btn-floating-theme {
   position:fixed;
   left:1rem;
-  bottom:1rem;
+  bottom:calc(1rem + env(safe-area-inset-bottom));
   z-index:9999;
   border:none;
   background:#1f2937;
@@ -901,7 +904,9 @@ body.dark-theme .level-up-banner {
 .inline-input-btn input[type="text"]{
   flex:1;
   min-width:150px;
-  font-size:0.9rem;
+  /* 1rem (16px), not smaller -- iOS Safari auto-zooms the page on focus
+     of any text input below 16px, which is jarring on a touch device. */
+  font-size:1rem;
   padding:0.6rem 0.8rem;
   border-radius:var(--radius-sm);
   border:2px solid var(--border);
@@ -910,6 +915,9 @@ body.dark-theme .level-up-banner {
 }
 .inline-input-btn button{
   flex-shrink:0;
+}
+#newWordDe, #newWordForeign {
+  font-size:1rem;
 }
 
 .muted {
@@ -1028,8 +1036,8 @@ body.dark-theme .level-up-banner {
     <div class="section-block">
       <div class="section-title">Neues Wort</div>
       <div class="flex-col" style="gap:0.5rem;">
-        <input id="newWordDe" type="text" placeholder="Deutsch, z.B. Haus" />
-        <input id="newWordForeign" type="text" placeholder="Fremdsprache, z.B. house" />
+        <input id="newWordDe" type="text" placeholder="Deutsch, z.B. Haus" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input id="newWordForeign" type="text" placeholder="Fremdsprache, z.B. house" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <div class="inline-input-btn">
           <input id="newWordIcon" type="text" placeholder="Icon (Emoji), optional" style="max-width:120px;flex:none;" />
           <button id="btnAddWord" class="btn" style="min-width:auto;">+ Hinzufügen</button>
@@ -1137,7 +1145,7 @@ body.dark-theme .level-up-banner {
       <div id="exampleSentence" class="muted" style="display:none;margin:0.3rem 0 0.5rem;font-style:italic;"></div>
 
       <div class="learn-input-row">
-        <input id="answerInput" type="text" autocomplete="off" />
+        <input id="answerInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <button id="btnFocusInput" class="btn-secondary btn" title="Tastatur wieder einblenden" aria-label="Tastatur wieder einblenden" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.7rem;opacity:0.55;">⌨️</button>
         <button id="btnHint" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">Tipp (-1)</button>
         <button id="btnReveal" class="btn-secondary btn" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">🔎 Lösung zeigen</button>
