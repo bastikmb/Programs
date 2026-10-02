@@ -1005,6 +1005,24 @@ body.dark-theme .level-up-banner {
   gap:0.75rem;
   margin-top:1.5rem;
 }
+/* "Weiter"/"Zurück"-style step navigation -- pinned near the bottom of
+   the viewport while scrolling a long screen (e.g. the book/page list),
+   so the way forward/back never requires hunting for it below the
+   fold. bottom matches .screen's own bottom padding, which already
+   reserves exactly this much clearance above the floating round
+   buttons; negative side margins let the backing bar bleed to the
+   card's full width while the matching padding keeps the buttons
+   themselves inset like everywhere else. */
+.btn-row-sticky {
+  position:sticky;
+  bottom:calc(4.5rem + env(safe-area-inset-bottom));
+  background:var(--card);
+  margin-left:-1.5rem;
+  margin-right:-1.5rem;
+  padding:0.75rem 1.5rem 0;
+  box-shadow:0 -8px 16px -8px rgba(0,0,0,0.12);
+  z-index:10;
+}
 .btn {
   appearance:none;
   border:none;
@@ -1305,7 +1323,7 @@ body.dark-theme .level-up-banner {
       <div class="section-sub">Englisch und Latein bringen fertige Vokabeln mit. Du kannst dir aber auch jederzeit eigene Bücher/Seiten/Vokabeln anlegen.</div>
     </div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnStartToPages" class="btn" disabled>Weiter ➡</button>
     </div>
   </div>
@@ -1350,7 +1368,7 @@ body.dark-theme .level-up-banner {
       </div>
     </div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnPagesBack" class="btn-secondary btn">⬅ Zurück</button>
       <button id="btnPagesNext" class="btn" disabled>Weiter ➡</button>
     </div>
@@ -1392,7 +1410,7 @@ body.dark-theme .level-up-banner {
       <div id="vocabAddList" class="vocab-list"></div>
     </div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnVocabAddDone" class="btn">Fertig ✅</button>
     </div>
   </div>
@@ -1415,7 +1433,7 @@ body.dark-theme .level-up-banner {
 
     <div id="vocabList" class="vocab-list"></div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnVocabBack" class="btn-secondary btn">⬅ Zurück</button>
       <button id="btnVocabNext" class="btn">Weiter ➡</button>
     </div>
@@ -1442,7 +1460,7 @@ body.dark-theme .level-up-banner {
       </div>
     </div>
 
-    <div class="btn-row" style="margin-top:2rem;">
+    <div class="btn-row btn-row-sticky" style="margin-top:2rem;">
       <button id="btnDirBack" class="btn-secondary btn">⬅ Zurück</button>
       <button id="btnDirNext" class="btn" disabled>Starten ➡</button>
     </div>
@@ -1520,7 +1538,7 @@ body.dark-theme .level-up-banner {
       <div id="hardWordList" class="danger-list"></div>
     </div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnSameRoundAgain" class="btn">🔄 Gleiche Runde nochmal</button>
       <button id="btnOnlyHard" class="btn">Nur schwierige Wörter üben 🔁</button>
       <button id="btnSummaryToStart" class="btn-secondary btn">Zur Startseite 🏠</button>
@@ -1549,7 +1567,7 @@ body.dark-theme .level-up-banner {
     <div class="section-title" style="margin-top:1rem;">Top Problem-Wörter</div>
     <div class="problem-list" id="problemList"></div>
 
-    <div class="btn-row">
+    <div class="btn-row btn-row-sticky">
       <button id="btnStatsBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
   </div>
