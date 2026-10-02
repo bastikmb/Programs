@@ -1037,6 +1037,39 @@ body.dark-theme .level-up-banner {
   color:var(--ink);
 }
 
+/* entry splash screen, shown once before the actual app (see
+   screen-splash) -- the illustration is a static, fixed-palette SVG
+   (its own brand moment, independent of the light/dark theme used
+   everywhere else). It's bounded by both card width AND viewport
+   height (preserveAspectRatio "meet" then scales/letterboxes the whole
+   drawing to fit, the SVG equivalent of object-fit:contain), so the
+   "Los geht's" control always fits on screen without scrolling even on
+   short mobile viewports. That control is the drawn pill group itself
+   (#splashStartGroup, a real click/keyboard target), not a separate
+   overlay -- an overlay positioned by percentage would drift off the
+   artwork whenever letterboxing kicks in. */
+#screen-splash.screen {
+  padding:0;
+  overflow:hidden;
+}
+.splash-wrap {
+  line-height:0;
+  /* matches the SVG's own darkest background stop, so any letterboxing
+     from the height clamp below blends in instead of showing white */
+  background:#171A40;
+}
+.splash-svg {
+  display:block;
+  width:100%;
+  aspect-ratio:390/844;
+  max-height:calc(100svh - 7rem);
+  margin:0 auto;
+  font-family:var(--font-display);
+}
+#splashStartGroup {
+  cursor:pointer;
+}
+
 /* correct blink animation */
 .correct-blink {
   animation:blinkGreen 0.3s ease-in-out;
@@ -1097,8 +1130,101 @@ body.dark-theme .level-up-banner {
 <body>
 <div id="app">
 
+  <!-- SPLASH SCREEN -->
+  <div id="screen-splash" class="screen active">
+    <div class="splash-wrap">
+      <svg class="splash-svg" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient id="splashBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2B2F6B"/>
+            <stop offset="1" stop-color="#171A40"/>
+          </linearGradient>
+          <radialGradient id="splashGlow" cx="0.5" cy="0.42" r="0.5">
+            <stop offset="0" stop-color="#6FE3C1" stop-opacity="0.35"/>
+            <stop offset="1" stop-color="#6FE3C1" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="splashShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#0A0C26" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <rect width="390" height="844" fill="url(#splashBg)"/>
+        <circle cx="195" cy="350" r="230" fill="url(#splashGlow)"/>
+
+        <g fill="#FFFFFF" opacity="0.6">
+          <circle cx="48" cy="96" r="1.6"/><circle cx="330" cy="70" r="1.2"/>
+          <circle cx="300" cy="160" r="1.8"/><circle cx="70" cy="210" r="1.1"/>
+          <circle cx="356" cy="260" r="1.4"/><circle cx="30" cy="420" r="1.3"/>
+          <circle cx="362" cy="470" r="1"/><circle cx="110" cy="130" r="0.9"/>
+        </g>
+        <g fill="#FFC94A">
+          <path d="M318 112 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z"/>
+          <path d="M62 300 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/>
+        </g>
+
+        <ellipse cx="195" cy="350" rx="165" ry="60" fill="none" stroke="#6FE3C1" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="4 7" transform="rotate(-14 195 350)"/>
+
+        <!-- Latein-Karte -->
+        <g filter="url(#splashShadow)" transform="rotate(-16 120 330)">
+          <rect x="52" y="262" width="150" height="104" rx="16" fill="#FF7A8A"/>
+          <text x="127" y="322" text-anchor="middle" font-size="24" font-weight="700" fill="#FFFFFF">canis</text>
+          <circle cx="70" cy="280" r="5" fill="#FFFFFF" opacity="0.5"/>
+        </g>
+
+        <!-- Französisch-Karte -->
+        <g filter="url(#splashShadow)" transform="rotate(14 270 330)">
+          <rect x="190" y="262" width="150" height="104" rx="16" fill="#FFC94A"/>
+          <text x="265" y="322" text-anchor="middle" font-size="24" font-weight="700" fill="#2B2F6B">chien</text>
+          <circle cx="322" cy="280" r="5" fill="#FFFFFF" opacity="0.6"/>
+        </g>
+
+        <!-- Hauptkarte (Englisch) -->
+        <g filter="url(#splashShadow)">
+          <rect x="95" y="290" width="200" height="140" rx="20" fill="#FFFFFF"/>
+          <rect x="95" y="290" width="200" height="34" rx="20" fill="#6FE3C1"/>
+          <rect x="95" y="306" width="200" height="18" fill="#6FE3C1"/>
+          <circle cx="117" cy="307" r="5" fill="#FFFFFF"/>
+          <circle cx="133" cy="307" r="5" fill="#FFFFFF" opacity="0.6"/>
+          <text x="195" y="372" text-anchor="middle" font-size="34" font-weight="700" fill="#2B2F6B">Hund</text>
+          <line x1="150" y1="390" x2="240" y2="390" stroke="#E3E5F3" stroke-width="2" stroke-linecap="round"/>
+          <text x="195" y="414" text-anchor="middle" font-size="18" fill="#7A7FB0">dog</text>
+        </g>
+
+        <!-- Maskottchen -->
+        <g transform="translate(262 254)">
+          <circle cx="0" cy="0" r="28" fill="#FFC94A" filter="url(#splashShadow)"/>
+          <ellipse cx="-15" cy="-6" rx="7" ry="13" fill="#B07A2E" transform="rotate(20 -15 -6)"/>
+          <ellipse cx="15" cy="-6" rx="7" ry="13" fill="#B07A2E" transform="rotate(-20 15 -6)"/>
+          <circle cx="0" cy="2" r="15" fill="#F2DDB8"/>
+          <circle cx="-5" cy="-1" r="2.2" fill="#2B2F6B"/>
+          <circle cx="5" cy="-1" r="2.2" fill="#2B2F6B"/>
+          <ellipse cx="0" cy="6" rx="3.5" ry="2.5" fill="#2B2F6B"/>
+          <path d="M-4 10 q4 4 8 0" fill="none" stroke="#2B2F6B" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+
+        <!-- Sprechblasen -->
+        <g filter="url(#splashShadow)">
+          <path d="M60 470 h70 a14 14 0 0 1 14 14 v20 a14 14 0 0 1 -14 14 h-46 l-12 12 v-12 h-12 a14 14 0 0 1 -14 -14 v-20 a14 14 0 0 1 14 -14z" fill="#6FE3C1"/>
+          <text x="95" y="500" text-anchor="middle" font-size="18" font-weight="700" fill="#2B2F6B">Hallo!</text>
+        </g>
+        <g filter="url(#splashShadow)">
+          <path d="M260 455 h70 a14 14 0 0 1 14 14 v20 a14 14 0 0 1 -14 14 h-12 v12 l-12 -12 h-46 a14 14 0 0 1 -14 -14 v-20 a14 14 0 0 1 14 -14z" fill="#FF7A8A"/>
+          <text x="295" y="485" text-anchor="middle" font-size="18" font-weight="700" fill="#FFFFFF">Salvē!</text>
+        </g>
+
+        <text x="195" y="610" text-anchor="middle" font-size="38" font-weight="700" fill="#FFFFFF" letter-spacing="-0.5">Vokabeltrainer</text>
+        <text x="195" y="642" text-anchor="middle" font-size="16" fill="#B9BCE6">Jeden Tag ein paar Wörter mehr</text>
+
+        <g id="splashStartGroup" filter="url(#splashShadow)" role="button" tabindex="0" aria-label="Los geht's">
+          <rect x="75" y="700" width="240" height="56" rx="28" fill="#6FE3C1"/>
+          <text x="195" y="735" text-anchor="middle" font-size="19" font-weight="700" fill="#1B1F4D">Los geht's</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
   <!-- START SCREEN -->
-  <div id="screen-start" class="screen active">
+  <div id="screen-start" class="screen">
     <div class="hero-banner">
       <span class="hero-sparkle s1">✨</span>
       <span class="hero-sparkle s2">✨</span>
@@ -5315,6 +5441,18 @@ function revealSolution(){
    =========================================================== */
 
 function setupEventListeners(){
+
+  // Splash screen
+  const splashStartGroup = document.getElementById("splashStartGroup");
+  splashStartGroup.addEventListener("click", ()=>{
+    switchScreen("screen-start");
+  });
+  splashStartGroup.addEventListener("keydown", (e)=>{
+    if(e.key==="Enter" || e.key===" "){
+      e.preventDefault();
+      switchScreen("screen-start");
+    }
+  });
 
   // Start screen
   document.getElementById("newProfileName").addEventListener("input", ()=>{
