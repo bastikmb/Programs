@@ -949,6 +949,7 @@ body.dark-theme .level-up-banner {
         <input id="newProfileName" type="text" placeholder="Neues Profil (Name)" />
         <button id="btnAddProfile" class="btn btn-secondary" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">+ Hinzufügen</button>
       </div>
+      <div id="profileNameWarning" class="answer-feedback close" style="display:none;"></div>
       <div class="section-sub">Profile werden auf diesem Gerät gespeichert.</div>
       <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
         <button id="btnExportData" class="btn-secondary btn" style="min-width:auto;font-size:0.75rem;padding:0.45rem 0.7rem;">⬇ Daten sichern</button>
@@ -967,6 +968,10 @@ body.dark-theme .level-up-banner {
           <div id="themePicker" class="flex-row-wrap"></div>
         </div>
       </details>
+    </div>
+
+    <div id="quickStartBlock" class="section-block" style="display:none;">
+      <button id="btnQuickStart" class="btn" style="width:100%;text-align:left;display:flex;align-items:center;gap:0.6rem;"></button>
     </div>
 
     <div class="section-block">
@@ -4193,6 +4198,8 @@ function renderStartScreen(){
     profDiv.appendChild(wrap);
   }
 
+  renderQuickStartBlock();
+
   // languages
   const langDiv=document.getElementById("languageList");
   langDiv.innerHTML="";
@@ -4239,6 +4246,53 @@ function renderStartScreen(){
   // enable weiter?
   const btnStartToPages=document.getElementById("btnStartToPages");
   btnStartToPages.disabled = !isStartContinueEnabled();
+}
+
+/* Reaching the first flashcard normally takes five screens (profile ->
+   language -> book/pages -> word selection -> direction) every single
+   time, even for the common case of the same child doing another round
+   of the same book right away. lastSession (saved on the profile when a
+   round actually starts, see btnDirNext) remembers book/pages/direction
+   so returning users can skip straight back in. It's intentionally not
+   offered for a profile that has never started a round yet, and it's
+   re-validated against the book's current pages every time in case a
+   custom page was deleted since. */
+function renderQuickStartBlock(){
+  const block = document.getElementById("quickStartBlock");
+  const prof = getCurrentProfileObj();
+  const last = prof && prof.lastSession;
+  const book = last && getBookDef(last.bookKey);
+  const validPages = book ? last.selectedPages.filter(pid=>book.pages[pid]) : [];
+  if(!book || validPages.length===0){
+    block.style.display="none";
+    return;
+  }
+  const pageLabel = validPages.length===1
+    ? formatPageLabel(validPages[0])
+    : `${validPages.length} Seiten`;
+  const dirLabel = last.direction==="mixed" ? "gemischt"
+    : last.direction==="deToEn" ? `Deutsch → ${getLangDisplayName(book.lang)}`
+    : `${getLangDisplayName(book.lang)} → Deutsch`;
+  const btn = document.getElementById("btnQuickStart");
+  btn.innerHTML = `<span style="font-size:1.3rem;">▶️</span><span><div class="bold">Weiter wie zuletzt</div><div class="muted" style="font-weight:400;">${book.name} – ${pageLabel} (${dirLabel})</div></span>`;
+  block.style.display="block";
+}
+
+function startQuickRound(){
+  const prof = getCurrentProfileObj();
+  const last = prof && prof.lastSession;
+  const book = last && getBookDef(last.bookKey);
+  if(!book) return;
+  const validPages = last.selectedPages.filter(pid=>book.pages[pid]);
+  if(validPages.length===0) return;
+  state.currentLang = book.lang;
+  state.currentBookKey = last.bookKey;
+  state.selectedPages = validPages;
+  state.direction = last.direction;
+  renderVocabPickScreen();
+  switchScreen("screen-learn");
+  buildRoundCardsFromVocab();
+  renderCurrentCard();
 }
 
 function renderBookPageScreen(){
@@ -4961,6 +5015,14 @@ function checkAnswer(){
     } else {
       showAnswerFeedback(pickRandom(FAR_MESSAGES), "far");
     }
+
+    // select the wrong attempt instead of leaving it in place -- typing
+    // the next try should just overwrite it, not require deleting it
+    // letter by letter first, while still showing it (and the red
+    // letter-box feedback above) until the child starts typing again
+    const inputEl = document.getElementById("answerInput");
+    inputEl.focus();
+    inputEl.select();
   }
 }
 
@@ -5011,15 +5073,25 @@ function revealSolution(){
 function setupEventListeners(){
 
   // Start screen
+  document.getElementById("newProfileName").addEventListener("input", ()=>{
+    document.getElementById("profileNameWarning").style.display="none";
+  });
   document.getElementById("btnAddProfile").addEventListener("click", ()=>{
     const inp=document.getElementById("newProfileName");
     const name=inp.value;
+    const warnEl=document.getElementById("profileNameWarning");
+    if(name.trim() && state.profiles[name.trim()]){
+      warnEl.textContent = `⚠️ Profil "${name.trim()}" gibt es schon -- es wurde ausgewählt.`;
+      warnEl.style.display="block";
+    }
     const created=createProfile(name);
     if(created){
       inp.value="";
       renderStartScreen();
     }
   });
+
+  document.getElementById("btnQuickStart").addEventListener("click", startQuickRound);
 
   document.getElementById("btnExportData").addEventListener("click", ()=>{
     // include customBooks (eigene Bücher/Seiten/Vokabeln), not just profile stats --
@@ -5260,6 +5332,17 @@ function setupEventListeners(){
   });
 
   document.getElementById("btnDirNext").addEventListener("click", ()=>{
+    // remember book/pages/direction so this profile can jump straight
+    // back in next time via "Weiter wie zuletzt" on the start screen
+    const prof = getCurrentProfileObj();
+    if(prof){
+      prof.lastSession = {
+        bookKey: state.currentBookKey,
+        selectedPages: [...state.selectedPages],
+        direction: state.direction
+      };
+      saveProfiles();
+    }
     // start round
     switchScreen("screen-learn");
     buildRoundCardsFromVocab();
