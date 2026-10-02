@@ -220,6 +220,70 @@ h2, .level-badge .level-num, .level-badge .level-title,
   filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));
 }
 
+/* welcome-screen hero banner -- built entirely from the language icons
+   already embedded for the selector buttons (see LANG_ICON_IMG), so it
+   adds no further image weight to the file */
+.hero-banner {
+  position:relative;
+  background:linear-gradient(135deg, var(--accent), #8b5cf6);
+  border-radius:var(--radius);
+  padding:1.4rem 1.25rem 1.6rem;
+  margin-bottom:1rem;
+  text-align:center;
+  overflow:hidden;
+  box-shadow:var(--card-shadow);
+}
+.hero-banner .hero-title {
+  font-family:var(--font-display);
+  font-size:1.6rem;
+  font-weight:800;
+  color:#fff;
+  text-shadow:0 2px 6px rgba(0,0,0,0.2);
+}
+.hero-banner .hero-subtitle {
+  font-size:0.9rem;
+  color:rgba(255,255,255,0.9);
+  margin-top:0.2rem;
+  margin-bottom:1.1rem;
+}
+.hero-icon-row {
+  display:flex;
+  justify-content:center;
+  gap:0.6rem;
+}
+.hero-icon-tile {
+  background:#fff;
+  border-radius:12px;
+  width:3.2rem;
+  height:3.2rem;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 6px 14px rgba(0,0,0,0.25);
+}
+.hero-icon-tile img {
+  width:75%;
+  height:75%;
+  object-fit:contain;
+}
+.hero-icon-tile:nth-child(1){ transform:rotate(-7deg); }
+.hero-icon-tile:nth-child(2){ transform:rotate(5deg); }
+.hero-icon-tile:nth-child(3){ transform:rotate(-4deg); }
+.hero-icon-tile:nth-child(4){ transform:rotate(7deg); }
+.hero-sparkle {
+  position:absolute;
+  font-size:1.1rem;
+  opacity:0.85;
+  animation:heroSparkle 2.4s ease-in-out infinite;
+}
+.hero-sparkle.s1{ top:0.7rem; left:1rem; animation-delay:0s; }
+.hero-sparkle.s2{ top:1.3rem; right:1.2rem; animation-delay:1.1s; }
+@keyframes heroSparkle {
+  0%,100% { transform:scale(0.85) rotate(0deg); opacity:0.6; }
+  50% { transform:scale(1.15) rotate(15deg); opacity:1; }
+}
+
 /* book pages list */
 .page-row {
   display:flex;
@@ -1035,6 +1099,19 @@ body.dark-theme .level-up-banner {
 
   <!-- START SCREEN -->
   <div id="screen-start" class="screen active">
+    <div class="hero-banner">
+      <span class="hero-sparkle s1">✨</span>
+      <span class="hero-sparkle s2">✨</span>
+      <div class="hero-title">📖 Vokabeltrainer</div>
+      <div class="hero-subtitle">Spielend Sprachen lernen</div>
+      <div class="hero-icon-row">
+        <div class="hero-icon-tile"><img id="heroIconDe" alt="" /></div>
+        <div class="hero-icon-tile"><img id="heroIconEn" alt="" /></div>
+        <div class="hero-icon-tile"><img id="heroIconFr" alt="" /></div>
+        <div class="hero-icon-tile"><img id="heroIconLa" alt="" /></div>
+      </div>
+    </div>
+
     <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>👋 Willkommen</span>
     </h2>
@@ -5660,12 +5737,20 @@ function applyDarkMode(on){
   applyProfileTheme();
 }
 
+function initHeroBanner(){
+  document.getElementById("heroIconDe").src = LANG_ICON_IMG.de;
+  document.getElementById("heroIconEn").src = LANG_ICON_IMG.en;
+  document.getElementById("heroIconFr").src = LANG_ICON_IMG.fr;
+  document.getElementById("heroIconLa").src = LANG_ICON_IMG.la;
+}
+
 function initApp(){
   loadProfiles();
   loadCustomBooks();
   let darkOn = false;
   try { darkOn = localStorage.getItem("vocabDarkMode")==="1"; } catch(e){ /* ignore */ }
   applyDarkMode(darkOn);
+  initHeroBanner();
   renderStartScreen();
   setupEventListeners();
 }
