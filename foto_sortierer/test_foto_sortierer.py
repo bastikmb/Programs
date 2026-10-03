@@ -190,6 +190,26 @@ class SortierTests(unittest.TestCase):
         z2 = fs.Sortierer(self.quelle, ziel, melde=lambda t: None).ausfuehren()
         self.assertEqual((z2["kopiert"], z2["duplikat"]), (0, 3))
 
+    def test_iphone_monatsordner_mit_gemischten_daten(self):
+        # iPhone-Ordner "202205__" mit Fotos aus verschiedenen Monaten/Jahren,
+        # Ziel im Stil "2022/05_Mai" -> jedes Foto in seinen eigenen Monat
+        quelle = self.quelle / "202205__"
+        quelle.mkdir()
+        ziel = Path(self.tmp.name) / "02_Bilder"
+        for jahr in (2021, 2022, 2023):
+            for m, name in enumerate(fs.MONATE_DE, 1):
+                (ziel / str(jahr) / f"{m:02d}_{name}").mkdir(parents=True)
+        daten = [dt.datetime(2022, 5, 3), dt.datetime(2022, 8, 28), dt.datetime(2021, 12, 24),
+                 dt.datetime(2023, 1, 2)]
+        for i, d in enumerate(daten):
+            p = quelle / f"IMG_{3484 + i}.JPG"
+            p.write_bytes(jpeg_mit_exif(d, bytes([i])))
+            ts = dt.datetime(2022, 8, 28, 3, 37).timestamp()
+            os.utime(p, (ts, ts))  # gleiches Änderungsdatum wie nach dem Kopieren vom iPhone
+        fs.Sortierer(quelle, ziel, melde=lambda t: None).ausfuehren()
+        for i, erwartet in enumerate(["2022/05_Mai", "2022/08_August", "2021/12_Dezember", "2023/01_Januar"]):
+            self.assertTrue((ziel / erwartet / f"IMG_{3484 + i}.JPG").exists(), erwartet)
+
 
 if __name__ == "__main__":
     unittest.main()

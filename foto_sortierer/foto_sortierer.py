@@ -651,6 +651,13 @@ def _stamm_fuer_begleitdatei(name):
     return re.sub(r"^IMG_[EO](\d)", r"IMG_\1", stamm)
 
 
+def _datum_text(datum, datumsquelle):
+    """'03.05.2022 10:31 – Aufnahmedatum (Metadaten)' für Log und Vorschau."""
+    if datum is None:
+        return datumsquelle
+    return f"{datum:%d.%m.%Y %H:%M} – {datumsquelle}"
+
+
 class Sortierer:
     def __init__(self, quelle, ziel, verschieben=False, vorschau=False,
                  ohne_datum_separat=False, melde=print, fortschritt=None, abbruch=None):
@@ -755,7 +762,8 @@ class Sortierer:
             ziel, duplikat = self._eindeutiges_ziel(ordner, pfad)
             if duplikat is not None:
                 self.zaehler["duplikat"] += 1
-                self.melde(f"= übersprungen (bereits vorhanden): {pfad.name} -> {duplikat}")
+                self.melde(f"= übersprungen (bereits vorhanden): {pfad.name} -> {duplikat}"
+                           f"  [{_datum_text(datum, datumsquelle)}]")
                 self._protokolliere("übersprungen (Duplikat)", pfad, duplikat, datum, datumsquelle)
                 return
 
@@ -781,7 +789,7 @@ class Sortierer:
                 self.zaehler[aktion] += 1
 
             self.melde(f"→ {aktion}: {pfad.name} -> {ziel.relative_to(self.ziel)}"
-                       f"  [{datumsquelle}]" + (f"  ({hinweis})" if hinweis else ""))
+                       f"  [{_datum_text(datum, datumsquelle)}]" + (f"  ({hinweis})" if hinweis else ""))
             self._protokolliere(aktion, pfad, ziel, datum, datumsquelle, hinweis)
         except Exception as fehler:  # einzelne Fehler dürfen den Lauf nicht stoppen
             self.zaehler["fehler"] += 1
