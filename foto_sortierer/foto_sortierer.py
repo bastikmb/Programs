@@ -7,8 +7,10 @@ Sortiert Fotos und Videos (z. B. vom iPhone importiert) anhand ihres
 Aufnahmedatums in vorbereitete Ordner nach Jahr/Monat.
 
 Sicherheitsregeln – dieses Programm
-  * löscht NIEMALS eine Datei (auf Wunsch werden nur komplett leere Ordner
-    entfernt – per os.rmdir, das bei nicht-leeren Ordnern verweigert wird),
+  * löscht NIEMALS ein Foto oder Video (auf Wunsch werden nur Ordner entfernt,
+    die nach dem Verschieben leer sind – per os.rmdir, das bei nicht-leeren
+    Ordnern verweigert wird; einzig die Windows-Hilfsdateien Thumbs.db und
+    desktop.ini werden dabei mit weggeräumt),
   * überschreibt NIEMALS eine vorhandene Datei,
   * kopiert standardmäßig (das Original bleibt im Quellordner),
   * verschiebt nur, wenn ausdrücklich gewünscht – und dann nur per
@@ -28,6 +30,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import struct
 import sys
 from pathlib import Path
@@ -598,6 +601,26 @@ def _kopiere_ohne_ueberschreiben(quelle, ziel):
     os.rename(temp, ziel)
 
 
+# Von Windows automatisch angelegte Hilfsdateien. Nur sie dürfen – und nur in
+# einem sonst leeren Ordner, der entfernt wird – mit weggeräumt werden.
+WINDOWS_HILFSDATEIEN = {"thumbs.db", "desktop.ini"}
+
+
+def _ist_windows_hilfsdatei(pfad):
+    return pfad.name.lower() in WINDOWS_HILFSDATEIEN and pfad.is_file() and not pfad.is_symlink()
+
+
+def _entferne_windows_hilfsdatei(pfad):
+    if not _ist_windows_hilfsdatei(pfad):  # doppelte Absicherung
+        raise ValueError(f"{pfad} ist keine Windows-Hilfsdatei")
+    try:
+        os.remove(pfad)
+    except PermissionError:
+        # desktop.ini ist oft schreibgeschützt/versteckt markiert
+        os.chmod(pfad, stat.S_IWRITE | stat.S_IREAD)
+        os.remove(pfad)
+
+
 def _relativ(pfad, basis):
     """Pfad für die Anzeige relativ zum Quellordner, z. B. 'Sebastian Handy\\202205__'."""
     try:
@@ -695,7 +718,8 @@ class Sortierer:
         self.protokoll = []
         self.bearbeitet = 0
         self.zaehler = {"kopiert": 0, "verschoben": 0, "duplikat": 0, "fehler": 0,
-                        "ohne_datum": 0, "datum_geschaetzt": 0, "ordner_entfernt": 0}
+                        "ohne_datum": 0, "datum_geschaetzt": 0, "ordner_entfernt": 0,
+                        "hilfsdateien": 0}
 
     def _eindeutiges_ziel(self, ordner, quelle):
         stamm, endung = quelle.stem, quelle.suffix
@@ -777,9 +801,11 @@ class Sortierer:
 
     def _leere_ordner_entfernen(self):
         """Entfernt Ordner im Quellordner, die durch das Verschieben leer geworden
-        sind. Nutzt ausschließlich os.rmdir – das Betriebssystem verweigert das
-        bei jedem Ordner, der noch irgendetwas enthält. Dateien können dadurch
-        nie verloren gehen. Der Quellordner selbst bleibt immer bestehen."""
+        sind. Der Ordner selbst wird ausschließlich per os.rmdir entfernt – das
+        Betriebssystem verweigert das bei jedem Ordner, der noch etwas enthält.
+        Einzige Ausnahme, vom Benutzer ausdrücklich freigegeben: die Windows-
+        Hilfsdateien Thumbs.db und desktop.ini werden in einem sonst leeren
+        Ordner mit entfernt. Der Quellordner selbst bleibt immer bestehen."""
         wurzel = self.quelle.resolve()
         ziel = self.ziel.resolve()
         kandidaten = set()
@@ -799,6 +825,8 @@ class Sortierer:
                           if p.resolve() not in entfernt and p.resolve() not in self.weg]
             except OSError:
                 continue
+            hilfsdateien = [p for p in inhalt if _ist_windows_hilfsdatei(p)]
+            inhalt = [p for p in inhalt if p not in hilfsdateien]
             if inhalt and all(p.resolve() in kandidaten for p in inhalt):
                 continue  # enthält nur Unterordner, die selbst bleiben – schon gemeldet
             if inhalt:
@@ -806,12 +834,18 @@ class Sortierer:
                 self.melde(f"Ordner bleibt (nicht leer, enthält noch: {namen}): {_relativ(ordner, wurzel)}")
                 self._protokolliere("Ordner bleibt", ordner, None, None, "", f"enthält noch: {namen}")
                 continue
+            zusatz = f" (samt {', '.join(p.name for p in hilfsdateien)})" if hilfsdateien else ""
             if self.vorschau:
                 entfernt.add(ordner)
                 self.zaehler["ordner_entfernt"] += 1
-                self.melde(f"Leerer Ordner würde entfernt: {_relativ(ordner, wurzel)}")
+                self.zaehler["hilfsdateien"] += len(hilfsdateien)
+                self.melde(f"Leerer Ordner würde entfernt: {_relativ(ordner, wurzel)}{zusatz}")
                 continue
             try:
+                for hilfsdatei in hilfsdateien:
+                    _entferne_windows_hilfsdatei(hilfsdatei)
+                    self.zaehler["hilfsdateien"] += 1
+                    self._protokolliere("Windows-Hilfsdatei entfernt", hilfsdatei, None, None, "")
                 os.rmdir(ordner)  # schlägt fehl, sobald irgendetwas darin liegt
             except OSError as fehler:
                 self.melde(f"! Ordner konnte nicht entfernt werden: {ordner} ({fehler})")
@@ -819,7 +853,7 @@ class Sortierer:
                 continue
             entfernt.add(ordner)
             self.zaehler["ordner_entfernt"] += 1
-            self.melde(f"Leerer Ordner entfernt: {_relativ(ordner, wurzel)}")
+            self.melde(f"Leerer Ordner entfernt: {_relativ(ordner, wurzel)}{zusatz}")
             self._protokolliere("leeren Ordner entfernt", ordner, None, None, "")
 
     def _verarbeite(self, pfad, datum, datumsquelle):
@@ -912,7 +946,10 @@ def zusammenfassung(z, vorschau, verschieben):
         zeilen.append(f"  FEHLER: {z['fehler']} (Details im Protokoll/Log)")
     if z.get("ordner_entfernt"):
         zeilen.append(f"  Leere Ordner {'würden entfernt' if vorschau else 'entfernt'}: {z['ordner_entfernt']}")
-    zeilen.append("  Gelöschte Dateien: 0 (dieses Programm löscht niemals Dateien)")
+    if z.get("hilfsdateien"):
+        zeilen.append(f"  Windows-Hilfsdateien (Thumbs.db/desktop.ini) "
+                      f"{'würden entfernt' if vorschau else 'entfernt'}: {z['hilfsdateien']}")
+    zeilen.append("  Gelöschte Fotos/Videos: 0 (dieses Programm löscht niemals Fotos oder Videos)")
     return "\n".join(zeilen)
 
 
@@ -1254,8 +1291,8 @@ def starte_gui():
              "der Datei einsortiert zu werden.")
     ordner_haken = Haekchen(
         optionen_innen, leere_ordner_var, "Geleerte Ordner nach dem Verschieben entfernen",
-        "Nur Ordner, die danach komplett leer sind. Liegt noch irgendetwas darin, bleibt der Ordner. "
-        "Der Quellordner selbst bleibt immer.")
+        "Nur Ordner, die danach leer sind (Windows-Hilfsdateien Thumbs.db/desktop.ini werden mit "
+        "entfernt). Liegt noch etwas anderes darin, bleibt der Ordner. Der Quellordner selbst bleibt immer.")
     modus_setzen("kopieren")
 
     # Aktionen

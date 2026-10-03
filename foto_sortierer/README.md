@@ -7,7 +7,9 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 
 ## Sicherheit
 
-- Es werden **niemals Dateien gelöscht**. Im Code gibt es keinen Befehl, der eine Datei löschen kann.
+- **Fotos und Videos werden niemals gelöscht.** Die einzige Ausnahme sind die
+  Windows-Hilfsdateien `Thumbs.db` und `desktop.ini`, und auch die nur in einem
+  Ordner, der beim Verschieben geleert und deshalb entfernt wird (siehe unten).
 - Vorhandene Dateien werden **nie überschrieben**. Gibt es im Ziel schon eine
   Datei mit gleichem Namen, aber anderem Inhalt, heißt die neue z. B. `IMG_1234 (1).HEIC`.
 - Liegt die identische Datei schon im Ziel, wird sie übersprungen. Das Tool
@@ -18,8 +20,11 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 - **Geleerte Ordner entfernen** ist optional (Häkchen, nur beim Verschieben).
   Entfernt werden ausschließlich Ordner, die nach dem Verschieben **komplett leer**
   sind. Das Programm nutzt dafür `os.rmdir`, und das Betriebssystem verweigert
-  das bei jedem Ordner, in dem noch irgendetwas liegt. Der Quellordner selbst
-  bleibt immer bestehen. Die Vorschau zeigt vorher, welche Ordner betroffen wären.
+  das bei jedem Ordner, in dem noch irgendetwas liegt. Liegen im Ordner nur noch
+  die von Windows angelegten Hilfsdateien `Thumbs.db` (Vorschaubilder) oder
+  `desktop.ini` (Ordnereinstellungen), werden diese mit entfernt. Liegt noch etwas
+  anderes darin, bleibt alles unangetastet. Der Quellordner selbst bleibt immer
+  bestehen. Die Vorschau zeigt vorher, welche Ordner betroffen wären.
 - Kopien werden erst unter einem temporären Namen geschrieben und nach der
   Größenprüfung umbenannt. So entsteht nie eine halbe Datei unter dem echten Namen.
 - Jeder Lauf schreibt ein Protokoll (CSV, lässt sich mit Excel öffnen) nach

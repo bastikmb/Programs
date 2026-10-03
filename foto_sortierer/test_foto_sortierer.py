@@ -244,6 +244,30 @@ class SortierTests(unittest.TestCase):
         self.assertTrue(self.a.exists())
         self.assertTrue((self.quelle / "100APPLE").is_dir())
 
+    def test_windows_hilfsdateien_werden_mitentfernt(self):
+        (self.quelle / "100APPLE" / "Thumbs.db").write_bytes(b"x")
+        ini = self.quelle / "100APPLE" / "desktop.ini"
+        ini.write_text("[.ShellClassInfo]")
+        os.chmod(ini, 0o444)  # schreibgeschützt wie unter Windows üblich
+        (self.quelle / "101APPLE").mkdir()
+        (self.quelle / "101APPLE" / "IMG_0003.JPG").write_bytes(jpeg_mit_exif(dt.datetime(2023, 3, 1), b"c"))
+        (self.quelle / "101APPLE" / "Thumbs.db").write_bytes(b"x")
+        notiz = self.quelle / "101APPLE" / "notiz.txt"
+        notiz.write_text("bleibt")
+
+        z = self.lauf(verschieben=True, leere_ordner_entfernen=True)
+        self.assertFalse((self.quelle / "100APPLE").exists())
+        self.assertEqual((z["ordner_entfernt"], z["hilfsdateien"]), (1, 2))
+        # Ordner mit fremder Datei bleibt – samt Thumbs.db
+        self.assertTrue((self.quelle / "101APPLE" / "Thumbs.db").exists())
+        self.assertEqual(notiz.read_text(), "bleibt")
+
+    def test_hilfsdateien_ohne_haken_unangetastet(self):
+        thumbs = self.quelle / "100APPLE" / "Thumbs.db"
+        thumbs.write_bytes(b"x")
+        self.lauf(verschieben=True)
+        self.assertTrue(thumbs.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
