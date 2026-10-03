@@ -210,6 +210,40 @@ class SortierTests(unittest.TestCase):
         for i, erwartet in enumerate(["2022/05_Mai", "2022/08_August", "2021/12_Dezember", "2023/01_Januar"]):
             self.assertTrue((ziel / erwartet / f"IMG_{3484 + i}.JPG").exists(), erwartet)
 
+    def test_leere_ordner_entfernen(self):
+        # 100APPLE wird komplett geleert -> entfernt; 101APPLE enthält noch eine
+        # fremde Datei -> bleibt samt Datei; der Quellordner selbst bleibt immer
+        (self.quelle / "101APPLE").mkdir()
+        c = self.quelle / "101APPLE" / "IMG_0003.JPG"
+        c.write_bytes(jpeg_mit_exif(dt.datetime(2023, 3, 1), b"c"))
+        fremd = self.quelle / "101APPLE" / "notiz.txt"
+        fremd.write_text("bleibt")
+        (self.quelle / "leer_von_anfang_an").mkdir()
+
+        vorschau = self.lauf(verschieben=True, vorschau=True, leere_ordner_entfernen=True)
+        self.assertEqual(vorschau["ordner_entfernt"], 1)
+        self.assertTrue((self.quelle / "100APPLE").is_dir())  # Vorschau ändert nichts
+
+        z = self.lauf(verschieben=True, leere_ordner_entfernen=True)
+        self.assertEqual(z["ordner_entfernt"], 1)
+        self.assertFalse((self.quelle / "100APPLE").exists())
+        self.assertEqual(fremd.read_text(), "bleibt")
+        self.assertTrue((self.quelle / "leer_von_anfang_an").is_dir())  # nicht von uns geleert
+        self.assertTrue(self.quelle.is_dir())
+        self.assertTrue((self.ziel / "2023" / "03" / "IMG_0003.JPG").exists())
+
+    def test_leere_ordner_nur_beim_verschieben(self):
+        z = self.lauf(leere_ordner_entfernen=True)  # Kopieren
+        self.assertEqual(z["ordner_entfernt"], 0)
+        self.assertTrue((self.quelle / "100APPLE").is_dir())
+
+    def test_duplikat_haelt_ordner_am_leben(self):
+        # identische Datei liegt schon im Ziel -> bleibt in der Quelle -> Ordner bleibt
+        (self.ziel / "2023" / "07" / "IMG_0001.JPG").write_bytes(self.a.read_bytes())
+        self.lauf(verschieben=True, leere_ordner_entfernen=True)
+        self.assertTrue(self.a.exists())
+        self.assertTrue((self.quelle / "100APPLE").is_dir())
+
 
 if __name__ == "__main__":
     unittest.main()

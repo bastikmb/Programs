@@ -7,7 +7,7 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 
 ## Sicherheit
 
-- Es werden **niemals Dateien gelöscht** (im Code gibt es keinen einzigen Löschbefehl).
+- Es werden **niemals Dateien gelöscht**. Im Code gibt es keinen Befehl, der eine Datei löschen kann.
 - Vorhandene Dateien werden **nie überschrieben**. Gibt es im Ziel schon eine
   Datei mit gleichem Namen, aber anderem Inhalt, heißt die neue z. B. `IMG_1234 (1).HEIC`.
 - Liegt die identische Datei schon im Ziel, wird sie übersprungen. Das Tool
@@ -15,6 +15,11 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 - Standard ist **Kopieren**: Die Originale bleiben im Quellordner.
 - **Verschieben** ist optional und passiert nur per Umbenennen auf demselben
   Laufwerk. Auf einem anderen Laufwerk wird stattdessen kopiert.
+- **Geleerte Ordner entfernen** ist optional (Häkchen, nur beim Verschieben).
+  Entfernt werden ausschließlich Ordner, die nach dem Verschieben **komplett leer**
+  sind. Das Programm nutzt dafür `os.rmdir`, und das Betriebssystem verweigert
+  das bei jedem Ordner, in dem noch irgendetwas liegt. Der Quellordner selbst
+  bleibt immer bestehen. Die Vorschau zeigt vorher, welche Ordner betroffen wären.
 - Kopien werden erst unter einem temporären Namen geschrieben und nach der
   Größenprüfung umbenannt. So entsteht nie eine halbe Datei unter dem echten Namen.
 - Jeder Lauf schreibt ein Protokoll (CSV, lässt sich mit Excel öffnen) nach
@@ -71,7 +76,8 @@ python foto_sortierer.py --quelle "C:\Users\Name\Pictures" --ziel "D:\Fotos" --v
 python foto_sortierer.py --quelle "C:\Users\Name\Pictures" --ziel "D:\Fotos"
 ```
 
-Optionen: `--verschieben` und `--ohne-datum-ordner` (siehe unten).
+Optionen: `--verschieben`, `--leere-ordner-entfernen` (nur zusammen mit
+`--verschieben`) und `--ohne-datum-ordner` (siehe unten).
 
 ## Welche Zielordner werden erkannt?
 

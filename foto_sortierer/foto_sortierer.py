@@ -7,7 +7,8 @@ Sortiert Fotos und Videos (z. B. vom iPhone importiert) anhand ihres
 Aufnahmedatums in vorbereitete Ordner nach Jahr/Monat.
 
 Sicherheitsregeln – dieses Programm
-  * löscht NIEMALS eine Datei,
+  * löscht NIEMALS eine Datei (auf Wunsch werden nur komplett leere Ordner
+    entfernt – per os.rmdir, das bei nicht-leeren Ordnern verweigert wird),
   * überschreibt NIEMALS eine vorhandene Datei,
   * kopiert standardmäßig (das Original bleibt im Quellordner),
   * verschiebt nur, wenn ausdrücklich gewünscht – und dann nur per
@@ -597,6 +598,21 @@ def _kopiere_ohne_ueberschreiben(quelle, ziel):
     os.rename(temp, ziel)
 
 
+def _relativ(pfad, basis):
+    """Pfad für die Anzeige relativ zum Quellordner, z. B. 'Sebastian Handy\\202205__'."""
+    try:
+        return str(Path(basis.name) / pfad.relative_to(basis))
+    except ValueError:
+        return str(pfad)
+
+
+def _gleiches_laufwerk(a, b):
+    try:
+        return os.stat(a).st_dev == os.stat(b).st_dev
+    except OSError:
+        return False
+
+
 def _verschiebe_ohne_ueberschreiben(quelle, ziel):
     """Verschiebt nur per Umbenennen auf demselben Laufwerk. Gibt False zurück,
     wenn das nicht möglich ist (dann wird stattdessen kopiert)."""
@@ -660,20 +676,26 @@ def _datum_text(datum, datumsquelle):
 
 class Sortierer:
     def __init__(self, quelle, ziel, verschieben=False, vorschau=False,
-                 ohne_datum_separat=False, melde=print, fortschritt=None, abbruch=None):
+                 ohne_datum_separat=False, leere_ordner_entfernen=False,
+                 melde=print, fortschritt=None, abbruch=None):
         self.quelle = Path(quelle)
         self.ziel = Path(ziel)
         self.verschieben = verschieben
         self.vorschau = vorschau
         self.ohne_datum_separat = ohne_datum_separat
+        # nur beim Verschieben sinnvoll: beim Kopieren wird kein Ordner leer
+        self.leere_ordner_entfernen = leere_ordner_entfernen and verschieben
+        self.weg = set()                # Quelldateien, die verschoben wurden (bzw. würden)
+        self.verlassene_ordner = set()  # Ordner, aus denen etwas verschoben wurde
         self.melde = melde
         self.fortschritt = fortschritt or (lambda i, n: None)
         self.abbruch = abbruch or (lambda: False)
         self.struktur = ZielStruktur(self.ziel)
         self.reserviert = {}  # geplante Zielpfade -> Quelldatei (für die Vorschau)
         self.protokoll = []
+        self.bearbeitet = 0
         self.zaehler = {"kopiert": 0, "verschoben": 0, "duplikat": 0, "fehler": 0,
-                        "ohne_datum": 0, "datum_geschaetzt": 0}
+                        "ohne_datum": 0, "datum_geschaetzt": 0, "ordner_entfernt": 0}
 
     def _eindeutiges_ziel(self, ordner, quelle):
         stamm, endung = quelle.stem, quelle.suffix
@@ -737,6 +759,7 @@ class Sortierer:
                 if datum:
                     bekannte_daten[(pfad.parent, _stamm_fuer_begleitdatei(pfad.name))] = datum
             self._verarbeite(pfad, datum, datumsquelle)
+            self.bearbeitet = i
 
         if self.struktur.neue_ordner:
             self.melde("")
@@ -745,9 +768,59 @@ class Sortierer:
             for o in self.struktur.neue_ordner:
                 self.melde(f"  {o}")
 
+        if self.leere_ordner_entfernen and self.verlassene_ordner:
+            self._leere_ordner_entfernen()
+
         if not self.vorschau and self.protokoll:
             self._protokoll_schreiben()
         return self.zaehler
+
+    def _leere_ordner_entfernen(self):
+        """Entfernt Ordner im Quellordner, die durch das Verschieben leer geworden
+        sind. Nutzt ausschließlich os.rmdir – das Betriebssystem verweigert das
+        bei jedem Ordner, der noch irgendetwas enthält. Dateien können dadurch
+        nie verloren gehen. Der Quellordner selbst bleibt immer bestehen."""
+        wurzel = self.quelle.resolve()
+        ziel = self.ziel.resolve()
+        kandidaten = set()
+        for ordner in self.verlassene_ordner:
+            while ordner != wurzel and _ist_unterhalb(ordner, wurzel):
+                kandidaten.add(ordner)
+                ordner = ordner.parent
+
+        self.melde("")
+        entfernt = set()
+        # tiefste Ordner zuerst, damit danach auch die Elternordner leer sein können
+        for ordner in sorted(kandidaten, key=lambda p: len(p.parts), reverse=True):
+            if ordner == ziel or _ist_unterhalb(ordner, ziel) or _ist_unterhalb(ziel, ordner):
+                continue
+            try:
+                inhalt = [p for p in ordner.iterdir()
+                          if p.resolve() not in entfernt and p.resolve() not in self.weg]
+            except OSError:
+                continue
+            if inhalt and all(p.resolve() in kandidaten for p in inhalt):
+                continue  # enthält nur Unterordner, die selbst bleiben – schon gemeldet
+            if inhalt:
+                namen = ", ".join(p.name for p in inhalt[:3]) + (" …" if len(inhalt) > 3 else "")
+                self.melde(f"Ordner bleibt (nicht leer, enthält noch: {namen}): {_relativ(ordner, wurzel)}")
+                self._protokolliere("Ordner bleibt", ordner, None, None, "", f"enthält noch: {namen}")
+                continue
+            if self.vorschau:
+                entfernt.add(ordner)
+                self.zaehler["ordner_entfernt"] += 1
+                self.melde(f"Leerer Ordner würde entfernt: {_relativ(ordner, wurzel)}")
+                continue
+            try:
+                os.rmdir(ordner)  # schlägt fehl, sobald irgendetwas darin liegt
+            except OSError as fehler:
+                self.melde(f"! Ordner konnte nicht entfernt werden: {ordner} ({fehler})")
+                self._protokolliere("Fehler", ordner, None, None, "", str(fehler))
+                continue
+            entfernt.add(ordner)
+            self.zaehler["ordner_entfernt"] += 1
+            self.melde(f"Leerer Ordner entfernt: {_relativ(ordner, wurzel)}")
+            self._protokolliere("leeren Ordner entfernt", ordner, None, None, "")
 
     def _verarbeite(self, pfad, datum, datumsquelle):
         try:
@@ -774,12 +847,16 @@ class Sortierer:
             if self.vorschau:
                 self.reserviert[ziel] = pfad
                 aktion = "verschieben" if self.verschieben else "kopieren"
+                if self.verschieben and _gleiches_laufwerk(pfad, self.ziel):
+                    self._merke_verschoben(pfad)
             else:
                 self._ordner_anlegen(ordner)
                 aktion = None
                 if self.verschieben:
+                    quelle_aufgeloest = pfad.resolve()
                     if _verschiebe_ohne_ueberschreiben(pfad, ziel):
                         aktion = "verschoben"
+                        self._merke_verschoben(quelle_aufgeloest)
                     else:
                         hinweis = (hinweis + "; " if hinweis else "") + \
                             "anderes Laufwerk – kopiert, Original bleibt erhalten"
@@ -795,6 +872,11 @@ class Sortierer:
             self.zaehler["fehler"] += 1
             self.melde(f"! FEHLER bei {pfad}: {fehler}")
             self._protokolliere("Fehler", pfad, None, datum, datumsquelle, str(fehler))
+
+    def _merke_verschoben(self, pfad):
+        pfad = Path(pfad).resolve()
+        self.weg.add(pfad)
+        self.verlassene_ordner.add(pfad.parent)
 
     def _protokoll_schreiben(self):
         ordner = self.ziel / PROTOKOLL_ORDNER
@@ -828,7 +910,9 @@ def zusammenfassung(z, vorschau, verschieben):
         zeilen.append(f"  Ohne Datum -> Ordner '{OHNE_DATUM_ORDNER}': {z['ohne_datum']}")
     if z["fehler"]:
         zeilen.append(f"  FEHLER: {z['fehler']} (Details im Protokoll/Log)")
-    zeilen.append("  Gelöscht: 0 (dieses Programm löscht niemals Dateien)")
+    if z.get("ordner_entfernt"):
+        zeilen.append(f"  Leere Ordner {'würden entfernt' if vorschau else 'entfernt'}: {z['ordner_entfernt']}")
+    zeilen.append("  Gelöschte Dateien: 0 (dieses Programm löscht niemals Dateien)")
     return "\n".join(zeilen)
 
 
@@ -950,7 +1034,7 @@ def starte_gui():
         return int(round(wert * skalierung))
 
     bildschirm_b, bildschirm_h = fenster.winfo_screenwidth(), fenster.winfo_screenheight()
-    fenster.geometry(f"{min(px(1040), int(bildschirm_b * 0.92))}x{min(px(780), int(bildschirm_h * 0.85))}")
+    fenster.geometry(f"{min(px(1040), int(bildschirm_b * 0.92))}x{min(px(840), int(bildschirm_h * 0.88))}")
     fenster.minsize(min(px(900), int(bildschirm_b * 0.8)), min(px(620), int(bildschirm_h * 0.7)))
 
     logo_gross = logo_icon = None
@@ -976,6 +1060,7 @@ def starte_gui():
     ziel_var = tk.StringVar(value=einstellungen.get("ziel", ""))
     modus_var = tk.StringVar(value="kopieren")
     ohne_datum_var = tk.BooleanVar(value=einstellungen.get("ohne_datum_separat", False))
+    leere_ordner_var = tk.BooleanVar(value=False)
     status_var = tk.StringVar(value="Bereit. Prüfe die Ordner und starte mit der Vorschau.")
     nachrichten = queue.Queue()
     laeuft = {"aktiv": False, "abbruch": False}
@@ -1110,6 +1195,7 @@ def starte_gui():
             k.configure(bg=F["karte"] if gewaehlt else F["hintergrund"],
                         fg=F["text"] if gewaehlt else F["leise"])
         modus_hilfe.configure(text=modus_texte[modus])
+        ordner_haken.schalten(modus == "verschieben")  # beim Kopieren wird kein Ordner leer
 
     for name, text in (("kopieren", "Kopieren"), ("verschieben", "Verschieben")):
         k = tk.Label(umschalter, text=text, font=S["fett"], padx=22, pady=7, cursor="hand2")
@@ -1117,38 +1203,60 @@ def starte_gui():
         k.bind("<Button-1>", lambda e, n=name: modus_setzen(n))
         modus_knoepfe[name] = k
     modus_hilfe.pack(fill="x", pady=(6, 0))
+
+    class Haekchen:
+        """Eigenes Kästchen: das Standard-Häkchen von Tk wächst unter Windows
+        nicht mit der Skalierung. Optional ausgegraut, wenn nicht wählbar."""
+
+        def __init__(self, master, var, text, hilfe):
+            self.var, self.aktiv, self.k = var, True, px(18)
+            zeile = tk.Frame(master, bg=F["karte"], cursor="hand2")
+            zeile.pack(fill="x", pady=(14, 0))
+            self.feld = tk.Canvas(zeile, width=self.k, height=self.k, bg=F["karte"],
+                                  highlightthickness=0, cursor="hand2")
+            self.feld.pack(side="left")
+            self.text = tk.Label(zeile, text=text, font=S["normal"], bg=F["karte"], fg=F["text"],
+                                 cursor="hand2")
+            self.text.pack(side="left", padx=(px(10), 0))
+            self.hilfe = tk.Label(master, text=hilfe, font=S["klein"], bg=F["karte"], fg=F["leise"],
+                                  anchor="w", justify="left")
+            self.hilfe.pack(fill="x", padx=(self.k + px(10), 0))
+            # Hilfetext bei schmalem Fenster umbrechen statt abschneiden
+            self.hilfe.bind("<Configure>", lambda e: self.hilfe.configure(wraplength=max(e.width - 4, 100)))
+            for w in (zeile, self.feld, self.text):
+                w.bind("<Button-1>", self.umschalten)
+            self.zeichnen()
+
+        def zeichnen(self):
+            k = self.k
+            self.feld.delete("all")
+            if self.var.get() and self.aktiv:
+                self.feld.create_rectangle(1, 1, k - 1, k - 1, fill=F["akzent"], outline=F["akzent"])
+                self.feld.create_line(k * 0.25, k * 0.52, k * 0.43, k * 0.70, k * 0.76, k * 0.32,
+                                      fill="#FFFFFF", width=max(2, px(2)), capstyle="round",
+                                      joinstyle="round")
+            else:
+                self.feld.create_rectangle(1, 1, k - 1, k - 1, fill=F["karte"] if self.aktiv else F["hintergrund"],
+                                           outline="#94A3B8" if self.aktiv else F["rand"])
+            self.text.configure(fg=F["text"] if self.aktiv else "#94A3B8")
+
+        def umschalten(self, _=None):
+            if self.aktiv and not laeuft["aktiv"]:
+                self.var.set(not self.var.get())
+                self.zeichnen()
+
+        def schalten(self, aktiv):
+            self.aktiv = aktiv
+            self.zeichnen()
+
+    Haekchen(optionen_innen, ohne_datum_var, "Dateien ohne Aufnahmedatum separat ablegen",
+             f"Sie landen dann in „{OHNE_DATUM_ORDNER}“, statt nach dem Änderungsdatum "
+             "der Datei einsortiert zu werden.")
+    ordner_haken = Haekchen(
+        optionen_innen, leere_ordner_var, "Geleerte Ordner nach dem Verschieben entfernen",
+        "Nur Ordner, die danach komplett leer sind. Liegt noch irgendetwas darin, bleibt der Ordner. "
+        "Der Quellordner selbst bleibt immer.")
     modus_setzen("kopieren")
-
-    # eigenes Kästchen: das Standard-Häkchen von Tk wächst unter Windows nicht mit der Skalierung
-    haken_zeile = tk.Frame(optionen_innen, bg=F["karte"], cursor="hand2")
-    haken_zeile.pack(fill="x", pady=(14, 0))
-    k = px(18)
-    haken = tk.Canvas(haken_zeile, width=k, height=k, bg=F["karte"], highlightthickness=0, cursor="hand2")
-    haken.pack(side="left")
-    haken_text = tk.Label(haken_zeile, text="Dateien ohne Aufnahmedatum separat ablegen", font=S["normal"],
-                          bg=F["karte"], fg=F["text"], cursor="hand2")
-    haken_text.pack(side="left", padx=(px(10), 0))
-
-    def haken_zeichnen():
-        haken.delete("all")
-        if ohne_datum_var.get():
-            haken.create_rectangle(1, 1, k - 1, k - 1, fill=F["akzent"], outline=F["akzent"])
-            haken.create_line(k * 0.25, k * 0.52, k * 0.43, k * 0.70, k * 0.76, k * 0.32,
-                              fill="#FFFFFF", width=max(2, px(2)), capstyle="round", joinstyle="round")
-        else:
-            haken.create_rectangle(1, 1, k - 1, k - 1, fill=F["karte"], outline="#94A3B8")
-
-    def haken_umschalten(_=None):
-        if not laeuft["aktiv"]:
-            ohne_datum_var.set(not ohne_datum_var.get())
-            haken_zeichnen()
-
-    for w in (haken_zeile, haken, haken_text):
-        w.bind("<Button-1>", haken_umschalten)
-    haken_zeichnen()
-    tk.Label(optionen_innen, text=f"Sie landen dann in „{OHNE_DATUM_ORDNER}“, statt nach dem Änderungsdatum "
-                                  "der Datei einsortiert zu werden.",
-             font=S["klein"], bg=F["karte"], fg=F["leise"], anchor="w").pack(fill="x", padx=(k + px(10), 0))
 
     # Aktionen
     aktionen = tk.Frame(inhalt, bg=F["hintergrund"])
@@ -1201,7 +1309,7 @@ def starte_gui():
             tag = "leise"
         elif text.startswith("!"):
             tag = "fehler"
-        elif text.startswith(("VORSCHAU", "Ordner angelegt", "Folgende", "Protokoll")):
+        elif text.startswith(("VORSCHAU", "Ordner angelegt", "Folgende", "Protokoll", "Leerer Ordner")):
             tag = "info"
         else:
             tag = None
@@ -1262,9 +1370,13 @@ def starte_gui():
             messagebox.showerror("Foto-Sortierer", "Quell- und Zielordner dürfen nicht gleich sein.")
             return
         verschieben = modus_var.get() == "verschieben"
+        ordner_entfernen = verschieben and leere_ordner_var.get()
         if not vorschau:
             text = ("Dateien werden jetzt " + ("VERSCHOBEN" if verschieben else "KOPIERT") +
-                    f".\n\nVon:  {quelle}\nNach: {ziel}\n\nEs wird nichts gelöscht oder überschrieben. Fortfahren?")
+                    f".\n\nVon:  {quelle}\nNach: {ziel}\n\nEs wird keine Datei gelöscht oder überschrieben.")
+            if ordner_entfernen:
+                text += "\nOrdner, die danach komplett leer sind, werden entfernt."
+            text += "\n\nFortfahren?"
             if not messagebox.askyesno("Foto-Sortierer", text):
                 return
         speichere_einstellungen({"quelle": quelle, "ziel": ziel,
@@ -1281,6 +1393,7 @@ def starte_gui():
             try:
                 s = Sortierer(quelle, ziel, verschieben=verschieben, vorschau=vorschau,
                               ohne_datum_separat=ohne_datum_var.get(),
+                              leere_ordner_entfernen=ordner_entfernen,
                               melde=lambda t: nachrichten.put(("text", t)),
                               abbruch=lambda: laeuft["abbruch"])
 
@@ -1291,7 +1404,7 @@ def starte_gui():
 
                 s.fortschritt = fortschritt
                 z = s.ausfuehren()
-                fortschritt(len(s.protokoll), max(len(s.protokoll), 1))
+                fortschritt(s.bearbeitet, max(s.bearbeitet, 1))
                 titel = "Vorschau fertig – nichts wurde verändert." if vorschau else "Fertig sortiert."
                 nachrichten.put(("fertig", (titel, zusammenfassung(z, vorschau, verschieben))))
             except Exception as fehler:
@@ -1324,6 +1437,9 @@ def main(argv=None):
     parser.add_argument("--vorschau", action="store_true", help="nur anzeigen, nichts verändern")
     parser.add_argument("--verschieben", action="store_true",
                         help="verschieben statt kopieren (nur auf demselben Laufwerk)")
+    parser.add_argument("--leere-ordner-entfernen", action="store_true",
+                        help="nach dem Verschieben komplett leere Ordner im Quellordner entfernen "
+                             "(nur mit --verschieben; Dateien werden nie gelöscht)")
     parser.add_argument("--ohne-datum-ordner", action="store_true",
                         help=f"Dateien ohne Aufnahmedatum nach '{OHNE_DATUM_ORDNER}' statt nach Änderungsdatum")
     args = parser.parse_args(argv)
@@ -1336,9 +1452,12 @@ def main(argv=None):
     quelle = args.quelle or str(standard_bilder_ordner())
     if Path(quelle).resolve() == Path(args.ziel).resolve():
         parser.error("Quell- und Zielordner dürfen nicht gleich sein")
+    if args.leere_ordner_entfernen and not args.verschieben:
+        parser.error("--leere-ordner-entfernen geht nur zusammen mit --verschieben")
 
     s = Sortierer(quelle, args.ziel, verschieben=args.verschieben, vorschau=args.vorschau,
-                  ohne_datum_separat=args.ohne_datum_ordner)
+                  ohne_datum_separat=args.ohne_datum_ordner,
+                  leere_ordner_entfernen=args.leere_ordner_entfernen)
     try:
         z = s.ausfuehren()
     except FileNotFoundError as fehler:
