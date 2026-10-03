@@ -20,7 +20,27 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 - Jeder Lauf schreibt ein Protokoll (CSV, lässt sich mit Excel öffnen) nach
   `Zielordner/_Sortierprotokolle/`.
 
-## Installation
+## Fertiges Programm (ohne Installation)
+
+Unter **Releases** im GitHub-Repository liegen fertige Programme, für die kein
+Python installiert sein muss:
+
+- **Windows:** `Foto-Sortierer.exe` herunterladen und doppelklicken. Beim
+  ersten Start zeigt Windows eventuell „Der Computer wurde durch Windows
+  geschützt“: auf **„Weitere Informationen“** und dann **„Trotzdem ausführen“**
+  klicken. Das passiert, weil das Programm nicht kostenpflichtig signiert ist.
+- **Mac:** `Foto-Sortierer-macOS.zip` herunterladen und entpacken. Dann
+  Rechtsklick auf die App → **„Öffnen“** und bestätigen.
+
+**Weitergeben:** Am besten den Download-Link der Release-Seite schicken. Gmail
+und Outlook blockieren `.exe`-Anhänge, auch innerhalb einer ZIP-Datei.
+
+**Neue Version veröffentlichen:** Die Programme baut der Workflow
+`.github/workflows/foto-sortierer.yml` bei jeder Änderung automatisch (zu finden
+unter *Actions* → Lauf → *Artifacts*). Ein Git-Tag wie `foto-sortierer-v1.1.0`
+erstellt zusätzlich ein Release mit Download-Link.
+
+## Installation (zum Starten aus dem Quellcode)
 
 Nötig ist nur **Python 3.8 oder neuer**, Zusatzpakete braucht es nicht.
 
