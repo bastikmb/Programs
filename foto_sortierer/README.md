@@ -1,7 +1,9 @@
 # Foto- & Video-Sortierer
 
 Sortiert Fotos und Videos vom iPhone nach **Aufnahmedatum** in vorbereitete
-Ordner nach **Jahr/Monat**.
+Ordner nach **Jahr/Monat**. Teil des Lando System.
+
+![Foto-Sortierer](docs/screenshot.png)
 
 ## Sicherheit
 
