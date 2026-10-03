@@ -940,13 +940,26 @@ def starte_gui():
 
     fenster = tk.Tk()
     fenster.title("Foto-Sortierer – Lando System")
-    fenster.geometry("1040x780")
-    fenster.minsize(900, 680)
     fenster.configure(bg=F["hintergrund"])
+
+    # Windows-Skalierung (125 %, 150 % …): Schriften wachsen automatisch mit,
+    # feste Pixelmaße müssen wir selbst umrechnen.
+    skalierung = max(1.0, float(fenster.tk.call("tk", "scaling")) * 72 / 96)  # 1.0 = 100 %
+
+    def px(wert):
+        return int(round(wert * skalierung))
+
+    bildschirm_b, bildschirm_h = fenster.winfo_screenwidth(), fenster.winfo_screenheight()
+    fenster.geometry(f"{min(px(1040), int(bildschirm_b * 0.92))}x{min(px(780), int(bildschirm_h * 0.85))}")
+    fenster.minsize(min(px(900), int(bildschirm_b * 0.8)), min(px(620), int(bildschirm_h * 0.7)))
 
     logo_gross = logo_icon = None
     try:
-        logo_gross = tk.PhotoImage(data=LANDO_LOGO_GROSS).subsample(2)
+        logo_gross = tk.PhotoImage(data=LANDO_LOGO_GROSS)  # 200 x 313 Pixel
+        if skalierung < 1.25:
+            logo_gross = logo_gross.subsample(2)
+        elif skalierung < 1.75:
+            logo_gross = logo_gross.zoom(3).subsample(4)
         logo_icon = tk.PhotoImage(data=LANDO_LOGO_ICON)
         fenster.iconphoto(True, logo_icon)
     except tk.TclError:
@@ -1007,9 +1020,10 @@ def starte_gui():
 
     # --- Seitenleiste mit Lando-Logo --------------------------------------
 
-    seite = tk.Frame(fenster, bg=F["seite"], width=260)
+    seite = tk.Frame(fenster, bg=F["seite"])
     seite.pack(side="left", fill="y")
-    seite.pack_propagate(False)
+    # Mindestbreite; wird der Inhalt breiter (große Schrift), wächst die Leiste mit
+    tk.Frame(seite, bg=F["seite"], width=px(260), height=0).pack()
 
     if logo_gross is not None:
         tk.Label(seite, image=logo_gross, bg=F["seite"]).pack(pady=(34, 10))
@@ -1018,21 +1032,22 @@ def starte_gui():
     tk.Label(seite, text="Fotos & Videos nach Jahr/Monat", font=S["klein"], bg=F["seite"],
              fg=F["seite_leise"]).pack()
 
-    tk.Frame(seite, bg=F["seite_linie"], height=1).pack(fill="x", padx=28, pady=26)
+    tk.Frame(seite, bg=F["seite_linie"], height=1).pack(fill="x", padx=px(28), pady=px(26))
 
     schritte = tk.Frame(seite, bg=F["seite"])
-    schritte.pack(fill="x", padx=28)
+    schritte.pack(fill="x", padx=px(28))
     for nr, text in enumerate(("Ordner prüfen", "Vorschau ansehen", "Sortieren starten"), 1):
         zeile = tk.Frame(schritte, bg=F["seite"])
         zeile.pack(fill="x", pady=5)
-        kreis = tk.Canvas(zeile, width=24, height=24, bg=F["seite"], highlightthickness=0)
-        kreis.create_oval(1, 1, 23, 23, outline=F["seite_leise"], width=1)
-        kreis.create_text(12, 12, text=str(nr), fill=F["seite_text"], font=S["klein"])
+        d = px(24)
+        kreis = tk.Canvas(zeile, width=d, height=d, bg=F["seite"], highlightthickness=0)
+        kreis.create_oval(1, 1, d - 1, d - 1, outline=F["seite_leise"], width=1)
+        kreis.create_text(d / 2, d / 2, text=str(nr), fill=F["seite_text"], font=S["klein"])
         kreis.pack(side="left")
         tk.Label(zeile, text=text, font=S["normal"], bg=F["seite"], fg=F["seite_text"]).pack(side="left", padx=10)
 
     hinweis = tk.Frame(seite, bg=F["seite"])
-    hinweis.pack(side="bottom", fill="x", padx=28, pady=28)
+    hinweis.pack(side="bottom", fill="x", padx=px(28), pady=px(28))
     tk.Label(hinweis, text="✓ Löscht niemals Dateien", font=S["fett"], bg=F["seite"],
              fg="#4ADE80", anchor="w").pack(fill="x")
     tk.Label(hinweis, text="Nichts wird überschrieben.\nJeder Lauf wird protokolliert.",
@@ -1042,7 +1057,7 @@ def starte_gui():
     # --- Inhalt -----------------------------------------------------------
 
     inhalt = tk.Frame(fenster, bg=F["hintergrund"])
-    inhalt.pack(side="left", fill="both", expand=True, padx=28, pady=24)
+    inhalt.pack(side="left", fill="both", expand=True, padx=px(28), pady=px(24))
 
     # Ordner
     ordner_karte, ordner_innen = karte(inhalt, "Ordner")
@@ -1104,13 +1119,36 @@ def starte_gui():
     modus_hilfe.pack(fill="x", pady=(6, 0))
     modus_setzen("kopieren")
 
-    tk.Checkbutton(optionen_innen, text=" Dateien ohne Aufnahmedatum separat ablegen",
-                   variable=ohne_datum_var, font=S["normal"], bg=F["karte"], fg=F["text"],
-                   activebackground=F["karte"], selectcolor=F["karte"], highlightthickness=0,
-                   bd=0, anchor="w").pack(fill="x", pady=(12, 0))
+    # eigenes Kästchen: das Standard-Häkchen von Tk wächst unter Windows nicht mit der Skalierung
+    haken_zeile = tk.Frame(optionen_innen, bg=F["karte"], cursor="hand2")
+    haken_zeile.pack(fill="x", pady=(14, 0))
+    k = px(18)
+    haken = tk.Canvas(haken_zeile, width=k, height=k, bg=F["karte"], highlightthickness=0, cursor="hand2")
+    haken.pack(side="left")
+    haken_text = tk.Label(haken_zeile, text="Dateien ohne Aufnahmedatum separat ablegen", font=S["normal"],
+                          bg=F["karte"], fg=F["text"], cursor="hand2")
+    haken_text.pack(side="left", padx=(px(10), 0))
+
+    def haken_zeichnen():
+        haken.delete("all")
+        if ohne_datum_var.get():
+            haken.create_rectangle(1, 1, k - 1, k - 1, fill=F["akzent"], outline=F["akzent"])
+            haken.create_line(k * 0.25, k * 0.52, k * 0.43, k * 0.70, k * 0.76, k * 0.32,
+                              fill="#FFFFFF", width=max(2, px(2)), capstyle="round", joinstyle="round")
+        else:
+            haken.create_rectangle(1, 1, k - 1, k - 1, fill=F["karte"], outline="#94A3B8")
+
+    def haken_umschalten(_=None):
+        if not laeuft["aktiv"]:
+            ohne_datum_var.set(not ohne_datum_var.get())
+            haken_zeichnen()
+
+    for w in (haken_zeile, haken, haken_text):
+        w.bind("<Button-1>", haken_umschalten)
+    haken_zeichnen()
     tk.Label(optionen_innen, text=f"Sie landen dann in „{OHNE_DATUM_ORDNER}“, statt nach dem Änderungsdatum "
                                   "der Datei einsortiert zu werden.",
-             font=S["klein"], bg=F["karte"], fg=F["leise"], anchor="w").pack(fill="x", padx=(24, 0))
+             font=S["klein"], bg=F["karte"], fg=F["leise"], anchor="w").pack(fill="x", padx=(k + px(10), 0))
 
     # Aktionen
     aktionen = tk.Frame(inhalt, bg=F["hintergrund"])
