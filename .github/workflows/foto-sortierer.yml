@@ -13,6 +13,10 @@ on:
       - ".github/workflows/foto-sortierer.yml"
     tags:
       - "foto-sortierer-v*"
+  pull_request:
+    paths:
+      - "foto_sortierer/**"
+      - ".github/workflows/foto-sortierer.yml"
   workflow_dispatch:
 
 permissions:
