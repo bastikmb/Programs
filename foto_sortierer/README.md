@@ -32,8 +32,8 @@ Ordner nach **Jahr/Monat**. Teil des Lando System.
 
 ## Fertiges Programm (ohne Installation)
 
-Unter **Releases** im GitHub-Repository liegen fertige Programme, für die kein
-Python installiert sein muss:
+Fertige Programme, für die kein Python installiert sein muss, gibt es hier:
+**<https://github.com/bastikmb/Programs/releases/tag/foto-sortierer-aktuell>**
 
 - **Windows:** `Foto-Sortierer.exe` herunterladen und doppelklicken. Beim
   ersten Start zeigt Windows eventuell „Der Computer wurde durch Windows
@@ -45,10 +45,10 @@ Python installiert sein muss:
 **Weitergeben:** Am besten den Download-Link der Release-Seite schicken. Gmail
 und Outlook blockieren `.exe`-Anhänge, auch innerhalb einer ZIP-Datei.
 
-**Neue Version veröffentlichen:** Die Programme baut der Workflow
-`.github/workflows/foto-sortierer.yml` bei jeder Änderung automatisch (zu finden
-unter *Actions* → Lauf → *Artifacts*). Ein Git-Tag wie `foto-sortierer-v1.1.0`
-erstellt zusätzlich ein Release mit Download-Link.
+**Neue Version veröffentlichen:** Der Workflow `.github/workflows/foto-sortierer.yml`
+baut die Programme bei jeder Änderung neu und aktualisiert das Release oben. Der
+Link bleibt dabei gleich. Ein Git-Tag wie `foto-sortierer-v1.1.0` erstellt
+zusätzlich ein eigenes, festes Release.
 
 ## Installation (zum Starten aus dem Quellcode)
 
