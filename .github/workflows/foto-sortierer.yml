@@ -1,0 +1,130 @@
+name: Foto-Sortierer bauen
+
+# Baut eigenständige Programme (ohne Python-Installation lauffähig):
+#   Windows: Foto-Sortierer.exe
+#   macOS:   Foto-Sortierer-macOS.zip (enthält Foto-Sortierer.app)
+# Die Dateien hängen als "Artifacts" am jeweiligen Lauf und werden als Release
+# "Foto-Sortierer – aktuelle Version" veröffentlicht (fester Download-Link):
+#   https://github.com/bastikmb/Programs/releases/tag/foto-sortierer-aktuell
+
+on:
+  push:
+    paths:
+      - "foto_sortierer/**"
+      - ".github/workflows/foto-sortierer.yml"
+    tags:
+      - "foto-sortierer-v*"
+  pull_request:
+    paths:
+      - "foto_sortierer/**"
+      - ".github/workflows/foto-sortierer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bauen:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            datei: Foto-Sortierer.exe
+          - os: macos-latest
+            name: macOS
+            datei: Foto-Sortierer-macOS.zip
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: foto_sortierer
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Werkzeuge installieren
+        run: python -m pip install pyinstaller pillow
+
+      - name: Tests
+        run: python -m unittest -v test_foto_sortierer.py
+
+      - name: Windows-Programm bauen
+        if: runner.os == 'Windows'
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name Foto-Sortierer --icon build_assets/icon.ico foto_sortierer.py
+
+      - name: Mac-App bauen
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --clean --windowed \
+            --name Foto-Sortierer --icon build_assets/icon.png foto_sortierer.py
+          cd dist && ditto -c -k --keepParent Foto-Sortierer.app Foto-Sortierer-macOS.zip
+
+      - name: Programm testweise starten (Vorschau über Kommandozeile)
+        run: |
+          mkdir -p probe/quelle probe/ziel
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./dist/Foto-Sortierer.exe --quelle probe/quelle --ziel probe/ziel --vorschau
+          else
+            ./dist/Foto-Sortierer.app/Contents/MacOS/Foto-Sortierer --quelle probe/quelle --ziel probe/ziel --vorschau
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Foto-Sortierer-${{ matrix.name }}
+          path: foto_sortierer/dist/${{ matrix.datei }}
+          if-no-files-found: error
+
+  veroeffentlichen:
+    # Pull-Request-Läufe, Pushes nach main und manuelle Starts aktualisieren das
+    # Release "Foto-Sortierer – aktuelle Version" (fester Download-Link).
+    # Ein Tag "foto-sortierer-v*" erzeugt zusätzlich ein eigenes, festes Release.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/foto-sortierer-v')
+    needs: bauen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dateien
+          merge-multiple: true
+
+      - name: Aktuelle Version veröffentlichen
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: foto-sortierer-aktuell
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          name: Foto-Sortierer – aktuelle Version
+          make_latest: true
+          files: dateien/*
+          body: |
+            **Windows:** `Foto-Sortierer.exe` herunterladen und doppelklicken.
+            Falls Windows „Der Computer wurde durch Windows geschützt“ meldet:
+            „Weitere Informationen“ → „Trotzdem ausführen“.
+
+            **Mac:** `Foto-Sortierer-macOS.zip` herunterladen, entpacken,
+            Rechtsklick auf die App → „Öffnen“.
+
+            Es muss nichts installiert werden. Fotos und Videos werden niemals gelöscht.
+
+      - name: Feste Version veröffentlichen
+        if: startsWith(github.ref, 'refs/tags/foto-sortierer-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Foto-Sortierer ${{ github.ref_name }}
+          files: dateien/*
+          body: |
+            **Windows:** `Foto-Sortierer.exe` herunterladen und doppelklicken.
+            Falls Windows „Der Computer wurde durch Windows geschützt“ meldet:
+            „Weitere Informationen“ → „Trotzdem ausführen“.
+
+            **Mac:** `Foto-Sortierer-macOS.zip` herunterladen, entpacken,
+            Rechtsklick auf die App → „Öffnen“.
+
+            Es muss nichts installiert werden. Fotos und Videos werden niemals gelöscht.
