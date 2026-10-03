@@ -4048,6 +4048,7 @@ function buildRoundCardsFromVocab(){
   state.roundIndex = 0;
   state.roundTotalPoints = 0;
   state.roundStartTime = Date.now();
+  state.requeuedKeys = {}; // which words (by de key) already got a within-round retry card, see maybeRequeueCard
   state.currentCombo = 0;
   state.bestCombo = 0;
   state.roundComboBonus = 0;
@@ -4395,6 +4396,7 @@ function renderAnswerBoxesLive(card, currentInput){
 function collectHardWords(){
   const hard=[];
   for(const card of state.roundCards){
+    if(card.isRequeue) continue; // the original card already represents this word here
     if(!card.done) continue;
     if(!card.firstTry){
       hard.push({
@@ -4414,7 +4416,12 @@ function collectHardWords(){
 /* compute round stats */
 function finalizeRoundAndUpdateProfile(){
   const durationSec = Math.round((Date.now()-state.roundStartTime)/1000);
-  const totalCards = state.roundCards.length;
+  // Requeued retry cards (see maybeRequeueCard) are a second shot at a word
+  // already represented by its original card, so they're excluded here --
+  // otherwise a corrected retry would dilute firstTryPct/wrongCounts/
+  // correctCounts with a result that isn't really a "first try" at all.
+  const originalCards = state.roundCards.filter(c=>!c.isRequeue);
+  const totalCards = originalCards.length;
   let firstTryCorrectCount=0;
   const hardWords=collectHardWords();
 
@@ -4432,7 +4439,7 @@ function finalizeRoundAndUpdateProfile(){
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
     ensureCorrectByDirection(prof); // older profiles predate this field too -- seeds it from correctCounts, see comment on ensureCorrectByDirection
-    for(const card of state.roundCards){
+    for(const card of originalCards){
       // only a genuine wrong-typed attempt counts against the long-term
       // "Problemwörter" stat -- skipping or revealing without trying
       // still marks the card as !firstTry (for the round summary and page
@@ -4464,7 +4471,7 @@ function finalizeRoundAndUpdateProfile(){
   }
 
   // calc first try %
-  for(const card of state.roundCards){
+  for(const card of originalCards){
     if(card.done && card.firstTry) firstTryCorrectCount++;
   }
   const firstTryPct = totalCards>0 ? Math.round(firstTryCorrectCount/totalCards*100) : 0;
@@ -5191,6 +5198,32 @@ function showSummaryScreen(){
    ROUND LOGIC (CHECK, HINT, NEXT)
    =========================================================== */
 
+/* Re-inserts a word a few cards further ahead in the SAME round after it
+   was genuinely answered wrong at least once (card.attemptedWrong), so it
+   gets a timely second retrieval attempt instead of only resurfacing via
+   "Nur schwierige Wörter üben" in a later session. Capped at one retry
+   card per word per round (via state.requeuedKeys) so a stubborn word
+   can't keep re-inserting itself indefinitely; the retry card starts with
+   a lower score and is flagged isRequeue so it's excluded from
+   firstTryPct/hardWords/wrongCounts -- those already reflect this word
+   via the original card. */
+function maybeRequeueCard(card){
+  if(!card.attemptedWrong || card.isRequeue) return;
+  const key = card.de;
+  if(state.requeuedKeys[key]) return;
+  state.requeuedKeys[key] = true;
+
+  const gap = 3 + Math.floor(Math.random()*4); // reappears 3-6 cards later
+  const insertPos = Math.min(state.roundIndex + 1 + gap, state.roundCards.length);
+  state.roundCards.splice(insertPos, 0, {
+    icon:card.icon, de:card.de, foreign:card.foreign, pageId:card.pageId,
+    example:card.example, direction:card.direction,
+    prompt:card.prompt, answer:card.answer,
+    score:5, firstTry:true, done:false, attemptedWrong:false,
+    isRequeue:true
+  });
+}
+
 /* Reveals several letters at once, at random positions within the answer,
    instead of just the next letter in sequence -- the number revealed
    scales with the answer's length (longer words/phrases get more letters
@@ -5397,6 +5430,7 @@ function checkAnswer(){
     // to actively dismiss, instead of a fixed pause that hid it again
     // before it could be read
     setLearnControlsDisabled(true);
+    maybeRequeueCard(card);
     showContinueOverlay(pickRandom(CORRECT_MESSAGES), "good", card.example, ()=>{
       state.roundIndex++;
       setLearnControlsDisabled(false);
@@ -5441,6 +5475,7 @@ function skipCurrentCard(){
   card.score = 0;
   state.currentCombo = 0;
   updateComboIndicator();
+  maybeRequeueCard(card);
   state.roundIndex++;
   renderCurrentCard();
 }
@@ -5466,6 +5501,7 @@ function revealSolution(){
   // show the solution + example sentence in an overlay the child has to
   // actively dismiss, instead of a fixed pause that hid it again too soon
   setLearnControlsDisabled(true);
+  maybeRequeueCard(card);
   showContinueOverlay("Hier ist die Lösung 👀", "far", card.example, ()=>{
     state.roundIndex++;
     setLearnControlsDisabled(false);
