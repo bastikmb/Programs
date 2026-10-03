@@ -1311,6 +1311,11 @@ def starte_gui():
 # ---------------------------------------------------------------------------
 
 def main(argv=None):
+    # Als Windows-Programm ohne Konsolenfenster gibt es keine Standardausgabe
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
     parser = argparse.ArgumentParser(
         description="Sortiert Fotos/Videos nach Aufnahmedatum in Jahr/Monat-Ordner. "
                     "Löscht und überschreibt niemals Dateien. Ohne Parameter startet die Oberfläche.")
