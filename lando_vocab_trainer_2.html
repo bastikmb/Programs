@@ -111,7 +111,7 @@ body {
   background:var(--card);
   border-radius:var(--radius);
   box-shadow:var(--card-shadow);
-  padding:1.5rem 1.5rem 4.5rem;
+  padding:1.5rem 1.5rem 8.5rem;
   box-sizing:border-box;
   min-height:70vh;
   position:relative;
@@ -984,6 +984,25 @@ body.dark-theme .level-up-banner {
 #btn-floating-theme:active {
   transform:scale(0.97);
 }
+/* stacked directly above the theme toggle, same left edge */
+#btn-floating-sound {
+  position:fixed;
+  left:1rem;
+  bottom:calc(1rem + 4.2rem + env(safe-area-inset-bottom));
+  z-index:9999;
+  border:none;
+  background:#1f2937;
+  color:#fff;
+  border-radius:999px;
+  padding:0.8rem 1rem;
+  font-size:1rem;
+  line-height:1rem;
+  box-shadow:0 10px 24px rgba(0,0,0,0.3);
+  cursor:pointer;
+}
+#btn-floating-sound:active {
+  transform:scale(0.97);
+}
 
 /* buttons general */
 .btn-row {
@@ -997,12 +1016,13 @@ body.dark-theme .level-up-banner {
    so the way forward/back never requires hunting for it below the
    fold. bottom matches .screen's own bottom padding, which already
    reserves exactly this much clearance above the floating round
-   buttons; negative side margins let the backing bar bleed to the
-   card's full width while the matching padding keeps the buttons
-   themselves inset like everywhere else. */
+   buttons (two of them now stack on the left: theme + sound toggle);
+   negative side margins let the backing bar bleed to the card's full
+   width while the matching padding keeps the buttons themselves inset
+   like everywhere else. */
 .btn-row-sticky {
   position:sticky;
-  bottom:calc(4.5rem + env(safe-area-inset-bottom));
+  bottom:calc(8.5rem + env(safe-area-inset-bottom));
   background:var(--card);
   margin-left:-1.5rem;
   margin-right:-1.5rem;
@@ -1573,6 +1593,7 @@ body.dark-theme .level-up-banner {
 
 
 <button id="btn-floating-theme">🌙</button>
+<button id="btn-floating-sound">🔊</button>
 <button id="btn-floating-stats">📊</button>
 
 <script>
@@ -3606,6 +3627,65 @@ function saveProfiles() {
   }
 }
 
+/* ===========================================================
+   SOUND EFFECTS (Web Audio API, synthesized -- no embedded audio
+   files, keeps this single-file app from growing further) -- every
+   playSound() call site is inside an existing button-click handler, so
+   the AudioContext is always created/resumed from within a user
+   gesture and autoplay restrictions never come into play.
+   =========================================================== */
+
+let audioCtx = null;
+let soundMuted = false;
+
+function ensureAudioCtx(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  }
+  if(audioCtx.state==="suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(ctx, {freq, duration=0.12, type="sine", gain=0.2, startDelay=0}){
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startDelay;
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gain, t0+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, t0+duration);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(t0); osc.stop(t0+duration+0.02);
+}
+
+function playSound(kind, opts={}){
+  if(soundMuted) return;
+  try {
+    const ctx = ensureAudioCtx();
+    switch(kind){
+      case "correct": playTone(ctx,{freq:880, duration:0.12}); break;
+      case "wrong":   playTone(ctx,{freq:220, duration:0.18, type:"sawtooth", gain:0.15}); break;
+      case "combo": {
+        // pitch rises with combo size so bigger streaks sound more exciting, capped so it never gets shrill
+        const freq = Math.min(660 + (opts.combo||2)*40, 1400);
+        playTone(ctx,{freq, duration:0.14, gain:0.22});
+        break;
+      }
+      case "levelup":
+        [660,880,1100].forEach((f,i)=>playTone(ctx,{freq:f, duration:0.16, startDelay:i*0.09}));
+        break;
+    }
+  } catch(e){ console.error("playSound error", e); }
+}
+
+function setSoundMuted(muted){
+  soundMuted = muted;
+  try { localStorage.setItem("vocabSoundMuted", muted ? "1" : "0"); } catch(e){ /* ignore */ }
+  const btn = document.getElementById("btn-floating-sound");
+  if(btn) btn.textContent = muted ? "🔇" : "🔊";
+}
+
 /* createProfile */
 function createProfile(name){
   if(!name || !name.trim()) return null;
@@ -5402,6 +5482,8 @@ function checkAnswer(){
     const comboBonus = comboBonusForStreak(state.currentCombo);
     state.roundComboBonus += comboBonus;
     updateComboIndicator();
+    if(state.currentCombo>=2) playSound("combo",{combo:state.currentCombo});
+    else playSound("correct");
 
     // add score (+ combo bonus)
     state.roundTotalPoints += card.score + comboBonus;
@@ -5417,6 +5499,7 @@ function checkAnswer(){
       if(newLevel > state.roundLevelAtStart){
         state.roundLevelAtStart = newLevel;
         showLevelUpBannerInRound(getLevelInfo(effectiveTotal));
+        playSound("levelup");
       }
     }
 
@@ -5440,6 +5523,7 @@ function checkAnswer(){
     // wrong -> combo breaks
     state.currentCombo = 0;
     updateComboIndicator();
+    playSound("wrong");
 
     card.firstTry=false;
     card.attemptedWrong=true;
@@ -5916,6 +6000,11 @@ function setupEventListeners(){
     applyDarkMode(!document.body.classList.contains("dark-theme"));
   });
 
+  // Floating sound mute toggle
+  document.getElementById("btn-floating-sound").addEventListener("click", ()=>{
+    setSoundMuted(!soundMuted);
+  });
+
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
@@ -5967,6 +6056,9 @@ function initApp(){
   let darkOn = false;
   try { darkOn = localStorage.getItem("vocabDarkMode")==="1"; } catch(e){ /* ignore */ }
   applyDarkMode(darkOn);
+  let mutedInit = false;
+  try { mutedInit = localStorage.getItem("vocabSoundMuted")==="1"; } catch(e){ /* ignore */ }
+  setSoundMuted(mutedInit);
   initHeroBanner();
   renderStartScreen();
   setupEventListeners();
