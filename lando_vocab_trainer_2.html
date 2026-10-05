@@ -668,6 +668,54 @@ body.dark-theme .hist-badge.wrong {
   margin-top:0.15rem;
 }
 
+/* daily goal badge -- same shape as the level badge, green accent */
+.daily-goal-badge {
+  align-items:center;
+  gap:0.7rem;
+  background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+  border:1px solid #34d399;
+  border-radius:var(--radius);
+  padding:0.7rem 1rem;
+  margin-bottom:1rem;
+  display:none;
+}
+.daily-goal-badge .goal-num {
+  font-size:1.3rem;
+  font-weight:800;
+  color:#059669;
+  min-width:2.2rem;
+  text-align:center;
+}
+.daily-goal-badge .goal-info {
+  flex:1;
+  min-width:0;
+}
+.daily-goal-badge .goal-title {
+  font-weight:700;
+  font-size:0.85rem;
+  color:#047857;
+}
+.daily-goal-badge .goal-progress-outer {
+  background:var(--border);
+  border-radius:999px;
+  height:0.4rem;
+  margin-top:0.3rem;
+  overflow:hidden;
+}
+.daily-goal-badge .goal-progress-inner {
+  height:100%;
+  background:#059669;
+  border-radius:999px;
+  transition:width 0.3s ease;
+}
+body.dark-theme .daily-goal-badge {
+  background:linear-gradient(135deg,#0d2a1f,#0f3326);
+  border-color:#059669;
+}
+body.dark-theme .daily-goal-badge .goal-title {
+  color:#6ee7b7;
+}
+
 /* combo indicator */
 .combo-indicator {
   text-align:center;
@@ -817,6 +865,26 @@ body.dark-theme .highlight-banner.record {
   background:linear-gradient(135deg,#3a2f0d,#4a3a10);
   border-color:#d97706;
   color:#fcd34d;
+}
+
+/* mid-round "Tagesziel erreicht" toast, smaller/greener sibling of
+   .level-up-banner -- shares its pop-in animation */
+.daily-goal-mini-banner {
+  background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+  border:1px solid #34d399;
+  border-radius:var(--radius);
+  padding:0.7rem;
+  margin-bottom:1rem;
+  text-align:center;
+  font-weight:700;
+  font-size:0.9rem;
+  color:#047857;
+  animation:levelUpPop 0.5s cubic-bezier(.34,1.56,.64,1);
+}
+body.dark-theme .daily-goal-mini-banner {
+  background:linear-gradient(135deg,#0d2a1f,#0f3326);
+  border-color:#059669;
+  color:#6ee7b7;
 }
 
 /* confetti burst, fired on round completion (see fireConfetti()) -- a
@@ -1315,6 +1383,7 @@ body.dark-theme .highlight-banner.record {
 
     <div id="streakBadge" class="streak-badge" style="display:none;"></div>
     <div id="levelBadge" class="level-badge" style="display:none;"></div>
+    <div id="dailyGoalBadge" class="daily-goal-badge" style="display:none;"></div>
 
     <div class="section-block">
       <div class="section-title">1. Wer bist du? (Profil wählen)</div>
@@ -1513,6 +1582,7 @@ body.dark-theme .highlight-banner.record {
     <div id="comboIndicator" class="combo-indicator" style="display:none;"></div>
 
     <div id="learnLevelUpBanner" class="level-up-banner" style="display:none;"></div>
+    <div id="learnDailyGoalBanner" class="daily-goal-mini-banner" style="display:none;"></div>
 
     <div class="learn-card-area" id="learnCardArea">
       <div class="learn-word-prompt">
@@ -3707,6 +3777,9 @@ function playSound(kind, opts={}){
         // also used for new personal-best records on the summary screen
         [880,660,1100].forEach((f,i)=>playTone(ctx,{freq:f, duration:0.15, startDelay:i*0.08}));
         break;
+      case "goal":
+        playTone(ctx,{freq:1000, duration:0.2, gain:0.22});
+        break;
     }
   } catch(e){ console.error("playSound error", e); }
 }
@@ -3732,7 +3805,8 @@ function createProfile(name){
         correctByDirection:{deToEn:{}, enToDe:{}},
         streak:{current:0, longest:0, lastActiveDate:null},
         records:{fastestRoundSec:null, fastestRoundWordCount:0,
-          highestCombo:0, bestFirstTryPct:0, mostPointsInRound:0}
+          highestCombo:0, bestFirstTryPct:0, mostPointsInRound:0},
+        dailyGoal:{date:null, correctToday:0}
       }
     };
     saveProfiles();
@@ -3848,6 +3922,24 @@ function updateRecords(prof, {durationSec, totalCards, firstTryPct}){
   return newRecords;
 }
 
+/* How many correct answers make up today's goal -- a flat constant for
+   now, easy to tune or later make per-profile if that's ever wanted. */
+const DAILY_GOAL_TARGET = 15;
+
+/* Profiles from before the daily goal existed don't have it yet; also
+   doubles as the once-a-day reset, exactly like the streak's own
+   lastActiveDate check -- correctToday only ever reflects "today". */
+function ensureDailyGoal(prof){
+  if(!prof.stats.dailyGoal){
+    prof.stats.dailyGoal = {date:null, correctToday:0};
+  }
+  if(prof.stats.dailyGoal.date !== todayKey()){
+    prof.stats.dailyGoal.date = todayKey();
+    prof.stats.dailyGoal.correctToday = 0;
+  }
+  return prof.stats.dailyGoal;
+}
+
 /* Call once per finished round. Returns true if today's session actually
    changed the streak count (i.e. this was the first round played today),
    so the caller can show a little "Serie verlängert!" moment. */
@@ -3944,6 +4036,29 @@ function renderLevelBadge(){
   badge.style.display="flex";
 }
 
+/* Daily-goal widget on the start screen -- same shape as the level badge
+   above, green accent. ensureDailyGoal() handles the once-a-day reset,
+   so this reads correctly even if no round has been played yet today. */
+function renderDailyGoalWidget(){
+  const badge = document.getElementById("dailyGoalBadge");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    badge.style.display="none";
+    return;
+  }
+  const goal = ensureDailyGoal(prof);
+  const count = Math.min(goal.correctToday, DAILY_GOAL_TARGET);
+  const pct = Math.round(count/DAILY_GOAL_TARGET*100);
+  badge.innerHTML = `
+    <div class="goal-num">${goal.correctToday>=DAILY_GOAL_TARGET ? "🎯" : count}</div>
+    <div class="goal-info">
+      <div class="goal-title">Tagesziel: ${goal.correctToday}/${DAILY_GOAL_TARGET} heute</div>
+      <div class="goal-progress-outer"><div class="goal-progress-inner" style="width:${pct}%;"></div></div>
+    </div>
+  `;
+  badge.style.display="flex";
+}
+
 /* Live level-up notice shown mid-round (see checkAnswer). The summary
    screen's own levelUpBanner still shows again at the end of the round --
    this one is just for immediate feedback while still playing. */
@@ -3953,6 +4068,15 @@ function showLevelUpBannerInRound(levelInfo){
   el.classList.remove("level-up-banner");
   void el.offsetWidth; // force reflow so the pop animation replays
   el.classList.add("level-up-banner");
+  el.style.display="block";
+}
+
+function showDailyGoalBannerInRound(){
+  const el = document.getElementById("learnDailyGoalBanner");
+  el.textContent = `🎯 Tagesziel erreicht! ${DAILY_GOAL_TARGET}/${DAILY_GOAL_TARGET} heute!`;
+  el.classList.remove("daily-goal-mini-banner");
+  void el.offsetWidth; // force reflow so the pop animation replays
+  el.classList.add("daily-goal-mini-banner");
   el.style.display="block";
 }
 
@@ -4220,6 +4344,15 @@ function buildRoundCardsFromVocab(){
   const prof = getCurrentProfileObj();
   state.roundStartTotalPoints = prof ? prof.stats.totalPoints : 0;
   state.roundLevelAtStart = prof ? computeLevel(prof.stats.totalPoints) : 1;
+
+  // Daily-goal tracking mirrors the level-up pattern just above: the
+  // profile itself is only updated once the round ends, but the live
+  // mid-round celebration (see checkAnswer) needs to compare "today's
+  // count before this round" + "correct answers so far this round"
+  // against the target without writing to the profile early.
+  state.roundCorrectCount = 0;
+  state.dailyGoalCountAtStart = prof ? ensureDailyGoal(prof).correctToday : 0;
+  state.dailyGoalCelebratedThisRound = state.dailyGoalCountAtStart>=DAILY_GOAL_TARGET;
 }
 
 function normalizeAnswer(str){
@@ -4597,6 +4730,7 @@ function finalizeRoundAndUpdateProfile(){
   let leveledUp=false;
   let levelInfo=null;
   let newRecords=[];
+  let dailyGoalJustMet=false;
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     prof.stats.totalPoints += state.roundTotalPoints;
@@ -4636,6 +4770,11 @@ function finalizeRoundAndUpdateProfile(){
 
     newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct});
 
+    const goal = ensureDailyGoal(prof);
+    const goalBefore = goal.correctToday;
+    goal.correctToday += state.roundCorrectCount;
+    dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
+
     saveProfiles();
   }
 
@@ -4647,7 +4786,8 @@ function finalizeRoundAndUpdateProfile(){
     streak: prof ? ensureStreakObj(prof) : null,
     leveledUp,
     levelInfo,
-    newRecords
+    newRecords,
+    dailyGoalJustMet
   };
 }
 
@@ -4741,6 +4881,7 @@ function renderStartScreen(){
   applyProfileTheme();
   renderStreakBadge();
   renderLevelBadge();
+  renderDailyGoalWidget();
   renderProfileCustomize();
 
   // profiles
@@ -5323,6 +5464,7 @@ function renderCurrentCard(){
   const card = state.roundCards[state.roundIndex];
 
   document.getElementById("learnLevelUpBanner").style.display="none";
+  document.getElementById("learnDailyGoalBanner").style.display="none";
 
   // top info
   document.getElementById("learnTotalPoints").textContent="Gesamt: "+state.roundTotalPoints;
@@ -5344,7 +5486,7 @@ function renderCurrentCard(){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet} = finalizeRoundAndUpdateProfile();
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
   document.getElementById("sumDuration").textContent=String(durationSec);
@@ -5391,6 +5533,15 @@ function showSummaryScreen(){
     banner.textContent=`🏆 Neuer Rekord: ${rec.label} (${rec.value})!`;
     extraDiv.appendChild(banner);
   });
+  if(dailyGoalJustMet){
+    // shown again here for visibility (the child may have dismissed the
+    // mid-round toast too quickly to read it) -- no sound replay, that
+    // already played live in checkAnswer() the moment the goal was hit
+    const banner=document.createElement("div");
+    banner.className="highlight-banner record";
+    banner.textContent=`🎯 Tagesziel erreicht! ${DAILY_GOAL_TARGET}/${DAILY_GOAL_TARGET} heute!`;
+    extraDiv.appendChild(banner);
+  }
 
   // at most one extra sound here, to avoid a cacophony when several good
   // things happen in the same round -- new-record beats a plain level-up
@@ -5630,6 +5781,17 @@ function checkAnswer(){
         showLevelUpBannerInRound(getLevelInfo(effectiveTotal));
         playSound("levelup");
       }
+    }
+
+    // Mid-round daily-goal check, same banked+earned-so-far comparison as
+    // the level-up check above -- celebrated live the moment it happens,
+    // persisted to the profile only once at round end (finalizeRoundAndUpdateProfile)
+    state.roundCorrectCount++;
+    if(!state.dailyGoalCelebratedThisRound
+       && state.dailyGoalCountAtStart + state.roundCorrectCount >= DAILY_GOAL_TARGET){
+      state.dailyGoalCelebratedThisRound = true;
+      showDailyGoalBannerInRound();
+      playSound("goal");
     }
 
     // blink effect
