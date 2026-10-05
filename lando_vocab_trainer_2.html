@@ -866,6 +866,16 @@ body.dark-theme .highlight-banner.record {
   border-color:#d97706;
   color:#fcd34d;
 }
+.highlight-banner.achievement {
+  background:linear-gradient(135deg,#ede9fe,#ddd6fe);
+  border:1px solid #8b5cf6;
+  color:#5b21b6;
+}
+body.dark-theme .highlight-banner.achievement {
+  background:linear-gradient(135deg,#2e1065,#3b1a7a);
+  border-color:#8b5cf6;
+  color:#ddd6fe;
+}
 
 /* mid-round "Tagesziel erreicht" toast, smaller/greener sibling of
    .level-up-banner -- shares its pop-in animation */
@@ -1011,6 +1021,38 @@ body.dark-theme .daily-goal-mini-banner {
   font-weight:600;
   font-size:1rem;
   color:var(--ink);
+}
+/* achievement badges -- CSS variables throughout, so light/dark mode
+   adapts automatically without a separate body.dark-theme override */
+.achievements-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+  gap:0.6rem;
+}
+.achievement-badge {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:0.7rem 0.5rem;
+  text-align:center;
+}
+.achievement-badge .icon {
+  font-size:1.6rem;
+}
+.achievement-badge .title {
+  font-weight:700;
+  font-size:0.78rem;
+  color:var(--ink);
+  margin-top:0.2rem;
+}
+.achievement-badge .desc {
+  font-size:0.68rem;
+  color:var(--muted);
+  margin-top:0.1rem;
+}
+.achievement-badge.locked {
+  opacity:0.4;
+  filter:grayscale(1);
 }
 .problem-list {
   max-height:30vh;
@@ -1668,6 +1710,9 @@ body.dark-theme .daily-goal-mini-banner {
 
     <div class="section-title" style="margin-top:1rem;">🏆 Bestleistungen</div>
     <div class="stats-row" id="recordsRow"></div>
+
+    <div class="section-title" style="margin-top:1rem;">🏅 Abzeichen</div>
+    <div class="achievements-grid" id="achievementsGrid"></div>
 
     <div class="section-title" style="margin-top:1rem;">Top Problem-Wörter</div>
     <div class="problem-list" id="problemList"></div>
@@ -3806,7 +3851,10 @@ function createProfile(name){
         streak:{current:0, longest:0, lastActiveDate:null},
         records:{fastestRoundSec:null, fastestRoundWordCount:0,
           highestCombo:0, bestFirstTryPct:0, mostPointsInRound:0},
-        dailyGoal:{date:null, correctToday:0}
+        dailyGoal:{date:null, correctToday:0},
+        achievements:{unlocked:{}},
+        roundsCompleted:0,
+        totalCorrectAnswersEver:0
       }
     };
     saveProfiles();
@@ -3938,6 +3986,15 @@ function ensureDailyGoal(prof){
     prof.stats.dailyGoal.correctToday = 0;
   }
   return prof.stats.dailyGoal;
+}
+
+/* Profiles from before achievements existed just have nothing unlocked
+   yet. unlocked[id] stores the dateKey it was unlocked on. */
+function ensureAchievements(prof){
+  if(!prof.stats.achievements){
+    prof.stats.achievements = {unlocked:{}};
+  }
+  return prof.stats.achievements;
 }
 
 /* Call once per finished round. Returns true if today's session actually
@@ -4276,6 +4333,52 @@ function computePageProgressByDirection(pageId){
     return Math.round(learned/words.length*100);
   };
   return { deToEn: pctFor(byDir.deToEn||{}), enToDe: pctFor(byDir.enToDe||{}) };
+}
+
+/* ===========================================================
+   ACHIEVEMENTS
+   =========================================================== */
+
+/* Each check(prof, ctx) runs against the profile's stats AFTER this
+   round's updates were applied (totalPoints, streak, records, etc.) plus
+   a ctx object built fresh per round in finalizeRoundAndUpdateProfile --
+   see its call site for exactly what ctx carries. */
+const ACHIEVEMENTS = [
+  {id:"first_round", icon:"🥇", title:"Erste Runde", desc:"Deine erste Runde abgeschlossen",
+    check:(p,ctx)=>p.stats.roundsCompleted===1},
+  {id:"correct_100", icon:"💯", title:"100 Richtige", desc:"100 richtige Antworten insgesamt",
+    check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=100},
+  {id:"streak_7", icon:"🔥", title:"7-Tage-Serie", desc:"7 Tage in Folge gelernt",
+    check:(p,ctx)=>ctx.streak.longest>=7},
+  {id:"streak_30", icon:"🌟", title:"30-Tage-Serie", desc:"30 Tage in Folge gelernt",
+    check:(p,ctx)=>ctx.streak.longest>=30},
+  {id:"perfect_round", icon:"✨", title:"Perfekte Runde", desc:"Alles beim ersten Versuch richtig",
+    check:(p,ctx)=>ctx.totalCards>=10 && ctx.firstTryPct===100},
+  {id:"level_5", icon:"🚀", title:"Level 5", desc:"Level 5 erreicht",
+    check:(p,ctx)=>ctx.levelInfo.level>=5},
+  {id:"level_10", icon:"🏆", title:"Level 10", desc:"Level 10 erreicht",
+    check:(p,ctx)=>ctx.levelInfo.level>=10},
+  {id:"fast_round", icon:"⚡", title:"Blitzschnell", desc:"Besonders schnelle Runde",
+    check:(p,ctx)=>ctx.totalCards>=10 && ctx.durationSec<=ctx.totalCards*3},
+  {id:"comeback_word", icon:"💪", title:"Comeback", desc:"Ein schwieriges Wort endlich gemeistert",
+    check:(p,ctx)=>ctx.comebackHappened},
+  {id:"daily_goal_hit", icon:"🎯", title:"Tagesziel", desc:"Das Tagesziel erreicht",
+    check:(p,ctx)=>ctx.dailyGoalJustMet}
+];
+
+/* Returns the newly-unlocked definitions (already-unlocked ones are
+   skipped), and records the unlock date on the profile as a side effect. */
+function checkAchievements(prof, ctx){
+  const unlocked = ensureAchievements(prof).unlocked;
+  const newly = [];
+  for(const def of ACHIEVEMENTS){
+    if(unlocked[def.id]) continue;
+    if(def.check(prof, ctx)){
+      unlocked[def.id] = todayKey();
+      newly.push(def);
+    }
+  }
+  return newly;
 }
 
 function buildRoundCardsFromVocab(){
@@ -4731,6 +4834,7 @@ function finalizeRoundAndUpdateProfile(){
   let levelInfo=null;
   let newRecords=[];
   let dailyGoalJustMet=false;
+  let newlyUnlockedAchievements=[];
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     prof.stats.totalPoints += state.roundTotalPoints;
@@ -4740,6 +4844,10 @@ function finalizeRoundAndUpdateProfile(){
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
     ensureCorrectByDirection(prof); // older profiles predate this field too -- seeds it from correctCounts, see comment on ensureCorrectByDirection
+    // snapshot BEFORE this round's wrongCounts update below, so the
+    // "comeback" achievement can tell a word that was already hard
+    // apart from one this round just made hard for the first time
+    const wrongCountsBefore = {...prof.stats.wrongCounts};
     for(const card of originalCards){
       // only a genuine wrong-typed attempt counts against the long-term
       // "Problemwörter" stat -- skipping or revealing without trying
@@ -4775,6 +4883,22 @@ function finalizeRoundAndUpdateProfile(){
     goal.correctToday += state.roundCorrectCount;
     dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
 
+    if(!prof.stats.roundsCompleted) prof.stats.roundsCompleted=0; // older profiles predate this field
+    prof.stats.roundsCompleted += 1;
+    if(!prof.stats.totalCorrectAnswersEver) prof.stats.totalCorrectAnswersEver=0; // older profiles predate this field
+    prof.stats.totalCorrectAnswersEver += state.roundCorrectCount;
+
+    // a word that had already gone wrong 3+ times (before this round) and
+    // got answered right on the first try this round counts as "mastered"
+    const comebackHappened = originalCards.some(c=>
+      c.firstTry && c.done && (wrongCountsBefore[c.de]||0)>=3);
+
+    const achievementCtx = {
+      streak: ensureStreakObj(prof), levelInfo, totalCards, firstTryPct,
+      durationSec, dailyGoalJustMet, comebackHappened
+    };
+    newlyUnlockedAchievements = checkAchievements(prof, achievementCtx);
+
     saveProfiles();
   }
 
@@ -4787,7 +4911,8 @@ function finalizeRoundAndUpdateProfile(){
     leveledUp,
     levelInfo,
     newRecords,
-    dailyGoalJustMet
+    dailyGoalJustMet,
+    newlyUnlockedAchievements
   };
 }
 
@@ -4816,6 +4941,24 @@ function renderRecordsSection(prof){
   }
 }
 
+/* Renders one tile per ACHIEVEMENTS definition, locked (greyed out) or
+   unlocked based on ensureAchievements(prof).unlocked. */
+function renderAchievementsGrid(prof){
+  const unlocked = ensureAchievements(prof).unlocked;
+  const grid = document.getElementById("achievementsGrid");
+  grid.innerHTML = "";
+  for(const def of ACHIEVEMENTS){
+    const isUnlocked = !!unlocked[def.id];
+    const badge=document.createElement("div");
+    badge.className = "achievement-badge" + (isUnlocked ? "" : " locked");
+    const icon=document.createElement("div"); icon.className="icon"; icon.textContent=def.icon;
+    const title=document.createElement("div"); title.className="title"; title.textContent=def.title;
+    const desc=document.createElement("div"); desc.className="desc"; desc.textContent=def.desc;
+    badge.appendChild(icon); badge.appendChild(title); badge.appendChild(desc);
+    grid.appendChild(badge);
+  }
+}
+
 function renderStatsScreen(){
   const prof=getCurrentProfileObj();
   const labelEl = document.getElementById("statsProfileLabel");
@@ -4824,6 +4967,7 @@ function renderStatsScreen(){
     document.getElementById("statTotalPoints").textContent="0";
     document.getElementById("statTotalTime").textContent="0";
     document.getElementById("recordsRow").innerHTML="";
+    document.getElementById("achievementsGrid").innerHTML="";
     document.getElementById("problemList").innerHTML="<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Keine Daten.</div>";
     return;
   }
@@ -4848,6 +4992,7 @@ function renderStatsScreen(){
   document.getElementById("statTotalTime").textContent = String(minTotal);
 
   renderRecordsSection(prof);
+  renderAchievementsGrid(prof);
 
   // sort wrongCounts desc
   const entries = Object.entries(prof.stats.wrongCounts||{});
@@ -5486,7 +5631,7 @@ function renderCurrentCard(){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements} = finalizeRoundAndUpdateProfile();
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
   document.getElementById("sumDuration").textContent=String(durationSec);
@@ -5523,10 +5668,16 @@ function showSummaryScreen(){
     });
   }
 
-  // extra celebratory banners (records now, achievements join later) --
-  // stacked below the level-up banner, same visual language
+  // extra celebratory banners, stacked below the level-up banner in order
+  // of significance: achievements, then records, then the daily-goal note
   const extraDiv=document.getElementById("summaryExtraBanners");
   extraDiv.innerHTML="";
+  newlyUnlockedAchievements.forEach(ach=>{
+    const banner=document.createElement("div");
+    banner.className="highlight-banner achievement";
+    banner.textContent=`${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`;
+    extraDiv.appendChild(banner);
+  });
   newRecords.forEach(rec=>{
     const banner=document.createElement("div");
     banner.className="highlight-banner record";
@@ -5544,10 +5695,10 @@ function showSummaryScreen(){
   }
 
   // at most one extra sound here, to avoid a cacophony when several good
-  // things happen in the same round -- new-record beats a plain level-up
-  // (level-up already played live in checkAnswer() the moment it happened,
-  // this is just a reminder chime for whichever is most noteworthy)
-  if(newRecords.length>0) playSound("achievement");
+  // things happen in the same round -- achievement/record beats a plain
+  // level-up (level-up already played live in checkAnswer() the moment it
+  // happened, this is just a reminder chime for whichever is most noteworthy)
+  if(newlyUnlockedAchievements.length>0 || newRecords.length>0) playSound("achievement");
   else if(leveledUp) playSound("levelup");
 
   switchScreen("screen-summary");
