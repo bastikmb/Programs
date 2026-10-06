@@ -876,6 +876,15 @@ body.dark-theme .highlight-banner.achievement {
   border-color:#8b5cf6;
   color:#ddd6fe;
 }
+/* neutral informational banner (e.g. the one-time "you're now in the
+   leaderboard" notice) -- not a celebration, so no pop animation */
+.highlight-banner.info {
+  background:var(--accent-bg);
+  border:1px solid var(--accent);
+  color:var(--ink);
+  animation:none;
+  font-weight:600;
+}
 
 /* mid-round "Tagesziel erreicht" toast, smaller/greener sibling of
    .level-up-banner -- shares its pop-in animation */
@@ -1054,6 +1063,56 @@ body.dark-theme .daily-goal-mini-banner {
   opacity:0.4;
   filter:grayscale(1);
 }
+/* leaderboard rows -- CSS variables throughout (like .achievement-badge),
+   so dark mode adapts automatically without a separate override block */
+.leaderboard-table {
+  display:flex;
+  flex-direction:column;
+  gap:0.5rem;
+}
+.leaderboard-row {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:0.75rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:0.7rem 0.9rem;
+}
+.leaderboard-row.own {
+  border:2px solid var(--accent);
+  background:var(--surface-strong);
+}
+.leaderboard-row .rank {
+  font-weight:800;
+  font-size:1.1rem;
+  color:var(--muted);
+  min-width:1.8rem;
+  text-align:center;
+}
+.leaderboard-row .nickname {
+  flex:1;
+  min-width:0;
+  font-weight:700;
+  color:var(--ink);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.leaderboard-row .score {
+  font-weight:800;
+  font-size:1.1rem;
+  color:var(--accent);
+  min-width:3.2rem;
+  text-align:right;
+}
+.leaderboard-row .breakdown {
+  flex-basis:100%;
+  font-size:0.72rem;
+  color:var(--muted);
+  margin-top:0.2rem;
+}
 .problem-list {
   max-height:30vh;
   overflow:auto;
@@ -1098,6 +1157,26 @@ body.dark-theme .daily-goal-mini-banner {
   cursor:pointer;
 }
 #btn-floating-stats:active {
+  transform:scale(0.97);
+}
+/* stacked directly above the stats button, same right edge -- mirrors the
+   left column's theme+sound stack so both columns stay 2-high */
+#btn-floating-leaderboard {
+  position:fixed;
+  right:1rem;
+  bottom:calc(1rem + 4.2rem + env(safe-area-inset-bottom));
+  z-index:9999;
+  border:none;
+  background:#1f2937;
+  color:#fff;
+  border-radius:999px;
+  padding:0.8rem 1rem;
+  font-size:1rem;
+  line-height:1rem;
+  box-shadow:0 10px 24px rgba(0,0,0,0.3);
+  cursor:pointer;
+}
+#btn-floating-leaderboard:active {
   transform:scale(0.97);
 }
 #btn-floating-theme {
@@ -1431,7 +1510,7 @@ body.dark-theme .daily-goal-mini-banner {
       <div class="section-title">1. Wer bist du? (Profil wählen)</div>
       <div id="profileList" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
       <div class="inline-input-btn">
-        <input id="newProfileName" type="text" placeholder="Neues Profil (Name)" />
+        <input id="newProfileName" type="text" placeholder="Neues Profil (Spitzname, z.B. 'Blitz' – kein echter Name nötig)" />
         <button id="btnAddProfile" class="btn btn-secondary" style="min-width:auto;font-size:0.8rem;padding:0.6rem 0.8rem;">+ Hinzufügen</button>
       </div>
       <div id="profileNameWarning" class="answer-feedback close" style="display:none;"></div>
@@ -1722,6 +1801,21 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
   </div>
 
+  <!-- LEADERBOARD SCREEN (cross-device "Vokabel-Bundesligatabelle") -->
+  <div id="screen-leaderboard" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>⚽ Vokabel-Bundesligatabelle</span>
+    </h2>
+    <div id="leaderboardProfileLabel" class="section-sub" style="margin-bottom:0.5rem;"></div>
+    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie.</div>
+    <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
+    <div class="leaderboard-table" id="leaderboardTableBody"></div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
 </div>
 
 <div id="confettiLayer" class="confetti-layer" aria-hidden="true"></div>
@@ -1737,9 +1831,98 @@ body.dark-theme .daily-goal-mini-banner {
 
 <button id="btn-floating-theme">🌙</button>
 <button id="btn-floating-sound">🔊</button>
+<button id="btn-floating-leaderboard">⚽</button>
 <button id="btn-floating-stats">📊</button>
 
+<!-- Firebase compat SDK (classic globals, not ES modules -- matches this
+     file's single classic script tag below, no build step). Used only for
+     the cross-device "Bundesligatabelle" leaderboard; see FIREBASE_CONFIG
+     and initFirebase() below for what this talks to and how failures
+     degrade. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
 <script>
+/* ===========================================================
+   CLOUD LEADERBOARD CONFIG ("Vokabel-Bundesligatabelle")
+   =========================================================== */
+
+/* One-time setup (done once by a parent/adult in the Firebase console, not
+   by editing code beyond pasting the config below):
+     1. console.firebase.google.com -> new project (skip Analytics)
+     2. Build -> Firestore Database -> create, production mode, a region
+        near your users (e.g. eur3)
+     3. Build -> Authentication -> Sign-in method -> enable "Anonymous"
+     4. Project settings -> "Your apps" -> add a Web app -> copy the
+        firebaseConfig object show there into FIREBASE_CONFIG below
+     5. Firestore -> Rules tab -> paste the rules below -> Publish
+   The apiKey in a Firebase web config is NOT a secret -- it only
+   identifies the project. Real access control comes entirely from the
+   security rules below, not from hiding this object, so embedding it
+   directly in this distributed HTML file is standard Firebase practice.
+
+   Firestore security rules (paste into the console's Rules tab):
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /leaderboard_v1/{docId} {
+         allow read: if true;
+         allow delete: if false;
+         allow create, update: if request.auth != null
+           && docId.matches('^' + request.auth.uid + '_.*$')
+           && request.resource.data.cloudId == docId
+           && request.resource.data.nickname is string
+           && request.resource.data.nickname.size() > 0 && request.resource.data.nickname.size() <= 24
+           && request.resource.data.leagueScore is number
+           && request.resource.data.leagueScore >= 0 && request.resource.data.leagueScore <= 100000
+           && request.resource.data.totalPoints is number
+           && request.resource.data.totalPoints >= 0 && request.resource.data.totalPoints <= 1000000
+           && request.resource.data.roundsCompleted is number
+           && request.resource.data.roundsCompleted >= 0 && request.resource.data.roundsCompleted <= 100000
+           && request.resource.data.bestFirstTryPct is number
+           && request.resource.data.bestFirstTryPct >= 0 && request.resource.data.bestFirstTryPct <= 100
+           && request.resource.data.longestStreak is number
+           && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
+           && request.resource.data.keys().hasOnly(
+                ["cloudId","nickname","leagueScore","totalPoints",
+                 "roundsCompleted","bestFirstTryPct","longestStreak","updatedAt","appVersion"])
+           && request.resource.data.updatedAt == request.time;
+       }
+     }
+   }
+
+   Until a real config is pasted in below, initFirebase() fails harmlessly
+   (caught, fbReady stays false) and the whole app behaves exactly as it
+   did before this feature existed -- the leaderboard screen shows the
+   same "no connection" state as a real offline device, nothing else is
+   affected. */
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE-YOUR-FIREBASE-API-KEY-HERE",
+  authDomain: "PASTE-YOUR-PROJECT.firebaseapp.com",
+  projectId: "PASTE-YOUR-PROJECT-ID",
+  storageBucket: "PASTE-YOUR-PROJECT.appspot.com",
+  messagingSenderId: "PASTE-YOUR-SENDER-ID",
+  appId: "PASTE-YOUR-APP-ID"
+};
+
+let fbApp = null;
+let fbDb = null;
+let fbAuth = null;
+let fbReady = false;
+
+function initFirebase(){
+  try{
+    fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb = firebase.firestore();
+    fbAuth = firebase.auth();
+    fbAuth.signInAnonymously()
+      .then(()=>{ fbReady = true; })
+      .catch(e=>{ console.error("Firebase anon auth failed", e); fbReady=false; });
+  } catch(e){ console.error("initFirebase error", e); fbReady=false; }
+}
+
 /* ===========================================================
    DATA SECTION
    =========================================================== */
@@ -3997,6 +4180,103 @@ function ensureAchievements(prof){
   return prof.stats.achievements;
 }
 
+function fallbackUuid(){
+  // only reached on very old browsers without crypto.randomUUID
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c=>{
+    const r = Math.random()*16|0;
+    return (c==="x" ? r : (r&0x3|0x8)).toString(16);
+  });
+}
+
+/* cloudId lives directly on the profile (like prof.avatar), not under
+   prof.stats, and is generated once -- NOT derived from the profile name
+   -- so renaming a profile never orphans/duplicates its leaderboard row,
+   and two children who pick the same nickname still get distinct rows. */
+function ensureCloudId(prof){
+  if(!prof.cloudId){
+    prof.cloudId = (typeof crypto!=="undefined" && crypto.randomUUID) ? crypto.randomUUID() : fallbackUuid();
+    saveProfiles();
+  }
+  return prof.cloudId;
+}
+
+/* The Firestore document id combines this device's anonymous-auth uid
+   (one per browser install) with the profile's own cloudId, since one
+   device/browser can host several children's profiles -- see the
+   leaderboard_v1 security rules (FIREBASE_CONFIG comment above) which
+   only allow a device to write ids prefixed with its own uid. */
+function getCloudDocId(prof){
+  if(!fbAuth || !fbAuth.currentUser) return null;
+  return fbAuth.currentUser.uid + "_" + ensureCloudId(prof);
+}
+
+/* "Tabellenpunkte" for the Bundesligatabelle leaderboard -- a weighted mix
+   of volume, accuracy and consistency, not just raw totalPoints, so a kid
+   who plays less often isn't structurally buried under one who grinds a
+   lot: points are normalized PER ROUND (totalPoints/roundsCompleted), not
+   summed, which is what makes "how good per round" matter more than "how
+   many rounds ever played". bestFirstTryPct is a personal best, not a
+   running average, so it's noisy from very few rounds -- gated behind a
+   3-round minimum rather than adding a whole new aggregate stat. */
+function computeLeagueScore(stats){
+  const roundsCompleted = Math.max(1, stats.roundsCompleted||0);
+  const avgPointsPerRound = (stats.totalPoints||0) / roundsCompleted;
+  const volumeScore = Math.min(100, (avgPointsPerRound/40)*100); // 40 pts/round ≈ a strong round
+  const accuracy = roundsCompleted>=3 ? ((stats.records&&stats.records.bestFirstTryPct)||0) : 0;
+  const streakScore = Math.min(100, (((stats.streak&&stats.streak.longest)||0)/14)*100); // cap at 2 weeks
+  const raw = volumeScore*0.4 + accuracy*0.4 + streakScore*0.2;
+  return Math.round(raw*10); // 0-1000 scale, reads as a real score
+}
+
+/* Fire-and-forget push of this profile's current cumulative stats to the
+   shared leaderboard -- never blocks or interrupts the round-end UI, same
+   try/catch-and-swallow philosophy as playSound(). No opt-in gate (the
+   parent chose "on for everyone" over a per-child checkbox), the only
+   real gate is whether Firebase is actually reachable right now. Each
+   call overwrites the whole document with current totals (no delta), so
+   a missed write just gets caught up by the next successful one. */
+function syncProfileToLeaderboard(prof){
+  if(!prof || !fbReady || !fbAuth || !fbAuth.currentUser) return;
+  try{
+    const docId = getCloudDocId(prof);
+    if(!docId) return;
+    const data = {
+      cloudId: docId,
+      nickname: (state.currentProfile||"").slice(0,24),
+      totalPoints: prof.stats.totalPoints||0,
+      roundsCompleted: prof.stats.roundsCompleted||0,
+      bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
+      longestStreak: (prof.stats.streak&&prof.stats.streak.longest)||0,
+      appVersion: "1.0"
+    };
+    data.leagueScore = computeLeagueScore(prof.stats);
+    data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    fbDb.collection("leaderboard_v1").doc(docId).set(data)
+      .then(()=>{
+        if(!prof.cloudInfoSeen){
+          prof.cloudInfoSeen = true;
+          saveProfiles();
+          showCloudInfoBanner();
+        }
+      })
+      .catch(e=>console.error("syncProfileToLeaderboard failed (offline?)", e));
+  } catch(e){ console.error("syncProfileToLeaderboard error", e); }
+}
+
+/* Shown once per profile, the first time its stats actually reach the
+   cloud -- informs without gating (see syncProfileToLeaderboard). Only
+   appends if the summary screen is still the one showing (the write's
+   round-trip is usually fast, but the child may have already moved on). */
+function showCloudInfoBanner(){
+  if(!document.getElementById("screen-summary").classList.contains("active")) return;
+  const extraDiv = document.getElementById("summaryExtraBanners");
+  if(!extraDiv) return;
+  const banner = document.createElement("div");
+  banner.className = "highlight-banner info";
+  banner.textContent = "ℹ️ Dein Spitzname und deine Punkte sind jetzt für deine Mitschüler in der Tabelle sichtbar.";
+  extraDiv.appendChild(banner);
+}
+
 /* Call once per finished round. Returns true if today's session actually
    changed the streak count (i.e. this was the first round played today),
    so the caller can show a little "Serie verlängert!" moment. */
@@ -5018,6 +5298,95 @@ function renderStatsScreen(){
   }
 }
 
+/* Cross-device leaderboard screen. Loading/error states are plain text in
+   #leaderboardStatusNote (reusing the .answer-feedback.close styling);
+   the actual ranked rows only render once a fetch has actually succeeded. */
+async function renderLeaderboardScreen(){
+  const prof = getCurrentProfileObj();
+  const labelEl = document.getElementById("leaderboardProfileLabel");
+  const avatarPrefix = prof && prof.avatar ? prof.avatar+" " : "";
+  labelEl.textContent = prof ? `Profil: ${avatarPrefix}${state.currentProfile}` : "";
+
+  const statusEl = document.getElementById("leaderboardStatusNote");
+  const bodyEl = document.getElementById("leaderboardTableBody");
+  bodyEl.innerHTML = "";
+
+  if(!fbReady){
+    statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
+    statusEl.style.display="block";
+    return;
+  }
+
+  statusEl.textContent = "⏳ Lade Tabelle...";
+  statusEl.style.display="block";
+  try{
+    const rows = await fetchLeaderboard();
+    statusEl.style.display="none";
+    renderLeaderboardRows(rows, prof);
+  } catch(e){
+    console.error("renderLeaderboardScreen error", e);
+    statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
+    statusEl.style.display="block";
+  }
+}
+
+async function fetchLeaderboard(){
+  const snap = await fbDb.collection("leaderboard_v1").orderBy("leagueScore","desc").limit(50).get();
+  return snap.docs.map(d=>d.data());
+}
+
+/* Builds one .leaderboard-row per entry: rank, nickname, big
+   "Tabellenpunkte" value, and a small breakdown line so kids can see WHY
+   they're ranked where they are, not just an opaque number. The row
+   matching this device's current profile is highlighted via .own.
+   Duplicate nicknames only get a disambiguating id suffix when a
+   collision is actually detected among the fetched rows -- keeps the
+   common case clean. */
+function renderLeaderboardRows(rows, prof){
+  const bodyEl = document.getElementById("leaderboardTableBody");
+  bodyEl.innerHTML = "";
+
+  if(rows.length===0){
+    bodyEl.innerHTML = "<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Noch niemand in der Tabelle 👀</div>";
+    return;
+  }
+
+  const nameCounts = {};
+  rows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
+
+  const ownDocId = prof ? getCloudDocId(prof) : null;
+
+  rows.forEach((r, idx)=>{
+    const row=document.createElement("div");
+    row.className = "leaderboard-row" + (r.cloudId===ownDocId ? " own" : "");
+
+    const rank=document.createElement("div");
+    rank.className="rank";
+    rank.textContent = String(idx+1);
+
+    const name=document.createElement("div");
+    name.className="nickname";
+    const dupSuffix = nameCounts[r.nickname]>1 ? ` (#${String(r.cloudId).slice(-4)})` : "";
+    name.textContent = (r.nickname||"?") + dupSuffix;
+
+    const score=document.createElement("div");
+    score.className="score";
+    score.textContent = String(r.leagueScore||0);
+
+    const roundsCompleted = Math.max(1, r.roundsCompleted||0);
+    const avgPts = Math.round((r.totalPoints||0)/roundsCompleted);
+    const breakdown=document.createElement("div");
+    breakdown.className="breakdown";
+    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie`;
+
+    row.appendChild(rank);
+    row.appendChild(name);
+    row.appendChild(score);
+    row.appendChild(breakdown);
+    bodyEl.appendChild(row);
+  });
+}
+
 /* ===========================================================
    RENDER SCREENS
    =========================================================== */
@@ -5632,6 +6001,7 @@ function renderCurrentCard(){
 
 function showSummaryScreen(){
   const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements} = finalizeRoundAndUpdateProfile();
+  syncProfileToLeaderboard(getCurrentProfileObj());
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
   document.getElementById("sumDuration").textContent=String(durationSec);
@@ -6447,6 +6817,17 @@ function setupEventListeners(){
     setSoundMuted(!soundMuted);
   });
 
+  // Floating leaderboard button -- own backStack variable (not the stats
+  // one) so Stats -> Tabelle -> Zurück doesn't fight over a shared value
+  document.getElementById("btn-floating-leaderboard").addEventListener("click", ()=>{
+    const activeScr=document.querySelector(".screen.active");
+    if(activeScr && activeScr.id!=="screen-leaderboard"){
+      state.backStackBeforeLeaderboard = activeScr.id;
+    }
+    switchScreen("screen-leaderboard");
+    renderLeaderboardScreen();
+  });
+
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
@@ -6464,6 +6845,28 @@ function setupEventListeners(){
       renderCurrentCard();
     } else if(target==="screen-summary"){
       // summary already rendered
+    }
+  });
+
+  document.getElementById("btnLeaderboardBack").addEventListener("click", ()=>{
+    const target=state.backStackBeforeLeaderboard || "screen-start";
+    switchScreen(target);
+    if(target==="screen-start"){
+      renderStartScreen();
+    } else if(target==="screen-bookpages"){
+      renderBookPageScreen();
+    } else if(target==="screen-vocab-add"){
+      renderVocabAddScreen();
+    } else if(target==="screen-vocabpick"){
+      renderVocabPickScreen();
+    } else if(target==="screen-direction"){
+      renderDirectionScreen();
+    } else if(target==="screen-learn"){
+      renderCurrentCard();
+    } else if(target==="screen-summary"){
+      // summary already rendered
+    } else if(target==="screen-stats"){
+      renderStatsScreen();
     }
   });
 }
@@ -6501,6 +6904,7 @@ function initApp(){
   let mutedInit = false;
   try { mutedInit = localStorage.getItem("vocabSoundMuted")==="1"; } catch(e){ /* ignore */ }
   setSoundMuted(mutedInit);
+  initFirebase();
   initHeroBanner();
   renderStartScreen();
   setupEventListeners();
