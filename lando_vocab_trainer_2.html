@@ -1845,7 +1845,7 @@ body.dark-theme .daily-goal-mini-banner {
       <span>⚽ Vokabel-Bundesligatabelle</span>
     </h2>
     <div id="leaderboardProfileLabel" class="section-sub" style="margin-bottom:0.5rem;"></div>
-    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie, plus Bonus für Abzeichen und Bestleistungen.</div>
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
@@ -1923,9 +1923,12 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.bestFirstTryPct >= 0 && request.resource.data.bestFirstTryPct <= 100
            && request.resource.data.longestStreak is number
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
+           && request.resource.data.achievementsUnlocked is number
+           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 10
            && request.resource.data.keys().hasOnly(
                 ["cloudId","nickname","leagueScore","totalPoints",
-                 "roundsCompleted","bestFirstTryPct","longestStreak","updatedAt","appVersion"])
+                 "roundsCompleted","bestFirstTryPct","longestStreak",
+                 "achievementsUnlocked","updatedAt","appVersion"])
            && request.resource.data.updatedAt == request.time;
        }
      }
@@ -4262,8 +4265,20 @@ function computeLeagueScore(stats){
   const volumeScore = Math.min(100, (avgPointsPerRound/40)*100); // 40 pts/round ≈ a strong round
   const accuracy = roundsCompleted>=3 ? ((stats.records&&stats.records.bestFirstTryPct)||0) : 0;
   const streakScore = Math.min(100, (((stats.streak&&stats.streak.longest)||0)/14)*100); // cap at 2 weeks
-  const raw = volumeScore*0.4 + accuracy*0.4 + streakScore*0.2;
-  return Math.round(raw*10); // 0-1000 scale, reads as a real score
+  const base = Math.round((volumeScore*0.4 + accuracy*0.4 + streakScore*0.2) * 10); // 0-1000 scale, reads as a real score
+
+  // Additive bonus on top of the base score -- deliberately NOT folded into
+  // the weighted average above, so the base's per-round-normalized fairness
+  // property stays untouched. Capped well below the base's own range so a
+  // badge/record collector can't outrank genuine skill+consistency, only
+  // meaningfully nudge the ranking.
+  const achievementsUnlocked = Object.keys((stats.achievements&&stats.achievements.unlocked)||{}).length;
+  const achievementBonus = achievementsUnlocked * 10; // max +100 (10 achievements total)
+  const comboBonus = Math.min(30, ((stats.records&&stats.records.highestCombo)||0) * 2); // full bonus from a 15+ combo
+  const pointsBonus = Math.min(30, Math.round((((stats.records&&stats.records.mostPointsInRound)||0)/150)*30)); // full bonus from 150+ pts in one round
+  const recordBonus = comboBonus + pointsBonus; // max +60
+
+  return base + achievementBonus + recordBonus;
 }
 
 /* Fire-and-forget push of this profile's current cumulative stats to the
@@ -4285,6 +4300,7 @@ function syncProfileToLeaderboard(prof){
       roundsCompleted: prof.stats.roundsCompleted||0,
       bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
       longestStreak: (prof.stats.streak&&prof.stats.streak.longest)||0,
+      achievementsUnlocked: Object.keys(ensureAchievements(prof).unlocked).length,
       appVersion: "1.0"
     };
     data.leagueScore = computeLeagueScore(prof.stats);
@@ -5475,7 +5491,7 @@ function renderLeaderboardRows(rows, prof){
     const avgPts = Math.round((r.totalPoints||0)/roundsCompleted);
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
-    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie`;
+    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen`;
 
     row.appendChild(rank);
     row.appendChild(name);
