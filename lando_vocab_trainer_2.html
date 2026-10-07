@@ -5014,10 +5014,32 @@ const CONTRACTIONS = [
   [/\bhasn't\b/g,"has not"], [/\bhaven't\b/g,"have not"], [/\bhadn't\b/g,"had not"]
 ];
 
+/* Dictionary-style placeholder abbreviations used in both English and
+   German vocab lists ("sth"/"something", "jdm."/"jemandem" etc.) --
+   expanded to a canonical full form the same way CONTRACTIONS are, so
+   the abbreviated and spelled-out forms count as the same answer in
+   either direction. Lookarounds instead of \b: a trailing "." is itself
+   a non-word character, so \b would not reliably match right after one
+   (two non-word characters in a row give no word boundary). Only
+   abbreviations that aren't themselves standalone words are included --
+   "s.o." for "someone" is deliberately left out, since without the dots
+   it collides with the common word "so". */
+const ABBREVIATIONS = [
+  [/(?<![a-zäöüß])sth\.?(?![a-zäöüß])/g,"something"],
+  [/(?<![a-zäöüß])sb\.?(?![a-zäöüß])/g,"somebody"],
+  [/(?<![a-zäöüß])jdn\.?(?![a-zäöüß])/g,"jemanden"],
+  [/(?<![a-zäöüß])jdm\.?(?![a-zäöüß])/g,"jemandem"],
+  [/(?<![a-zäöüß])jds\.?(?![a-zäöüß])/g,"jemandes"],
+  [/(?<![a-zäöüß])etw\.?(?![a-zäöüß])/g,"etwas"]
+];
+
 function normalizeForMatch(str){
   let s = normalizeAnswer(str);
   s = s.replace(/[\u2018\u2019\u02BC\u0060]/g,"'"); // unify curly/backtick apostrophes to a plain one
   for(const [pattern, expansion] of CONTRACTIONS){
+    s = s.replace(pattern, expansion);
+  }
+  for(const [pattern, expansion] of ABBREVIATIONS){
     s = s.replace(pattern, expansion);
   }
   // missing or extra punctuation shouldn't count as a mistake
