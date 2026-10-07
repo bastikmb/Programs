@@ -716,6 +716,22 @@ body.dark-theme .daily-goal-badge .goal-title {
   color:#6ee7b7;
 }
 
+/* league rank widget -- uses var(--accent)/var(--accent-bg) throughout
+   (like .achievement-badge) instead of fixed hex colors, so it
+   automatically matches both dark mode and whichever accent color the
+   profile picked, no separate dark-theme override needed */
+.league-rank-badge {
+  align-items:center;
+  background:var(--accent-bg);
+  border:1px solid var(--accent);
+  border-radius:var(--radius);
+  padding:0.7rem 1rem;
+  margin-bottom:1rem;
+  font-weight:700;
+  font-size:0.9rem;
+  color:var(--ink);
+}
+
 /* combo indicator */
 .combo-indicator {
   text-align:center;
@@ -1511,6 +1527,7 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="streakBadge" class="streak-badge" style="display:none;"></div>
     <div id="levelBadge" class="level-badge" style="display:none;"></div>
     <div id="dailyGoalBadge" class="daily-goal-badge" style="display:none;"></div>
+    <div id="leagueRankBadge" class="league-rank-badge" style="display:none;"></div>
 
     <div class="section-block">
       <div class="section-title">1. Wer bist du? (Profil wählen)</div>
@@ -4402,6 +4419,39 @@ function renderDailyGoalWidget(){
   badge.style.display="flex";
 }
 
+/* Current rank in the cross-device Bundesligatabelle, shown right on the
+   start screen so a child doesn't have to open the separate leaderboard
+   screen just to see where they stand. Fire-and-forget/async like the
+   rest of the Firebase code -- renderStartScreen() itself returns
+   immediately, this widget fills in once the (already existing)
+   fetchLeaderboard() call resolves. */
+async function renderLeagueRankWidget(){
+  const badge = document.getElementById("leagueRankBadge");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    badge.style.display="none";
+    return;
+  }
+  if(!fbReady){
+    badge.innerHTML = `⚽ Tabellenplatz: <span style="color:var(--muted);">keine Verbindung</span>`;
+    badge.style.display="flex";
+    return;
+  }
+  badge.innerHTML = `⚽ Tabellenplatz: ⏳`;
+  badge.style.display="flex";
+  try{
+    const rows = await fetchLeaderboard();
+    const ownDocId = getCloudDocId(prof);
+    const idx = rows.findIndex(r=>r.cloudId===ownDocId);
+    badge.innerHTML = idx>=0
+      ? `⚽ Tabellenplatz: <strong>${idx+1}.</strong> von ${rows.length}`
+      : `⚽ Tabellenplatz: <span style="color:var(--muted);">noch nicht in der Tabelle</span>`;
+  } catch(e){
+    console.error("renderLeagueRankWidget error", e);
+    badge.innerHTML = `⚽ Tabellenplatz: <span style="color:var(--muted);">keine Verbindung</span>`;
+  }
+}
+
 /* Live level-up notice shown mid-round (see checkAnswer). The summary
    screen's own levelUpBanner still shows again at the end of the round --
    this one is just for immediate feedback while still playing. */
@@ -5429,6 +5479,7 @@ function renderStartScreen(){
   renderStreakBadge();
   renderLevelBadge();
   renderDailyGoalWidget();
+  renderLeagueRankWidget();
   renderProfileCustomize();
 
   // profiles
