@@ -1521,7 +1521,7 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
 
     <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
-      <span>👋 Willkommen</span>
+      <span id="welcomeHeading">👋 Willkommen</span>
     </h2>
 
     <div id="streakBadge" class="streak-badge" style="display:none;"></div>
@@ -1529,8 +1529,33 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="dailyGoalBadge" class="daily-goal-badge" style="display:none;"></div>
     <div id="leagueRankBadge" class="league-rank-badge" style="display:none;"></div>
 
+    <div class="section-block" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+      <div id="currentProfileSummary" style="font-weight:600;"></div>
+      <button id="btnGoToProfiles" class="btn-secondary btn" style="min-width:auto;"></button>
+    </div>
+
+    <div id="quickStartBlock" class="section-block" style="display:none;">
+      <button id="btnQuickStart" class="btn" style="width:100%;text-align:left;display:flex;align-items:center;gap:0.6rem;"></button>
+    </div>
+
     <div class="section-block">
-      <div class="section-title">1. Wer bist du? (Profil wählen)</div>
+      <div class="section-title">Sprache wählen</div>
+      <div id="languageList" class="flex-row-wrap"></div>
+      <div class="section-sub">Englisch und Latein bringen fertige Vokabeln mit. Du kannst dir aber auch jederzeit eigene Bücher/Seiten/Vokabeln anlegen.</div>
+    </div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnStartToPages" class="btn" disabled>Weiter ➡</button>
+    </div>
+  </div>
+
+  <!-- PROFILES SCREEN -->
+  <div id="screen-profiles" class="screen">
+    <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>👤 Profil wählen</span>
+    </h2>
+
+    <div class="section-block">
       <div id="profileList" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
       <div class="inline-input-btn">
         <input id="newProfileName" type="text" placeholder="Neues Profil (Spitzname, z.B. 'Blitz' – kein echter Name nötig)" />
@@ -1557,18 +1582,8 @@ body.dark-theme .daily-goal-mini-banner {
       </details>
     </div>
 
-    <div id="quickStartBlock" class="section-block" style="display:none;">
-      <button id="btnQuickStart" class="btn" style="width:100%;text-align:left;display:flex;align-items:center;gap:0.6rem;"></button>
-    </div>
-
-    <div class="section-block">
-      <div class="section-title">2. Sprache wählen</div>
-      <div id="languageList" class="flex-row-wrap"></div>
-      <div class="section-sub">Englisch und Latein bringen fertige Vokabeln mit. Du kannst dir aber auch jederzeit eigene Bücher/Seiten/Vokabeln anlegen.</div>
-    </div>
-
     <div class="btn-row btn-row-sticky">
-      <button id="btnStartToPages" class="btn" disabled>Weiter ➡</button>
+      <button id="btnProfilesBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
   </div>
 
@@ -4549,7 +4564,7 @@ function renderProfileCustomize(){
     btn.addEventListener("click",()=>{
       prof.avatar = emoji;
       saveProfiles();
-      renderStartScreen();
+      renderProfilesScreen();
     });
     avatarDiv.appendChild(btn);
   });
@@ -4568,7 +4583,7 @@ function renderProfileCustomize(){
     btn.addEventListener("click",()=>{
       prof.themeColor = key;
       saveProfiles();
-      renderStartScreen();
+      renderProfilesScreen();
     });
     themeDiv.appendChild(btn);
   });
@@ -5474,15 +5489,14 @@ function renderLeaderboardRows(rows, prof){
    RENDER SCREENS
    =========================================================== */
 
-function renderStartScreen(){
-  applyProfileTheme();
-  renderStreakBadge();
-  renderLevelBadge();
-  renderDailyGoalWidget();
-  renderLeagueRankWidget();
+/* Profile list/management screen -- split out of renderStartScreen() so
+   the start screen itself only needs a compact summary + "Wechseln"
+   button (see btnGoToProfiles). Rebuild the whole list on every call,
+   same as before the split. */
+function renderProfilesScreen(){
+  applyProfileTheme(); // so picking a new avatar/color reflects immediately, not just after returning to the start screen
   renderProfileCustomize();
 
-  // profiles
   const profDiv=document.getElementById("profileList");
   profDiv.innerHTML="";
   for(const name of Object.keys(state.profiles)){
@@ -5500,7 +5514,7 @@ function renderStartScreen(){
     btn.textContent = avatar ? `${avatar} ${name}` : name;
     btn.addEventListener("click", ()=>{
       state.currentProfile=name;
-      renderStartScreen();
+      renderProfilesScreen();
     });
     wrap.appendChild(btn);
 
@@ -5518,12 +5532,37 @@ function renderStartScreen(){
         delete state.profiles[name];
         if(state.currentProfile===name) state.currentProfile=null;
         saveProfiles();
-        renderStartScreen();
+        renderProfilesScreen();
       }
     });
     wrap.appendChild(delBtn);
 
     profDiv.appendChild(wrap);
+  }
+}
+
+function renderStartScreen(){
+  applyProfileTheme();
+  renderStreakBadge();
+  renderLevelBadge();
+  renderDailyGoalWidget();
+  renderLeagueRankWidget();
+
+  // personal greeting + compact profile summary (full profile list/
+  // management now lives on screen-profiles, see renderProfilesScreen)
+  const prof = getCurrentProfileObj();
+  const welcomeEl = document.getElementById("welcomeHeading");
+  const summaryEl = document.getElementById("currentProfileSummary");
+  const goToProfilesBtn = document.getElementById("btnGoToProfiles");
+  if(prof){
+    const avatar = prof.avatar || "";
+    welcomeEl.textContent = `👋 Willkommen ${avatar} ${state.currentProfile}`.replace(/\s+/g," ").trim();
+    summaryEl.textContent = `${avatar} ${state.currentProfile}`.trim();
+    goToProfilesBtn.textContent = "👤 Wechseln";
+  } else {
+    welcomeEl.textContent = "👋 Willkommen";
+    summaryEl.textContent = "Kein Profil ausgewählt";
+    goToProfilesBtn.textContent = "➕ Profil erstellen";
   }
 
   renderQuickStartBlock();
@@ -6522,7 +6561,7 @@ function setupEventListeners(){
     const created=createProfile(name);
     if(created){
       inp.value="";
-      renderStartScreen();
+      renderProfilesScreen();
     }
   });
 
@@ -6576,7 +6615,7 @@ function setupEventListeners(){
         }
         saveCustomBooks();
 
-        renderStartScreen();
+        renderProfilesScreen();
         alert("Daten erfolgreich importiert.");
       } catch(err){
         console.error("Import error", err);
@@ -6585,6 +6624,16 @@ function setupEventListeners(){
     };
     reader.readAsText(file);
     e.target.value = "";
+  });
+
+  document.getElementById("btnGoToProfiles").addEventListener("click", ()=>{
+    switchScreen("screen-profiles");
+    renderProfilesScreen();
+  });
+
+  document.getElementById("btnProfilesBack").addEventListener("click", ()=>{
+    switchScreen("screen-start");
+    renderStartScreen();
   });
 
   document.getElementById("btnStartToPages").addEventListener("click", ()=>{
