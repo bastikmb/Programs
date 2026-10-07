@@ -1059,6 +1059,12 @@ body.dark-theme .daily-goal-mini-banner {
   color:var(--muted);
   margin-top:0.1rem;
 }
+.achievement-badge .progress {
+  font-size:0.68rem;
+  font-weight:700;
+  color:var(--accent);
+  margin-top:0.3rem;
+}
 .achievement-badge.locked {
   opacity:0.4;
   filter:grayscale(1);
@@ -4623,27 +4629,41 @@ function computePageProgressByDirection(pageId){
    round's updates were applied (totalPoints, streak, records, etc.) plus
    a ctx object built fresh per round in finalizeRoundAndUpdateProfile --
    see its call site for exactly what ctx carries. */
+/* progress(prof) is optional -- only present where a meaningful cumulative
+   value exists to show "where you stand / how much is left" for a still-
+   locked badge. The other four (first_round, fast_round, comeback_word)
+   are binary or depend on a single round's size/duration, so there's no
+   honest running number to show -- they show their description only. */
 const ACHIEVEMENTS = [
   {id:"first_round", icon:"🥇", title:"Erste Runde", desc:"Deine erste Runde abgeschlossen",
     check:(p,ctx)=>p.stats.roundsCompleted===1},
   {id:"correct_100", icon:"💯", title:"100 Richtige", desc:"100 richtige Antworten insgesamt",
-    check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=100},
+    check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=100,
+    progress:p=>({current:p.stats.totalCorrectAnswersEver||0, target:100})},
   {id:"streak_7", icon:"🔥", title:"7-Tage-Serie", desc:"7 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=7},
+    check:(p,ctx)=>ctx.streak.longest>=7,
+    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:7})},
   {id:"streak_30", icon:"🌟", title:"30-Tage-Serie", desc:"30 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=30},
+    check:(p,ctx)=>ctx.streak.longest>=30,
+    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:30})},
   {id:"perfect_round", icon:"✨", title:"Perfekte Runde", desc:"Alles beim ersten Versuch richtig",
-    check:(p,ctx)=>ctx.totalCards>=10 && ctx.firstTryPct===100},
+    check:(p,ctx)=>ctx.totalCards>=10 && ctx.firstTryPct===100,
+    // proxy: best first-try % reached so far (no running "how close was my
+    // last round" counter exists, this is the closest honest stand-in)
+    progress:p=>({current:(p.stats.records&&p.stats.records.bestFirstTryPct)||0, target:100})},
   {id:"level_5", icon:"🚀", title:"Level 5", desc:"Level 5 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=5},
+    check:(p,ctx)=>ctx.levelInfo.level>=5,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:5})},
   {id:"level_10", icon:"🏆", title:"Level 10", desc:"Level 10 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=10},
+    check:(p,ctx)=>ctx.levelInfo.level>=10,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:10})},
   {id:"fast_round", icon:"⚡", title:"Blitzschnell", desc:"Besonders schnelle Runde",
     check:(p,ctx)=>ctx.totalCards>=10 && ctx.durationSec<=ctx.totalCards*3},
   {id:"comeback_word", icon:"💪", title:"Comeback", desc:"Ein schwieriges Wort endlich gemeistert",
     check:(p,ctx)=>ctx.comebackHappened},
   {id:"daily_goal_hit", icon:"🎯", title:"Tagesziel", desc:"Das Tagesziel erreicht",
-    check:(p,ctx)=>ctx.dailyGoalJustMet}
+    check:(p,ctx)=>ctx.dailyGoalJustMet,
+    progress:p=>({current:ensureDailyGoal(p).correctToday, target:DAILY_GOAL_TARGET})}
 ];
 
 /* Returns the newly-unlocked definitions (already-unlocked ones are
@@ -5235,6 +5255,19 @@ function renderAchievementsGrid(prof){
     const title=document.createElement("div"); title.className="title"; title.textContent=def.title;
     const desc=document.createElement("div"); desc.className="desc"; desc.textContent=def.desc;
     badge.appendChild(icon); badge.appendChild(title); badge.appendChild(desc);
+
+    // locked + has a meaningful running number -> show where you stand and
+    // how much is left, so a badge doesn't just sit there as a mystery
+    if(!isUnlocked && def.progress){
+      const p = def.progress(prof);
+      const current = Math.min(p.current, p.target);
+      const remaining = Math.max(0, p.target - p.current);
+      const prog=document.createElement("div");
+      prog.className="progress";
+      prog.textContent = `${current}/${p.target} · noch ${remaining}`;
+      badge.appendChild(prog);
+    }
+
     grid.appendChild(badge);
   }
 }
