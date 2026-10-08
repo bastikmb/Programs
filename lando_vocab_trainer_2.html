@@ -1291,21 +1291,28 @@ body.dark-theme .daily-goal-mini-banner {
   gap:0.75rem;
   margin-top:1.5rem;
 }
-/* "Weiter"/"Zurück"-style step navigation -- pinned near the bottom of
-   the viewport while scrolling a long screen (e.g. the book/page list),
-   so the way forward/back never requires hunting for it below the
-   fold. bottom matches .screen's own bottom padding, which already
-   reserves exactly this much clearance above the floating round
-   buttons (two of them now stack on the left: theme + sound toggle);
-   negative side margins let the backing bar bleed to the card's full
-   width while the matching padding keeps the buttons themselves inset
-   like everywhere else. */
+/* "Weiter"/"Zurück"-style step navigation -- pinned to the true bottom of
+   the viewport on EVERY screen, not just while scrolling a long one.
+   position:sticky previously only engaged once a screen's content
+   actually scrolled past this point; on the now much shorter start/
+   language screens that never happens, so the button just sat in normal
+   flow wherever the (short) content ended, looking like it was "hanging
+   in the middle". position:fixed pins it unconditionally. left/right
+   (instead of width+centering) replicate #app's own horizontal padding
+   exactly, so the bar's edges line up with the card's edges on a real
+   phone viewport (where #app's max-width:900px never actually applies --
+   this is a phone-first app; on an unrealistically wide desktop test
+   window the bar is simply wider than the 900px-capped card, which is an
+   acceptable trade-off for a screen size nobody actually uses the app
+   at). bottom matches .screen's own bottom padding, which already
+   reserves exactly this much clearance above the floating round buttons
+   (theme + sound, stacked bottom-left). */
 .btn-row-sticky {
-  position:sticky;
+  position:fixed;
+  left:calc(1.5rem + env(safe-area-inset-left));
+  right:calc(1.5rem + env(safe-area-inset-right));
   bottom:calc(8.5rem + env(safe-area-inset-bottom));
   background:var(--card);
-  margin-left:-1.5rem;
-  margin-right:-1.5rem;
   padding:0.75rem 1.5rem 0;
   box-shadow:0 -8px 16px -8px rgba(0,0,0,0.12);
   z-index:10;
@@ -7093,6 +7100,17 @@ function checkAnswer(){
 
     // add score (+ combo bonus)
     state.roundTotalPoints += card.score + comboBonus;
+
+    // Update the live total immediately -- renderCurrentCard() below only
+    // runs once the child dismisses the correct-overlay and the next card
+    // loads, which would otherwise leave the visible "Gesamt" counter
+    // stale for several seconds right when it should feel like it's
+    // actively counting up with each correct answer.
+    const totalPointsEl = document.getElementById("learnTotalPoints");
+    totalPointsEl.textContent = "Gesamt: "+state.roundTotalPoints;
+    totalPointsEl.classList.remove("combo-pop");
+    void totalPointsEl.offsetWidth; // force reflow so the pop animation replays
+    totalPointsEl.classList.add("combo-pop");
 
     // Mid-round level-up check (see roundStartTotalPoints/roundLevelAtStart
     // in buildRoundCardsFromVocab): the profile itself isn't updated until
