@@ -622,6 +622,27 @@ body.dark-theme .hist-badge.wrong {
   50% { box-shadow:0 0 0 6px rgba(239,68,68,0.12); }
 }
 
+/* bonus cards (unlocked at streak thresholds) */
+.bonus-cards-block { margin-bottom:1rem; }
+.bonus-card-list { display:flex; flex-direction:column; gap:0.6rem; }
+.bonus-card {
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  border:1px solid #60a5fa;
+  border-radius:var(--radius);
+  padding:0.9rem 1rem;
+  text-align:center;
+}
+body.dark-theme .bonus-card { background:linear-gradient(135deg,#1e2f5c,#1e3a73); border-color:#3b82f6; }
+.bonus-card-icon { font-size:1.8rem; }
+.bonus-card-title { font-weight:800; font-size:1rem; color:var(--ink); margin-top:0.2rem; }
+.bonus-card-sub { font-size:0.75rem; color:var(--muted); margin-top:0.1rem; }
+.bonus-card-timestamp { font-weight:700; font-size:1.15rem; color:var(--accent); margin:0.5rem 0; font-family:monospace; }
+.bonus-card-redeem-btn { margin-top:0.3rem; }
+/* "schon verwendet", nicht "noch nicht erreicht" -- bewusst NICHT die
+   Graustufen-"locked"-Optik der Achievements, die etwas anderes bedeutet */
+.bonus-card.redeemed { opacity:0.65; }
+.bonus-card.redeemed .bonus-card-timestamp { font-size:0.8rem; font-family:inherit; color:var(--muted); }
+
 /* level badge */
 .level-badge {
   align-items:center;
@@ -892,6 +913,16 @@ body.dark-theme .highlight-banner.achievement {
   border-color:#8b5cf6;
   color:#ddd6fe;
 }
+.highlight-banner.bonuscard {
+  background:linear-gradient(135deg,#dbeafe,#bfdbfe);
+  border:1px solid #3b82f6;
+  color:#1e3a8a;
+}
+body.dark-theme .highlight-banner.bonuscard {
+  background:linear-gradient(135deg,#1e2f5c,#1e3a73);
+  border-color:#3b82f6;
+  color:#bfdbfe;
+}
 /* neutral informational banner (e.g. the one-time "you're now in the
    leaderboard" notice) -- not a celebration, so no pop animation */
 .highlight-banner.info {
@@ -1135,6 +1166,24 @@ body.dark-theme .daily-goal-mini-banner {
   color:var(--muted);
   margin-top:0.2rem;
 }
+.team-pill {
+  display:flex;
+  align-items:center;
+  gap:0.4rem;
+}
+.team-badge {
+  width:2.2rem;
+  height:2.2rem;
+  border-radius:50%;
+  background:var(--team-color, #999);
+  color:#fff;
+  font-weight:800;
+  font-size:0.65rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
 .problem-list {
   max-height:30vh;
   overflow:auto;
@@ -1199,6 +1248,26 @@ body.dark-theme .daily-goal-mini-banner {
   cursor:pointer;
 }
 #btn-floating-leaderboard:active {
+  transform:scale(0.97);
+}
+/* stacked 3rd in the right column, directly above the individual
+   leaderboard button */
+#btn-floating-team-leaderboard {
+  position:fixed;
+  right:1rem;
+  bottom:calc(1rem + 8.4rem + env(safe-area-inset-bottom));
+  z-index:9999;
+  border:none;
+  background:#1f2937;
+  color:#fff;
+  border-radius:999px;
+  padding:0.8rem 1rem;
+  font-size:1rem;
+  line-height:1rem;
+  box-shadow:0 10px 24px rgba(0,0,0,0.3);
+  cursor:pointer;
+}
+#btn-floating-team-leaderboard:active {
   transform:scale(0.97);
 }
 #btn-floating-theme {
@@ -1525,6 +1594,14 @@ body.dark-theme .daily-goal-mini-banner {
     </h2>
 
     <div id="streakBadge" class="streak-badge" style="display:none;"></div>
+    <div id="bonusCardsBlock" class="bonus-cards-block" style="display:none;">
+      <div class="section-title">🎁 Bonuskarten</div>
+      <div id="bonusCardsAvailable" class="bonus-card-list"></div>
+      <details id="bonusCardsHistoryDetails" style="display:none;margin-top:0.5rem;">
+        <summary>Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</summary>
+        <div id="bonusCardsRedeemedList" class="bonus-card-list" style="margin-top:0.5rem;"></div>
+      </details>
+    </div>
     <div id="levelBadge" class="level-badge" style="display:none;"></div>
     <div id="dailyGoalBadge" class="daily-goal-badge" style="display:none;"></div>
     <div id="leagueRankBadge" class="league-rank-badge" style="display:none;"></div>
@@ -1578,6 +1655,18 @@ body.dark-theme .daily-goal-mini-banner {
           <div id="avatarPicker" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
           <div class="section-sub" style="margin-bottom:0.5rem;">Farbe</div>
           <div id="themePicker" class="flex-row-wrap"></div>
+        </div>
+      </details>
+    </div>
+
+    <div id="teamPickerBlock" class="section-block" style="display:none;">
+      <details>
+        <summary class="section-title" style="cursor:pointer;">⚽ Team wählen</summary>
+        <div style="margin-top:0.75rem;">
+          <div class="section-sub" style="margin-bottom:0.5rem;">1. Bundesliga</div>
+          <div id="teamPickerLeague1" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
+          <div class="section-sub" style="margin-bottom:0.5rem;">2. Bundesliga</div>
+          <div id="teamPickerLeague2" class="flex-row-wrap"></div>
         </div>
       </details>
     </div>
@@ -1854,6 +1943,20 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
   </div>
 
+  <!-- TEAM LEADERBOARD SCREEN -->
+  <div id="screen-team-leaderboard" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>🏆 Team-Tabelle</span>
+    </h2>
+    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams.</div>
+    <div id="teamLeaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
+    <div class="leaderboard-table" id="teamLeaderboardTableBody"></div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnTeamLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
 </div>
 
 <div id="confettiLayer" class="confetti-layer" aria-hidden="true"></div>
@@ -1869,6 +1972,7 @@ body.dark-theme .daily-goal-mini-banner {
 
 <button id="btn-floating-theme">🌙</button>
 <button id="btn-floating-sound">🔊</button>
+<button id="btn-floating-team-leaderboard">🏆</button>
 <button id="btn-floating-leaderboard">⚽</button>
 <button id="btn-floating-stats">📊</button>
 
@@ -1925,10 +2029,12 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
            && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 10
+           && (request.resource.data.team == null ||
+               (request.resource.data.team is string && request.resource.data.team.size() <= 20))
            && request.resource.data.keys().hasOnly(
                 ["cloudId","nickname","leagueScore","totalPoints",
                  "roundsCompleted","bestFirstTryPct","longestStreak",
-                 "achievementsUnlocked","updatedAt","appVersion"])
+                 "achievementsUnlocked","team","updatedAt","appVersion"])
            && request.resource.data.updatedAt == request.time;
        }
      }
@@ -4077,6 +4183,7 @@ function createProfile(name){
           highestCombo:0, bestFirstTryPct:0, mostPointsInRound:0},
         dailyGoal:{date:null, correctToday:0},
         achievements:{unlocked:{}},
+        bonusCards:{redeemed:{}},
         roundsCompleted:0,
         totalCorrectAnswersEver:0
       }
@@ -4221,6 +4328,40 @@ function ensureAchievements(prof){
   return prof.stats.achievements;
 }
 
+/* ===========================================================
+   BONUSKARTEN (Belohnung bei jeder 3-Flammen-Schwelle der Serie)
+   =========================================================== */
+
+const BONUS_CARD_INTERVAL = 3; // jede 3 Flammen = eine weitere Karte
+const BONUS_CARD_REWARD_TITLE = "1 Stunde zusätzliche Handyzeit";
+
+/* redeemed[schwelle] = ISO-Zeitstempel, wann als eingelöst markiert.
+   Welche Schwellen VERFÜGBAR sind, wird nicht gespeichert, sondern live
+   aus streak.longest abgeleitet (siehe getBonusCardThresholds) -- gleiche
+   Logik wie bei den streak_7/streak_30-Achievements, die ebenfalls
+   "longest" statt "current" prüfen, damit ein späteres Abreißen der
+   Serie eine bereits verdiente Karte nicht wieder entzieht. */
+function ensureBonusCards(prof){
+  if(!prof.stats.bonusCards){
+    prof.stats.bonusCards = {redeemed:{}};
+  }
+  return prof.stats.bonusCards;
+}
+
+function getBonusCardThresholds(prof){
+  const longest = (prof.stats.streak && prof.stats.streak.longest) || 0;
+  const totalEarned = Math.floor(longest / BONUS_CARD_INTERVAL);
+  const redeemed = ensureBonusCards(prof).redeemed;
+  const available = [];
+  const redeemedList = [];
+  for(let n=1; n<=totalEarned; n++){
+    const threshold = n*BONUS_CARD_INTERVAL;
+    if(redeemed[threshold]) redeemedList.push({threshold, redeemedAt:redeemed[threshold]});
+    else available.push({threshold});
+  }
+  return {available, redeemed:redeemedList};
+}
+
 function fallbackUuid(){
   // only reached on very old browsers without crypto.randomUUID
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c=>{
@@ -4281,6 +4422,32 @@ function computeLeagueScore(stats){
   return base + achievementBonus + recordBonus;
 }
 
+/* Team-vs-Team aggregate for the team leaderboard -- AVERAGE, not SUM,
+   of member leagueScores: mirrors computeLeagueScore()'s own per-round
+   (not per-total) normalization philosophy one layer up, so a 1-member
+   "team" can compete on equal footing with a 5-member one instead of
+   always losing to whichever team has the most members. */
+function computeTeamScore(memberRows){
+  if(memberRows.length===0) return {score:0, memberCount:0, avgFirstTryPct:0, avgStreak:0};
+  const sum = key => memberRows.reduce((s,r)=>s+(r[key]||0),0);
+  const memberCount = memberRows.length;
+  return {
+    score: Math.round(sum("leagueScore")/memberCount),
+    memberCount,
+    avgFirstTryPct: Math.round(sum("bestFirstTryPct")/memberCount),
+    avgStreak: Math.round(sum("longestStreak")/memberCount)
+  };
+}
+
+function groupMembersByTeam(rows){
+  const byTeam = {};
+  rows.forEach(r=>{
+    if(!r.team) return; // profile never picked a team -- excluded from the team table entirely
+    (byTeam[r.team] = byTeam[r.team] || []).push(r);
+  });
+  return byTeam;
+}
+
 /* Fire-and-forget push of this profile's current cumulative stats to the
    shared leaderboard -- never blocks or interrupts the round-end UI, same
    try/catch-and-swallow philosophy as playSound(). No opt-in gate (the
@@ -4301,6 +4468,7 @@ function syncProfileToLeaderboard(prof){
       bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
       longestStreak: (prof.stats.streak&&prof.stats.streak.longest)||0,
       achievementsUnlocked: Object.keys(ensureAchievements(prof).unlocked).length,
+      team: prof.team || null,
       appVersion: "1.0"
     };
     data.leagueScore = computeLeagueScore(prof.stats);
@@ -4539,6 +4707,59 @@ const THEME_COLORS = {
   purple: {label:"Lila",   accent:"#7c3aed"}
 };
 
+/* Feste, nicht frei wählbare Teamliste -- aktuelle Saison 2026/27.
+   logoUrl ist immer null: aus rechtlichen Gründen werden keine echten
+   Vereinswappen eingebettet oder nachgeladen (Vereinswappen sind nicht
+   nur Marken, sondern auch urheberrechtlich geschützte Grafiken, ohne
+   eine Quelle, die eine freie Weiterverwendung erlaubt) -- stattdessen
+   wird ein Farb-Badge mit shortCode gerendert. league: 1 oder 2. Die
+   Liga-Zugehörigkeit ändert sich jede Saison durch Auf-/Abstieg --
+   vor Saison 2027/28 prüfen und ggf. aktualisieren. */
+const TEAM_LIST = [
+  // --- 1. Bundesliga 2026/27 ---
+  {id:"fcb",name:"FC Bayern München",league:1,colorPrimary:"#DC052D",colorSecondary:"#0A1A5C",shortCode:"FCB",logoUrl:null},
+  {id:"bvb",name:"Borussia Dortmund",league:1,colorPrimary:"#FDE100",colorSecondary:"#000000",shortCode:"BVB",logoUrl:null},
+  {id:"rbl",name:"RB Leipzig",league:1,colorPrimary:"#DD0741",colorSecondary:"#FFFFFF",shortCode:"RBL",logoUrl:null},
+  {id:"vfb",name:"VfB Stuttgart",league:1,colorPrimary:"#E32219",colorSecondary:"#FFFFFF",shortCode:"VFB",logoUrl:null},
+  {id:"tsg",name:"TSG 1899 Hoffenheim",league:1,colorPrimary:"#1C63B7",colorSecondary:"#FFFFFF",shortCode:"TSG",logoUrl:null},
+  {id:"b04",name:"Bayer 04 Leverkusen",league:1,colorPrimary:"#E32221",colorSecondary:"#000000",shortCode:"B04",logoUrl:null},
+  {id:"scf",name:"SC Freiburg",league:1,colorPrimary:"#000000",colorSecondary:"#E2001A",shortCode:"SCF",logoUrl:null},
+  {id:"sge",name:"Eintracht Frankfurt",league:1,colorPrimary:"#000000",colorSecondary:"#E1000F",shortCode:"SGE",logoUrl:null},
+  {id:"fca",name:"FC Augsburg",league:1,colorPrimary:"#BA3733",colorSecondary:"#00843D",shortCode:"FCA",logoUrl:null},
+  {id:"m05",name:"1. FSV Mainz 05",league:1,colorPrimary:"#C3141E",colorSecondary:"#FFFFFF",shortCode:"M05",logoUrl:null},
+  {id:"fcu",name:"1. FC Union Berlin",league:1,colorPrimary:"#E2001A",colorSecondary:"#FFD700",shortCode:"FCU",logoUrl:null},
+  {id:"bmg",name:"Borussia Mönchengladbach",league:1,colorPrimary:"#000000",colorSecondary:"#00A94F",shortCode:"BMG",logoUrl:null},
+  {id:"hsv",name:"Hamburger SV",league:1,colorPrimary:"#0C1C8C",colorSecondary:"#000000",shortCode:"HSV",logoUrl:null},
+  {id:"fck",name:"1. FC Köln",league:1,colorPrimary:"#ED1C24",colorSecondary:"#FFFFFF",shortCode:"FCK",logoUrl:null},
+  {id:"svw",name:"SV Werder Bremen",league:1,colorPrimary:"#1D9053",colorSecondary:"#FFFFFF",shortCode:"SVW",logoUrl:null},
+  {id:"s04",name:"FC Schalke 04",league:1,colorPrimary:"#004B9B",colorSecondary:"#FFFFFF",shortCode:"S04",logoUrl:null},
+  {id:"sve",name:"SV 07 Elversberg",league:1,colorPrimary:"#000000",colorSecondary:"#E2001A",shortCode:"SVE",logoUrl:null},
+  {id:"scp",name:"SC Paderborn 07",league:1,colorPrimary:"#003C7D",colorSecondary:"#000000",shortCode:"SCP",logoUrl:null},
+  // --- 2. Bundesliga 2026/27 ---
+  {id:"h96",name:"Hannover 96",league:2,colorPrimary:"#00843D",colorSecondary:"#000000",shortCode:"H96",logoUrl:null},
+  {id:"sv98",name:"SV Darmstadt 98",league:2,colorPrimary:"#003D7C",colorSecondary:"#FFFFFF",shortCode:"SV98",logoUrl:null},
+  {id:"kai",name:"1. FC Kaiserslautern",league:2,colorPrimary:"#E2001A",colorSecondary:"#FFFFFF",shortCode:"KAI",logoUrl:null},
+  {id:"bsc",name:"Hertha BSC",league:2,colorPrimary:"#005CA5",colorSecondary:"#FFFFFF",shortCode:"BSC",logoUrl:null},
+  {id:"fcn",name:"1. FC Nürnberg",league:2,colorPrimary:"#C6050D",colorSecondary:"#FFFFFF",shortCode:"FCN",logoUrl:null},
+  {id:"vfl",name:"VfL Bochum",league:2,colorPrimary:"#005CA9",colorSecondary:"#FFFFFF",shortCode:"VFL",logoUrl:null},
+  {id:"ksc",name:"Karlsruher SC",league:2,colorPrimary:"#0C2C56",colorSecondary:"#FFFFFF",shortCode:"KSC",logoUrl:null},
+  {id:"sgd",name:"Dynamo Dresden",league:2,colorPrimary:"#FFCC00",colorSecondary:"#000000",shortCode:"SGD",logoUrl:null},
+  {id:"ksv",name:"Holstein Kiel",league:2,colorPrimary:"#003C78",colorSecondary:"#E2001A",shortCode:"KSV",logoUrl:null},
+  {id:"dsc",name:"Arminia Bielefeld",league:2,colorPrimary:"#003C7D",colorSecondary:"#000000",shortCode:"DSC",logoUrl:null},
+  {id:"fcm",name:"1. FC Magdeburg",league:2,colorPrimary:"#4AA3DF",colorSecondary:"#FFFFFF",shortCode:"FCM",logoUrl:null},
+  {id:"ebs",name:"Eintracht Braunschweig",league:2,colorPrimary:"#FFCC00",colorSecondary:"#002B5C",shortCode:"EBS",logoUrl:null},
+  {id:"sgf",name:"SpVgg Greuther Fürth",league:2,colorPrimary:"#1F7A3E",colorSecondary:"#FFFFFF",shortCode:"SGF",logoUrl:null},
+  {id:"vfo",name:"VfL Osnabrück",league:2,colorPrimary:"#6E2585",colorSecondary:"#FFFFFF",shortCode:"VFO",logoUrl:null},
+  {id:"fce",name:"FC Energie Cottbus",league:2,colorPrimary:"#E2001A",colorSecondary:"#FFFFFF",shortCode:"FCE",logoUrl:null},
+  {id:"wob",name:"VfL Wolfsburg",league:2,colorPrimary:"#65B32E",colorSecondary:"#FFFFFF",shortCode:"WOB",logoUrl:null},
+  {id:"hdh",name:"1. FC Heidenheim",league:2,colorPrimary:"#E2001A",colorSecondary:"#002B5C",shortCode:"HDH",logoUrl:null},
+  {id:"stp",name:"FC St. Pauli",league:2,colorPrimary:"#543825",colorSecondary:"#FFFFFF",shortCode:"STP",logoUrl:null}
+];
+
+function getTeamById(id){
+  return TEAM_LIST.find(t=>t.id===id) || null;
+}
+
 function hexToRgba(hex, alpha){
   const h = hex.replace("#","");
   const r = parseInt(h.substring(0,2),16);
@@ -4605,6 +4826,38 @@ function renderProfileCustomize(){
   });
 }
 
+function renderTeamPicker(){
+  const block = document.getElementById("teamPickerBlock");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    block.style.display="none";
+    return;
+  }
+  block.style.display="block";
+  const currentTeam = prof.team || null;
+  [[1,"teamPickerLeague1"],[2,"teamPickerLeague2"]].forEach(([league, divId])=>{
+    const div = document.getElementById(divId);
+    div.innerHTML = "";
+    TEAM_LIST.filter(t=>t.league===league).forEach(team=>{
+      const btn=document.createElement("button");
+      btn.className="select-pill team-pill";
+      btn.style.setProperty("--swatch", team.colorPrimary);
+      btn.innerHTML=`<span class="theme-swatch"></span> ${team.shortCode}`;
+      btn.title = team.name;
+      const isActive = team.id===currentTeam;
+      btn.setAttribute("aria-pressed", isActive ? "true":"false");
+      if(isActive) btn.classList.add("active");
+      btn.addEventListener("click",()=>{
+        prof.team = team.id;
+        saveProfiles();
+        renderProfilesScreen();
+        syncProfileToLeaderboard(prof);
+      });
+      div.appendChild(btn);
+    });
+  });
+}
+
 /* ===========================================================
    COMBO-BONUS (Belohnung für mehrere richtige Antworten in Folge)
    =========================================================== */
@@ -4663,6 +4916,100 @@ function renderStreakBadge(){
     </div>
   `;
   badge.style.display="flex";
+}
+
+function formatGermanDateTime(d){
+  const p2 = n=>String(n).padStart(2,"0");
+  return `${p2(d.getDate())}.${p2(d.getMonth()+1)}.${d.getFullYear()}, ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
+
+function redeemBonusCard(threshold){
+  const prof = getCurrentProfileObj();
+  if(!prof) return;
+  if(!confirm(`Bonuskarte (${BONUS_CARD_REWARD_TITLE}, ${threshold} Flammen) jetzt als eingelöst markieren? Das kann danach nicht mehr zurückgenommen werden.`)) return;
+  ensureBonusCards(prof).redeemed[threshold] = new Date().toISOString();
+  saveProfiles();
+  renderBonusCardsBlock();
+}
+
+/* Shown directly under the streak badge, not on a separate screen --
+   this is deliberately a parent-facing moment (the child shows/screenshots
+   the card for a parent), so it sits where it's fastest to reach, right
+   next to the streak data that drives it. The timestamp on an unredeemed
+   card ticks live every second (self-cleaning once screen-start isn't
+   active anymore) so a parent glancing at it always sees "right now", not
+   the frozen moment the threshold was unlocked. */
+function renderBonusCardsBlock(){
+  if(state.bonusCardTimestampInterval){
+    clearInterval(state.bonusCardTimestampInterval);
+    state.bonusCardTimestampInterval=null;
+  }
+  const block = document.getElementById("bonusCardsBlock");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    block.style.display="none";
+    return;
+  }
+  const {available, redeemed} = getBonusCardThresholds(prof);
+  if(available.length===0 && redeemed.length===0){
+    block.style.display="none";
+    return;
+  }
+  block.style.display="block";
+
+  const availDiv = document.getElementById("bonusCardsAvailable");
+  availDiv.innerHTML="";
+  available.forEach(({threshold})=>{
+    const card=document.createElement("div");
+    card.className="bonus-card";
+    card.innerHTML = `
+      <div class="bonus-card-icon">📱</div>
+      <div class="bonus-card-title">${BONUS_CARD_REWARD_TITLE}</div>
+      <div class="bonus-card-sub">Freigeschaltet bei ${threshold} Flammen 🔥</div>
+      <div class="bonus-card-timestamp" data-live-ts="1">${formatGermanDateTime(new Date())}</div>
+    `;
+    const btn=document.createElement("button");
+    btn.className="btn bonus-card-redeem-btn";
+    btn.textContent="✅ Als eingelöst markieren";
+    btn.addEventListener("click", ()=>redeemBonusCard(threshold));
+    card.appendChild(btn);
+    availDiv.appendChild(card);
+  });
+
+  const histDetails = document.getElementById("bonusCardsHistoryDetails");
+  const redeemedListDiv = document.getElementById("bonusCardsRedeemedList");
+  redeemedListDiv.innerHTML="";
+  if(redeemed.length>0){
+    histDetails.style.display="block";
+    document.getElementById("bonusCardsRedeemedCount").textContent=String(redeemed.length);
+    redeemed.sort((a,b)=>b.threshold-a.threshold).forEach(({threshold, redeemedAt})=>{
+      const card=document.createElement("div");
+      card.className="bonus-card redeemed";
+      card.innerHTML = `
+        <div class="bonus-card-icon">📱</div>
+        <div class="bonus-card-title">${BONUS_CARD_REWARD_TITLE}</div>
+        <div class="bonus-card-sub">War bei ${threshold} Flammen freigeschaltet</div>
+        <div class="bonus-card-timestamp">✅ Eingelöst am ${formatGermanDateTime(new Date(redeemedAt))}</div>
+      `;
+      redeemedListDiv.appendChild(card);
+    });
+  } else {
+    histDetails.style.display="none";
+  }
+
+  if(available.length>0){
+    state.bonusCardTimestampInterval = setInterval(()=>{
+      const startScr = document.getElementById("screen-start");
+      if(!startScr || !startScr.classList.contains("active")){
+        clearInterval(state.bonusCardTimestampInterval);
+        state.bonusCardTimestampInterval=null;
+        return;
+      }
+      document.querySelectorAll('#bonusCardsAvailable .bonus-card-timestamp[data-live-ts]').forEach(el=>{
+        el.textContent = formatGermanDateTime(new Date());
+      });
+    }, 1000);
+  }
 }
 
 function formatPageLabel(pageId){
@@ -5238,11 +5585,19 @@ function finalizeRoundAndUpdateProfile(){
   let newRecords=[];
   let dailyGoalJustMet=false;
   let newlyUnlockedAchievements=[];
+  let newlyUnlockedBonusCards=[];
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     prof.stats.totalPoints += state.roundTotalPoints;
     prof.stats.totalTimeSec += durationSec;
+    const longestBeforeRound = ensureStreakObj(prof).longest;
     streakChanged = updateStreak(prof);
+    const longestAfterRound = ensureStreakObj(prof).longest;
+    const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
+    const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
+    for(let n=thresholdsBefore+1; n<=thresholdsAfter; n++){
+      newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
+    }
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
@@ -5315,7 +5670,8 @@ function finalizeRoundAndUpdateProfile(){
     levelInfo,
     newRecords,
     dailyGoalJustMet,
-    newlyUnlockedAchievements
+    newlyUnlockedAchievements,
+    newlyUnlockedBonusCards
   };
 }
 
@@ -5471,6 +5827,15 @@ async function fetchLeaderboard(){
   return snap.docs.map(d=>d.data());
 }
 
+/* Unlike fetchLeaderboard(), NOT limited to the top 50 by individual score
+   and NOT ordered -- a team aggregate needs every member, including ones
+   who'd never crack the individual top 50. 500 is comfortably above this
+   classroom-scale app's realistic user count. */
+async function fetchAllTeamMembers(){
+  const snap = await fbDb.collection("leaderboard_v1").limit(500).get();
+  return snap.docs.map(d=>d.data());
+}
+
 /* Builds one .leaderboard-row per entry: rank, nickname, big
    "Tabellenpunkte" value, and a small breakdown line so kids can see WHY
    they're ranked where they are, not just an opaque number. The row
@@ -5523,6 +5888,83 @@ function renderLeaderboardRows(rows, prof){
   });
 }
 
+/* Team-vs-team leaderboard screen -- same loading/error pattern as
+   renderLeaderboardScreen(), but fetches via fetchAllTeamMembers() (not
+   the capped/ordered fetchLeaderboard()) since a team aggregate needs
+   every member, not just the individual top 50. */
+async function renderTeamLeaderboardScreen(){
+  const statusEl = document.getElementById("teamLeaderboardStatusNote");
+  const bodyEl = document.getElementById("teamLeaderboardTableBody");
+  bodyEl.innerHTML = "";
+
+  if(!fbReady){
+    statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
+    statusEl.style.display="block";
+    return;
+  }
+
+  statusEl.textContent = "⏳ Lade Team-Tabelle...";
+  statusEl.style.display="block";
+  try{
+    const rows = await fetchAllTeamMembers();
+    statusEl.style.display="none";
+    renderTeamLeaderboardRows(rows);
+  } catch(e){
+    console.error("renderTeamLeaderboardScreen error", e);
+    statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
+    statusEl.style.display="block";
+  }
+}
+
+function renderTeamLeaderboardRows(rows){
+  const bodyEl = document.getElementById("teamLeaderboardTableBody");
+  bodyEl.innerHTML = "";
+
+  const byTeam = groupMembersByTeam(rows);
+  const teamEntries = Object.entries(byTeam)
+    .map(([teamId, members])=>({teamId, team:getTeamById(teamId), agg:computeTeamScore(members)}))
+    .filter(e=>e.team) // drop any unknown/stale team id defensively
+    .sort((a,b)=>b.agg.score-a.agg.score);
+
+  if(teamEntries.length===0){
+    bodyEl.innerHTML = "<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Noch kein Team in der Tabelle 👀</div>";
+    return;
+  }
+
+  teamEntries.forEach((entry, idx)=>{
+    const row=document.createElement("div");
+    row.className="leaderboard-row";
+
+    const rank=document.createElement("div");
+    rank.className="rank";
+    rank.textContent=String(idx+1);
+
+    const badge=document.createElement("div");
+    badge.className="team-badge";
+    badge.style.setProperty("--team-color", entry.team.colorPrimary);
+    badge.textContent = entry.team.shortCode;
+
+    const name=document.createElement("div");
+    name.className="nickname";
+    name.textContent = entry.team.name;
+
+    const score=document.createElement("div");
+    score.className="score";
+    score.textContent=String(entry.agg.score);
+
+    const breakdown=document.createElement("div");
+    breakdown.className="breakdown";
+    breakdown.textContent = `${entry.agg.memberCount} Mitglied${entry.agg.memberCount===1?"":"er"} · Ø ${entry.agg.avgFirstTryPct}% Trefferquote · Ø ${entry.agg.avgStreak} Tage Serie`;
+
+    row.appendChild(rank);
+    row.appendChild(badge);
+    row.appendChild(name);
+    row.appendChild(score);
+    row.appendChild(breakdown);
+    bodyEl.appendChild(row);
+  });
+}
+
 /* ===========================================================
    RENDER SCREENS
    =========================================================== */
@@ -5534,6 +5976,7 @@ function renderLeaderboardRows(rows, prof){
 function renderProfilesScreen(){
   applyProfileTheme(); // so picking a new avatar/color reflects immediately, not just after returning to the start screen
   renderProfileCustomize();
+  renderTeamPicker();
 
   const profDiv=document.getElementById("profileList");
   profDiv.innerHTML="";
@@ -5582,6 +6025,7 @@ function renderProfilesScreen(){
 function renderStartScreen(){
   applyProfileTheme();
   renderStreakBadge();
+  renderBonusCardsBlock();
   renderLevelBadge();
   renderDailyGoalWidget();
   renderLeagueRankWidget();
@@ -6161,7 +6605,7 @@ function renderCurrentCard(){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
@@ -6215,6 +6659,12 @@ function showSummaryScreen(){
     banner.textContent=`🏆 Neuer Rekord: ${rec.label} (${rec.value})!`;
     extraDiv.appendChild(banner);
   });
+  newlyUnlockedBonusCards.forEach(bc=>{
+    const banner=document.createElement("div");
+    banner.className="highlight-banner bonuscard";
+    banner.textContent=`📱 Bonuskarte freigeschaltet: ${BONUS_CARD_REWARD_TITLE} (bei ${bc.threshold} Flammen)!`;
+    extraDiv.appendChild(banner);
+  });
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
     // mid-round toast too quickly to read it) -- no sound replay, that
@@ -6229,7 +6679,7 @@ function showSummaryScreen(){
   // things happen in the same round -- achievement/record beats a plain
   // level-up (level-up already played live in checkAnswer() the moment it
   // happened, this is just a reminder chime for whichever is most noteworthy)
-  if(newlyUnlockedAchievements.length>0 || newRecords.length>0) playSound("achievement");
+  if(newlyUnlockedAchievements.length>0 || newRecords.length>0 || newlyUnlockedBonusCards.length>0) playSound("achievement");
   else if(leveledUp) playSound("levelup");
 
   switchScreen("screen-summary");
@@ -6999,6 +7449,17 @@ function setupEventListeners(){
     renderLeaderboardScreen();
   });
 
+  // Floating team-leaderboard button -- own backStack variable, same
+  // reasoning as the individual leaderboard's
+  document.getElementById("btn-floating-team-leaderboard").addEventListener("click", ()=>{
+    const activeScr=document.querySelector(".screen.active");
+    if(activeScr && activeScr.id!=="screen-team-leaderboard"){
+      state.backStackBeforeTeamLeaderboard = activeScr.id;
+    }
+    switchScreen("screen-team-leaderboard");
+    renderTeamLeaderboardScreen();
+  });
+
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
@@ -7016,6 +7477,10 @@ function setupEventListeners(){
       renderCurrentCard();
     } else if(target==="screen-summary"){
       // summary already rendered
+    } else if(target==="screen-leaderboard"){
+      renderLeaderboardScreen();
+    } else if(target==="screen-team-leaderboard"){
+      renderTeamLeaderboardScreen();
     }
   });
 
@@ -7038,6 +7503,32 @@ function setupEventListeners(){
       // summary already rendered
     } else if(target==="screen-stats"){
       renderStatsScreen();
+    } else if(target==="screen-team-leaderboard"){
+      renderTeamLeaderboardScreen();
+    }
+  });
+
+  document.getElementById("btnTeamLeaderboardBack").addEventListener("click", ()=>{
+    const target=state.backStackBeforeTeamLeaderboard || "screen-start";
+    switchScreen(target);
+    if(target==="screen-start"){
+      renderStartScreen();
+    } else if(target==="screen-bookpages"){
+      renderBookPageScreen();
+    } else if(target==="screen-vocab-add"){
+      renderVocabAddScreen();
+    } else if(target==="screen-vocabpick"){
+      renderVocabPickScreen();
+    } else if(target==="screen-direction"){
+      renderDirectionScreen();
+    } else if(target==="screen-learn"){
+      renderCurrentCard();
+    } else if(target==="screen-summary"){
+      // summary already rendered
+    } else if(target==="screen-stats"){
+      renderStatsScreen();
+    } else if(target==="screen-leaderboard"){
+      renderLeaderboardScreen();
     }
   });
 }
