@@ -77,14 +77,6 @@ body.dark-theme .toggle-btn.on {
   background:rgba(16,185,129,0.15);
   border-color:#34d399;
 }
-body.dark-theme .streak-badge {
-  background:linear-gradient(135deg,#2a1d10,#3a2412);
-  border-color:#b45309;
-}
-body.dark-theme .streak-badge.at-risk {
-  background:linear-gradient(135deg,#2a1414,#3a1a1a);
-  border-color:#b91c1c;
-}
 body.dark-theme .danger-list {
   color:#f87171;
 }
@@ -138,8 +130,8 @@ body {
   gap:0.5rem;
   font-family:var(--font-display);
 }
-h2, .level-badge .level-num, .level-badge .level-title,
-.streak-badge .streak-num, .summary-head, .stats-card .value {
+h2, .start-greeting-text, .stat-tile-value,
+.summary-head, .stats-card .value {
   font-family:var(--font-display);
 }
 .section-sub {
@@ -245,6 +237,23 @@ h2, .level-badge .level-num, .level-badge .level-title,
   color:rgba(255,255,255,0.9);
   margin-top:0.2rem;
   margin-bottom:1.1rem;
+}
+/* compact variant for the start screen -- same banner, smaller so it
+   doesn't crowd out the stat tiles below it */
+.hero-banner.compact {
+  padding:1rem 1.1rem 1.1rem;
+}
+.hero-banner.compact .hero-title {
+  font-size:1.2rem;
+}
+.hero-banner.compact .hero-subtitle {
+  font-size:0.76rem;
+  margin-bottom:0.7rem;
+}
+.hero-banner.compact .hero-icon-tile {
+  width:2.3rem;
+  height:2.3rem;
+  border-radius:10px;
 }
 .hero-icon-row {
   display:flex;
@@ -576,50 +585,169 @@ body.dark-theme .hist-badge.wrong {
   border-style:dashed;
   color:#92400e;
 }
-.streak-badge {
-  align-items:center;
-  gap:0.7rem;
-  background:linear-gradient(135deg,#fff7ed,#ffedd5);
-  border:1px solid #fdba74;
-  border-radius:var(--radius);
-  padding:0.7rem 1rem;
-  margin-bottom:1rem;
+@keyframes streakPulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  50% { box-shadow:0 0 0 6px rgba(239,68,68,0.12); }
 }
-.streak-badge .flame {
+
+/* start-screen greeting row (avatar/name/switch button, replaces the old
+   separate "Willkommen" heading + profile-summary section-block) */
+.start-greeting-row {
   display:flex;
-  flex-wrap:wrap;
   align-items:center;
-  gap:0.05rem;
-  max-width:8rem;
-  font-size:1.4rem;
-  line-height:1;
+  justify-content:space-between;
+  gap:0.75rem;
+  margin-bottom:0.9rem;
 }
-.streak-badge .flame-extra {
-  font-size:0.85rem;
+.start-greeting-text {
+  font-size:1.25rem;
+  font-weight:800;
+  font-family:var(--font-display);
+  color:var(--ink);
+}
+.start-profile-btn {
+  display:flex;
+  align-items:center;
+  gap:0.4rem;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:0.35rem 0.75rem 0.35rem 0.35rem;
+  font-weight:700;
+  font-size:0.82rem;
+  font-family:inherit;
+  color:var(--ink);
+  cursor:pointer;
+  white-space:nowrap;
+}
+.start-profile-btn .avatar-circle {
+  width:1.6rem;
+  height:1.6rem;
+  border-radius:50%;
+  background:var(--accent-bg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:0.95rem;
+  flex-shrink:0;
+}
+
+/* start-screen stat tiles -- a compact 2-column dashboard replacing the
+   previously separately-stacked streak/level/daily-goal/league-rank
+   badges, which made the start screen feel cluttered. CSS variables
+   throughout (like .achievement-badge/.league-rank-badge already did),
+   so dark mode and the per-profile accent color both apply automatically. */
+.start-stat-grid {
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:0.6rem;
+  margin-bottom:0.6rem;
+}
+.stat-tile {
+  display:none;
+  flex-direction:column;
+  gap:0.3rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:0.75rem 0.85rem;
+}
+.stat-tile.show { display:flex; }
+.stat-tile-wide { grid-column:1 / -1; }
+.stat-tile-head {
+  display:flex;
+  align-items:center;
+  gap:0.35rem;
+  font-size:0.66rem;
   font-weight:700;
   color:var(--muted);
-  margin-left:0.15rem;
+  text-transform:uppercase;
+  letter-spacing:0.02em;
 }
-.streak-badge .streak-num {
-  font-size:1.05rem;
+.stat-tile-value {
+  font-size:1.1rem;
+  font-weight:800;
+  font-family:var(--font-display);
+  color:var(--ink);
+  overflow-wrap:break-word;
+}
+.stat-tile-flames {
+  font-size:1rem;
+  letter-spacing:-0.07em;
+  line-height:1.1;
+}
+.stat-tile-bar-outer {
+  background:var(--border);
+  border-radius:999px;
+  height:0.35rem;
+  overflow:hidden;
+}
+.stat-tile-bar-inner {
+  height:100%;
+  border-radius:999px;
+  transition:width 0.3s ease;
+}
+.stat-tile-sub {
+  font-size:0.64rem;
   font-weight:700;
-  color:#c2410c;
-}
-.streak-badge .streak-text {
-  font-size:0.78rem;
   color:var(--muted);
 }
-.streak-badge.at-risk {
+.stat-tile.at-risk {
   border-color:#fca5a5;
   background:linear-gradient(135deg,#fef2f2,#fee2e2);
   animation:streakPulse 1.6s ease-in-out infinite;
 }
-.streak-badge.at-risk .streak-num {
-  color:#b91c1c;
+body.dark-theme .stat-tile.at-risk {
+  background:linear-gradient(135deg,#2a1414,#3a1a1a);
+  border-color:#b91c1c;
 }
-@keyframes streakPulse {
-  0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
-  50% { box-shadow:0 0 0 6px rgba(239,68,68,0.12); }
+
+/* team-placement tile -- wide, row layout (badge + name + rank), dashed
+   border + muted icon when no team has been picked yet */
+.team-tile-row {
+  flex-direction:row;
+  align-items:center;
+  gap:0.7rem;
+}
+.team-tile-row .team-tile-badge {
+  width:2rem;
+  height:2rem;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-weight:800;
+  font-size:0.6rem;
+  flex-shrink:0;
+}
+.team-tile-row .team-tile-rank {
+  font-size:1rem;
+  font-weight:800;
+  color:var(--ink);
+  flex-shrink:0;
+}
+.team-tile-row.no-team {
+  border-style:dashed;
+  cursor:pointer;
+}
+
+/* bonus-card progress tile -- only shown while no card is currently
+   available to redeem (see renderBonusProgressTile); the rich redeem UI
+   in #bonusCardsBlock takes over once one actually is */
+.bonus-progress-tile {
+  flex-direction:row;
+  align-items:center;
+  gap:0.6rem;
+  background:var(--accent-bg);
+  border-color:var(--accent);
+  margin-bottom:1rem;
+}
+.bonus-progress-tile .stat-tile-bar-outer {
+  background:rgba(0,0,0,0.08);
+}
+body.dark-theme .bonus-progress-tile .stat-tile-bar-outer {
+  background:rgba(255,255,255,0.12);
 }
 
 /* bonus cards (unlocked at streak thresholds) */
@@ -643,115 +771,6 @@ body.dark-theme .bonus-card { background:linear-gradient(135deg,#1e2f5c,#1e3a73)
 .bonus-card.redeemed { opacity:0.65; }
 .bonus-card.redeemed .bonus-card-timestamp { font-size:0.8rem; font-family:inherit; color:var(--muted); }
 
-/* level badge */
-.level-badge {
-  align-items:center;
-  gap:0.7rem;
-  background:linear-gradient(135deg, var(--accent-bg), var(--card));
-  border:1px solid var(--accent);
-  border-radius:var(--radius);
-  padding:0.7rem 1rem;
-  margin-bottom:1rem;
-  display:none;
-}
-.level-badge .level-num {
-  font-size:1.4rem;
-  font-weight:800;
-  color:var(--accent);
-  min-width:2.2rem;
-  text-align:center;
-}
-.level-badge .level-info {
-  flex:1;
-  min-width:0;
-}
-.level-badge .level-title {
-  font-weight:700;
-  font-size:0.92rem;
-  color:var(--ink);
-}
-.level-badge .level-progress-outer {
-  background:var(--border);
-  border-radius:999px;
-  height:0.4rem;
-  margin-top:0.3rem;
-  overflow:hidden;
-}
-.level-badge .level-progress-inner {
-  height:100%;
-  background:var(--accent);
-  border-radius:999px;
-  transition:width 0.3s ease;
-}
-.level-badge .level-sub {
-  font-size:0.72rem;
-  color:var(--muted);
-  margin-top:0.15rem;
-}
-
-/* daily goal badge -- same shape as the level badge, green accent */
-.daily-goal-badge {
-  align-items:center;
-  gap:0.7rem;
-  background:linear-gradient(135deg,#ecfdf5,#d1fae5);
-  border:1px solid #34d399;
-  border-radius:var(--radius);
-  padding:0.7rem 1rem;
-  margin-bottom:1rem;
-  display:none;
-}
-.daily-goal-badge .goal-num {
-  font-size:1.3rem;
-  font-weight:800;
-  color:#059669;
-  min-width:2.2rem;
-  text-align:center;
-}
-.daily-goal-badge .goal-info {
-  flex:1;
-  min-width:0;
-}
-.daily-goal-badge .goal-title {
-  font-weight:700;
-  font-size:0.85rem;
-  color:#047857;
-}
-.daily-goal-badge .goal-progress-outer {
-  background:var(--border);
-  border-radius:999px;
-  height:0.4rem;
-  margin-top:0.3rem;
-  overflow:hidden;
-}
-.daily-goal-badge .goal-progress-inner {
-  height:100%;
-  background:#059669;
-  border-radius:999px;
-  transition:width 0.3s ease;
-}
-body.dark-theme .daily-goal-badge {
-  background:linear-gradient(135deg,#0d2a1f,#0f3326);
-  border-color:#059669;
-}
-body.dark-theme .daily-goal-badge .goal-title {
-  color:#6ee7b7;
-}
-
-/* league rank widget -- uses var(--accent)/var(--accent-bg) throughout
-   (like .achievement-badge) instead of fixed hex colors, so it
-   automatically matches both dark mode and whichever accent color the
-   profile picked, no separate dark-theme override needed */
-.league-rank-badge {
-  align-items:center;
-  background:var(--accent-bg);
-  border:1px solid var(--accent);
-  border-radius:var(--radius);
-  padding:0.7rem 1rem;
-  margin-bottom:1rem;
-  font-weight:700;
-  font-size:0.9rem;
-  color:var(--ink);
-}
 
 /* combo indicator */
 .combo-indicator {
@@ -1572,7 +1591,7 @@ body.dark-theme .daily-goal-mini-banner {
 
   <!-- START SCREEN -->
   <div id="screen-start" class="screen">
-    <div class="hero-banner">
+    <div class="hero-banner compact">
       <span class="hero-sparkle s1">✨</span>
       <span class="hero-sparkle s2">✨</span>
       <div class="hero-title">📖 Vokabeltrainer</div>
@@ -1585,11 +1604,21 @@ body.dark-theme .daily-goal-mini-banner {
       </div>
     </div>
 
-    <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
-      <span id="welcomeHeading">👋 Willkommen</span>
-    </h2>
+    <div class="start-greeting-row">
+      <div id="welcomeHeading" class="start-greeting-text">👋 Willkommen</div>
+      <button id="btnGoToProfiles" class="start-profile-btn"></button>
+    </div>
 
-    <div id="streakBadge" class="streak-badge" style="display:none;"></div>
+    <div class="start-stat-grid">
+      <div id="streakTile" class="stat-tile"></div>
+      <div id="levelTile" class="stat-tile"></div>
+      <div id="dailyGoalTile" class="stat-tile"></div>
+      <div id="leagueRankTile" class="stat-tile"></div>
+      <div id="teamRankTile" class="stat-tile stat-tile-wide team-tile-row"></div>
+    </div>
+
+    <div id="bonusProgressTile" class="stat-tile bonus-progress-tile"></div>
+
     <div id="bonusCardsBlock" class="bonus-cards-block" style="display:none;">
       <div class="section-title">🎁 Bonuskarten</div>
       <div id="bonusCardsAvailable" class="bonus-card-list"></div>
@@ -1597,14 +1626,6 @@ body.dark-theme .daily-goal-mini-banner {
         <summary>Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</summary>
         <div id="bonusCardsRedeemedList" class="bonus-card-list" style="margin-top:0.5rem;"></div>
       </details>
-    </div>
-    <div id="levelBadge" class="level-badge" style="display:none;"></div>
-    <div id="dailyGoalBadge" class="daily-goal-badge" style="display:none;"></div>
-    <div id="leagueRankBadge" class="league-rank-badge" style="display:none;"></div>
-
-    <div class="section-block" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-      <div id="currentProfileSummary" style="font-weight:600;"></div>
-      <button id="btnGoToProfiles" class="btn-secondary btn" style="min-width:auto;"></button>
     </div>
 
     <div id="quickStartBlock" class="section-block" style="display:none;">
@@ -4381,6 +4402,24 @@ function getBonusCardThresholds(prof){
   return {available, redeemed:redeemedList};
 }
 
+/* How close the profile is to the NEXT not-yet-earned bonus-card
+   threshold -- purely derived from streak.longest (same high-water-mark
+   logic as getBonusCardThresholds above), so it stays correct no matter
+   how many earlier thresholds have already been redeemed. Only
+   meaningful while nothing is currently available to redeem (see
+   renderBonusProgressTile), since once longest crosses a threshold that
+   one's availability is what matters, not "progress". */
+function getNextBonusCardProgress(prof){
+  const longest = (prof.stats.streak && prof.stats.streak.longest) || 0;
+  const currentInCycle = longest % BONUS_CARD_INTERVAL;
+  const remaining = currentInCycle===0 ? BONUS_CARD_INTERVAL : BONUS_CARD_INTERVAL-currentInCycle;
+  return {
+    remaining,
+    nextThreshold: longest+remaining,
+    pct: Math.round((BONUS_CARD_INTERVAL-remaining)/BONUS_CARD_INTERVAL*100)
+  };
+}
+
 function fallbackUuid(){
   // only reached on very old browsers without crypto.randomUUID
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c=>{
@@ -4601,45 +4640,41 @@ function getLevelInfo(totalPoints){
 }
 
 function renderLevelBadge(){
-  const badge = document.getElementById("levelBadge");
+  const tile = document.getElementById("levelTile");
   const prof = getCurrentProfileObj();
   if(!prof){
-    badge.style.display="none";
+    tile.classList.remove("show");
     return;
   }
   const info = getLevelInfo(prof.stats.totalPoints);
-  badge.innerHTML = `
-    <div class="level-num">${info.level}</div>
-    <div class="level-info">
-      <div class="level-title">${info.title}</div>
-      <div class="level-progress-outer"><div class="level-progress-inner" style="width:${info.pct}%;"></div></div>
-      <div class="level-sub">${info.pointsToNext>0 ? `noch ${info.pointsToNext} Punkte bis Level ${info.level+1}` : "Maximalstufe erreicht"}</div>
-    </div>
+  tile.innerHTML = `
+    <div class="stat-tile-head"><span>⭐</span><span>Level</span></div>
+    <div class="stat-tile-value">${info.level} · ${info.title}</div>
+    <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${info.pct}%;background:var(--accent);"></div></div>
+    <div class="stat-tile-sub">${info.pointsToNext>0 ? `noch ${info.pointsToNext} Pkt. bis Lvl ${info.level+1}` : "Maximalstufe erreicht"}</div>
   `;
-  badge.style.display="flex";
+  tile.classList.add("show");
 }
 
-/* Daily-goal widget on the start screen -- same shape as the level badge
-   above, green accent. ensureDailyGoal() handles the once-a-day reset,
-   so this reads correctly even if no round has been played yet today. */
+/* Daily-goal tile on the start screen's stat grid. ensureDailyGoal()
+   handles the once-a-day reset, so this reads correctly even if no round
+   has been played yet today. */
 function renderDailyGoalWidget(){
-  const badge = document.getElementById("dailyGoalBadge");
+  const tile = document.getElementById("dailyGoalTile");
   const prof = getCurrentProfileObj();
   if(!prof){
-    badge.style.display="none";
+    tile.classList.remove("show");
     return;
   }
   const goal = ensureDailyGoal(prof);
   const count = Math.min(goal.correctToday, DAILY_GOAL_TARGET);
   const pct = Math.round(count/DAILY_GOAL_TARGET*100);
-  badge.innerHTML = `
-    <div class="goal-num">${goal.correctToday>=DAILY_GOAL_TARGET ? "🎯" : count}</div>
-    <div class="goal-info">
-      <div class="goal-title">Tagesziel: ${goal.correctToday}/${DAILY_GOAL_TARGET} heute</div>
-      <div class="goal-progress-outer"><div class="goal-progress-inner" style="width:${pct}%;"></div></div>
-    </div>
+  tile.innerHTML = `
+    <div class="stat-tile-head"><span>🎯</span><span>Tagesziel</span></div>
+    <div class="stat-tile-value">${goal.correctToday}${goal.correctToday>=DAILY_GOAL_TARGET ? " 🎯" : ""} / ${DAILY_GOAL_TARGET}</div>
+    <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:#16a34a;"></div></div>
   `;
-  badge.style.display="flex";
+  tile.classList.add("show");
 }
 
 /* Current rank in the cross-device Bundesligatabelle, shown right on the
@@ -4649,29 +4684,89 @@ function renderDailyGoalWidget(){
    immediately, this widget fills in once the (already existing)
    fetchLeaderboard() call resolves. */
 async function renderLeagueRankWidget(){
-  const badge = document.getElementById("leagueRankBadge");
+  const tile = document.getElementById("leagueRankTile");
   const prof = getCurrentProfileObj();
   if(!prof){
-    badge.style.display="none";
+    tile.classList.remove("show");
     return;
   }
+  const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
   if(!fbReady){
-    badge.innerHTML = `⚽ Tabellenplatz: <span style="color:var(--muted);">keine Verbindung</span>`;
-    badge.style.display="flex";
+    tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
+    tile.classList.add("show");
     return;
   }
-  badge.innerHTML = `⚽ Tabellenplatz: ⏳`;
-  badge.style.display="flex";
+  tile.innerHTML = `${head}<div class="stat-tile-value">⏳</div>`;
+  tile.classList.add("show");
   try{
     const rows = await fetchLeaderboard();
     const ownDocId = getCloudDocId(prof);
     const idx = rows.findIndex(r=>r.cloudId===ownDocId);
-    badge.innerHTML = idx>=0
-      ? `⚽ Tabellenplatz: <strong>${idx+1}.</strong> von ${rows.length}`
-      : `⚽ Tabellenplatz: <span style="color:var(--muted);">noch nicht in der Tabelle</span>`;
+    tile.innerHTML = idx>=0
+      ? `${head}<div class="stat-tile-value">Platz ${idx+1}</div>`
+      : `${head}<div class="stat-tile-sub">noch nicht gelistet</div>`;
   } catch(e){
     console.error("renderLeagueRankWidget error", e);
-    badge.innerHTML = `⚽ Tabellenplatz: <span style="color:var(--muted);">keine Verbindung</span>`;
+    tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
+  }
+}
+
+/* Current rank in the Team-Tabelle for the profile's chosen team (see
+   TEAM_LIST/prof.team) -- mirrors renderLeagueRankWidget()'s async/
+   fire-and-forget pattern and reuses the same aggregation helpers the
+   team-leaderboard screen itself uses (groupMembersByTeam,
+   computeTeamScore), so the rank shown here always matches that screen.
+   Shown as its own wide tile (badge + name + rank needs more room than
+   the compact stat tiles), with a dashed "pick a team" prompt when the
+   profile hasn't chosen one yet. */
+async function renderTeamRankWidget(){
+  const tile = document.getElementById("teamRankTile");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    tile.classList.remove("show");
+    return;
+  }
+  if(!prof.team){
+    tile.classList.add("show", "no-team");
+    tile.innerHTML = `
+      <span style="font-size:1.2rem;opacity:0.6;">⚽</span>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-tile-head">Noch kein Team gewählt</div>
+        <div class="stat-tile-sub">Für die Team-Tabelle im Profil auswählen</div>
+      </div>
+      <span style="font-size:0.78rem;font-weight:800;color:var(--accent);white-space:nowrap;">Wählen →</span>
+    `;
+    tile.onclick = ()=>{
+      switchScreen("screen-profiles");
+      renderProfilesScreen();
+    };
+    return;
+  }
+  tile.classList.add("show");
+  tile.classList.remove("no-team");
+  tile.onclick = null;
+  const team = getTeamById(prof.team);
+  if(!team) { tile.classList.remove("show"); return; } // defensive: team id no longer in TEAM_LIST
+  const badge = `<span class="team-tile-badge" style="background:${team.colorPrimary};">${team.shortCode}</span>`;
+  const nameBlock = (sub)=>`${badge}<div style="flex:1;min-width:0;"><div class="stat-tile-head">Team</div><div class="stat-tile-value" style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${team.name}</div></div>${sub}`;
+  if(!fbReady){
+    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">keine Verbindung</span>`);
+    return;
+  }
+  tile.innerHTML = nameBlock(`<span class="stat-tile-sub">⏳</span>`);
+  try{
+    const rows = await fetchAllTeamMembers();
+    const byTeam = groupMembersByTeam(rows);
+    const teamEntries = Object.entries(byTeam)
+      .map(([teamId, members])=>({teamId, agg:computeTeamScore(members)}))
+      .sort((a,b)=>b.agg.score-a.agg.score);
+    const idx = teamEntries.findIndex(e=>e.teamId===prof.team);
+    tile.innerHTML = nameBlock(idx>=0
+      ? `<span class="team-tile-rank">Platz ${idx+1}</span>`
+      : `<span class="stat-tile-sub">noch nicht gelistet</span>`);
+  } catch(e){
+    console.error("renderTeamRankWidget error", e);
+    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">keine Verbindung</span>`);
   }
 }
 
@@ -4906,40 +5001,38 @@ function updateComboIndicator(){
   }
 }
 function renderStreakBadge(){
-  const badge = document.getElementById("streakBadge");
+  const tile = document.getElementById("streakTile");
   const prof = getCurrentProfileObj();
   if(!prof){
-    badge.style.display="none";
+    tile.classList.remove("show", "at-risk");
     return;
   }
   const streak = ensureStreakObj(prof);
   if(streak.current<=0){
-    badge.style.display="none";
+    tile.classList.remove("show", "at-risk");
     return;
   }
   const goalReachedToday = streak.lastActiveDate === todayKey();
-  badge.classList.toggle("at-risk", !goalReachedToday);
+  tile.classList.toggle("at-risk", !goalReachedToday);
   const sub = goalReachedToday
-    ? `Rekord: ${streak.longest} Tage`
-    : `Tagesziel noch nicht erreicht – Serie retten!`;
+    ? `${streak.current} Tag${streak.current===1?"":"e"} in Folge`
+    : `Tagesziel retten! (Rekord ${streak.longest})`;
 
-  // one flame per streak day, capped so a long streak doesn't fill the
-  // whole badge with emoji -- the remaining days are shown as "+N" instead
-  const MAX_FLAMES = 10;
+  // one flame per streak day, capped so the narrower tile doesn't overflow
+  // -- the remaining days are shown as "+N" instead
+  const MAX_FLAMES = 6;
   const flameCount = Math.min(streak.current, MAX_FLAMES);
   let flamesHtml = "🔥".repeat(flameCount);
   if(streak.current > MAX_FLAMES){
-    flamesHtml += `<span class="flame-extra">+${streak.current-MAX_FLAMES}</span>`;
+    flamesHtml += `<span class="stat-tile-sub">+${streak.current-MAX_FLAMES}</span>`;
   }
 
-  badge.innerHTML = `
-    <div class="flame">${flamesHtml}</div>
-    <div>
-      <div class="streak-num">${streak.current} Tag${streak.current===1?"":"e"} in Folge</div>
-      <div class="streak-text">${sub}</div>
-    </div>
+  tile.innerHTML = `
+    <div class="stat-tile-head"><span>🔥</span><span>Serie</span></div>
+    <div class="stat-tile-flames">${flamesHtml}</div>
+    <div class="stat-tile-sub">${sub}</div>
   `;
-  badge.style.display="flex";
+  tile.classList.add("show");
 }
 
 function formatGermanDateTime(d){
@@ -4954,6 +5047,34 @@ function redeemBonusCard(threshold){
   ensureBonusCards(prof).redeemed[threshold] = new Date().toISOString();
   saveProfiles();
   renderBonusCardsBlock();
+  renderBonusProgressTile(prof);
+}
+
+/* Compact "how close to the next card" tile in the stat grid -- only
+   shown while nothing is currently available to redeem (available.length
+   === 0), so it never competes with the rich redeem UI in
+   #bonusCardsBlock below for the same message; once a card becomes
+   available this tile just hides and that block takes over. */
+function renderBonusProgressTile(prof){
+  const tile = document.getElementById("bonusProgressTile");
+  if(!prof){
+    tile.classList.remove("show");
+    return;
+  }
+  const {available} = getBonusCardThresholds(prof);
+  if(available.length>0){
+    tile.classList.remove("show");
+    return;
+  }
+  const {remaining, pct} = getNextBonusCardProgress(prof);
+  tile.innerHTML = `
+    <span style="font-size:1.2rem;">🎁</span>
+    <div style="flex:1;min-width:0;">
+      <div class="stat-tile-head" style="margin-bottom:0.3rem;">Nächste Bonuskarte: noch ${remaining} Flamme${remaining===1?"":"n"} 🔥</div>
+      <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
+    </div>
+  `;
+  tile.classList.add("show");
 }
 
 /* Shown directly under the streak badge, not on a separate screen --
@@ -6086,28 +6207,29 @@ function renderStartScreen(){
   applyProfileTheme();
   renderStreakBadge();
   renderBonusCardsBlock();
+  const prof = getCurrentProfileObj();
+  renderBonusProgressTile(prof);
   renderLevelBadge();
   renderDailyGoalWidget();
   renderLeagueRankWidget();
+  renderTeamRankWidget();
 
-  // personal greeting + compact profile summary (full profile list/
-  // management now lives on screen-profiles, see renderProfilesScreen)
-  const prof = getCurrentProfileObj();
+  // personal greeting + profile switch button, combined into one row
+  // (full profile list/management lives on screen-profiles, see
+  // renderProfilesScreen) -- the button itself carries the avatar+name
+  // now, replacing the old separate profile-summary section-block.
   const welcomeEl = document.getElementById("welcomeHeading");
-  const summaryEl = document.getElementById("currentProfileSummary");
   const goToProfilesBtn = document.getElementById("btnGoToProfiles");
   if(prof){
     const avatar = prof.avatar || "";
-    welcomeEl.textContent = `👋 Willkommen ${avatar} ${state.currentProfile}`.replace(/\s+/g," ").trim();
-    summaryEl.textContent = `${avatar} ${state.currentProfile}`.trim();
-    goToProfilesBtn.textContent = "👤 Wechseln";
+    welcomeEl.textContent = `Hallo ${state.currentProfile}! 👋`;
+    goToProfilesBtn.innerHTML = `<span class="avatar-circle">${avatar}</span>${state.currentProfile} <span style="color:var(--muted);font-weight:600;">▾</span>`;
   } else {
     welcomeEl.textContent = "👋 Willkommen";
-    summaryEl.textContent = "Kein Profil ausgewählt";
     // "Profil erstellen" wäre irreführend, wenn schon Profile existieren --
     // dann will man meistens eins davon AUSWÄHLEN, nicht ein neues anlegen.
     // Nur wenn wirklich noch gar keins existiert, ist "erstellen" korrekt.
-    goToProfilesBtn.textContent = Object.keys(state.profiles).length>0
+    goToProfilesBtn.innerHTML = Object.keys(state.profiles).length>0
       ? "👤 Profil wählen"
       : "➕ Profil erstellen";
   }
