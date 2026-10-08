@@ -1246,45 +1246,6 @@ body.dark-theme .daily-goal-mini-banner {
 }
 
 
-/* floating stats button */
-#btn-floating-stats {
-  position:fixed;
-  right:1rem;
-  bottom:calc(1rem + env(safe-area-inset-bottom));
-  z-index:9999;
-  border:none;
-  background:#1f2937;
-  color:#fff;
-  border-radius:999px;
-  padding:0.8rem 1rem;
-  font-size:1rem;
-  line-height:1rem;
-  box-shadow:0 10px 24px rgba(0,0,0,0.3);
-  cursor:pointer;
-}
-#btn-floating-stats:active {
-  transform:scale(0.97);
-}
-/* stacked directly above the stats button, same right edge -- mirrors the
-   left column's theme+sound stack so both columns stay 2-high */
-#btn-floating-leaderboard {
-  position:fixed;
-  right:1rem;
-  bottom:calc(1rem + 4.2rem + env(safe-area-inset-bottom));
-  z-index:9999;
-  border:none;
-  background:#1f2937;
-  color:#fff;
-  border-radius:999px;
-  padding:0.8rem 1rem;
-  font-size:1rem;
-  line-height:1rem;
-  box-shadow:0 10px 24px rgba(0,0,0,0.3);
-  cursor:pointer;
-}
-#btn-floating-leaderboard:active {
-  transform:scale(0.97);
-}
 #btn-floating-theme {
   position:fixed;
   left:1rem;
@@ -1622,11 +1583,22 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="bonusCardsBlock" class="bonus-cards-block" style="display:none;">
       <div class="section-title">🎁 Bonuskarten</div>
       <div id="bonusCardsAvailable" class="bonus-card-list"></div>
-      <details id="bonusCardsHistoryDetails" style="display:none;margin-top:0.5rem;">
-        <summary>Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</summary>
-        <div id="bonusCardsRedeemedList" class="bonus-card-list" style="margin-top:0.5rem;"></div>
-      </details>
+      <div id="bonusCardsHistorySection" style="display:none;margin-top:0.5rem;">
+        <div class="stat-tile-sub" style="margin-bottom:0.4rem;">Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</div>
+        <div id="bonusCardsRedeemedList" class="bonus-card-list"></div>
+      </div>
     </div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnStartToLanguage" class="btn" disabled>Weiter ➡</button>
+    </div>
+  </div>
+
+  <!-- LANGUAGE SELECTION SCREEN -->
+  <div id="screen-language" class="screen">
+    <h2 style="margin-top:0;margin-bottom:1rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>🗣️ Sprache wählen</span>
+    </h2>
 
     <div id="quickStartBlock" class="section-block" style="display:none;">
       <button id="btnQuickStart" class="btn" style="width:100%;text-align:left;display:flex;align-items:center;gap:0.6rem;"></button>
@@ -1639,6 +1611,7 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
 
     <div class="btn-row btn-row-sticky">
+      <button id="btnLanguageBack" class="btn-secondary btn">⬅ Zurück</button>
       <button id="btnStartToPages" class="btn" disabled>Weiter ➡</button>
     </div>
   </div>
@@ -1955,7 +1928,7 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
-    <h2 style="margin-top:1.5rem;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+    <h2 id="teamTableHeading" style="margin-top:1.5rem;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🏆 Team-Tabelle</span>
     </h2>
     <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
@@ -1982,8 +1955,6 @@ body.dark-theme .daily-goal-mini-banner {
 
 <button id="btn-floating-theme">🌙</button>
 <button id="btn-floating-sound">🔊</button>
-<button id="btn-floating-leaderboard">⚽</button>
-<button id="btn-floating-stats">📊</button>
 
 <!-- Firebase compat SDK (classic globals, not ES modules -- matches this
      file's single classic script tag below, no build step). Used only for
@@ -4245,8 +4216,11 @@ function switchScreen(id){
   if(sc) sc.classList.add("active");
 }
 
-function isStartContinueEnabled(){
-  return !!(state.currentProfile && state.currentLang);
+/* Gating for the start screen's own "Weiter" button, which now only
+   leads to the language-selection screen -- the language itself is
+   picked there, so only a chosen profile is required here. */
+function isProfileChosen(){
+  return !!state.currentProfile;
 }
 
 function getCurrentProfileObj(){
@@ -4654,6 +4628,12 @@ function renderLevelBadge(){
     <div class="stat-tile-sub">${info.pointsToNext>0 ? `noch ${info.pointsToNext} Pkt. bis Lvl ${info.level+1}` : "Maximalstufe erreicht"}</div>
   `;
   tile.classList.add("show");
+  tile.style.cursor = "pointer";
+  tile.onclick = ()=>{
+    state.backStackBeforeStats = "screen-start";
+    switchScreen("screen-stats");
+    renderStatsScreen();
+  };
 }
 
 /* Daily-goal tile on the start screen's stat grid. ensureDailyGoal()
@@ -4690,6 +4670,12 @@ async function renderLeagueRankWidget(){
     tile.classList.remove("show");
     return;
   }
+  tile.style.cursor = "pointer";
+  tile.onclick = ()=>{
+    state.backStackBeforeLeaderboard = "screen-start";
+    switchScreen("screen-leaderboard");
+    renderLeaderboardScreen();
+  };
   const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
   if(!fbReady){
     tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
@@ -4744,7 +4730,13 @@ async function renderTeamRankWidget(){
   }
   tile.classList.add("show");
   tile.classList.remove("no-team");
-  tile.onclick = null;
+  tile.onclick = ()=>{
+    state.backStackBeforeLeaderboard = "screen-start";
+    switchScreen("screen-leaderboard");
+    renderLeaderboardScreen();
+    const heading = document.getElementById("teamTableHeading");
+    if(heading) heading.scrollIntoView({behavior:"smooth", block:"start"});
+  };
   const team = getTeamById(prof.team);
   if(!team) { tile.classList.remove("show"); return; } // defensive: team id no longer in TEAM_LIST
   const badge = `<span class="team-tile-badge" style="background:${team.colorPrimary};">${team.shortCode}</span>`;
@@ -5075,6 +5067,11 @@ function renderBonusProgressTile(prof){
     </div>
   `;
   tile.classList.add("show");
+  tile.style.cursor = "pointer";
+  tile.onclick = ()=>{
+    state.showRedeemedBonusCards = true;
+    renderBonusCardsBlock();
+  };
 }
 
 /* Shown directly under the streak badge, not on a separate screen --
@@ -5121,11 +5118,11 @@ function renderBonusCardsBlock(){
     availDiv.appendChild(card);
   });
 
-  const histDetails = document.getElementById("bonusCardsHistoryDetails");
+  const histSection = document.getElementById("bonusCardsHistorySection");
   const redeemedListDiv = document.getElementById("bonusCardsRedeemedList");
   redeemedListDiv.innerHTML="";
-  if(redeemed.length>0){
-    histDetails.style.display="block";
+  if(redeemed.length>0 && state.showRedeemedBonusCards){
+    histSection.style.display="block";
     document.getElementById("bonusCardsRedeemedCount").textContent=String(redeemed.length);
     redeemed.sort((a,b)=>b.threshold-a.threshold).forEach(({threshold, redeemedAt})=>{
       const card=document.createElement("div");
@@ -5139,7 +5136,7 @@ function renderBonusCardsBlock(){
       redeemedListDiv.appendChild(card);
     });
   } else {
-    histDetails.style.display="none";
+    histSection.style.display="none";
   }
 
   if(available.length>0){
@@ -6234,6 +6231,16 @@ function renderStartScreen(){
       : "➕ Profil erstellen";
   }
 
+  // enable weiter? (only a chosen profile is required here -- the
+  // language itself is picked on the next screen, see renderLanguageScreen)
+  const btnStartToLanguage=document.getElementById("btnStartToLanguage");
+  btnStartToLanguage.disabled = !isProfileChosen();
+}
+
+/* "Weiter wie zuletzt" + Sprachauswahl leben auf einer eigenen Seite,
+   erst nach Klick auf "Weiter" auf der Startseite erreichbar -- hält die
+   Startseite selbst auf Begrüßung+Dashboard beschränkt. */
+function renderLanguageScreen(){
   renderQuickStartBlock();
 
   // languages
@@ -6249,7 +6256,7 @@ function renderStartScreen(){
   enBtn.addEventListener("click",()=>{
     state.currentLang="en";
     state.currentBookKey="en_5";
-    renderStartScreen();
+    renderLanguageScreen();
   });
   langDiv.appendChild(enBtn);
 
@@ -6275,13 +6282,13 @@ function renderStartScreen(){
   laBtn.addEventListener("click",()=>{
     state.currentLang="la";
     state.currentBookKey="pontes";
-    renderStartScreen();
+    renderLanguageScreen();
   });
   langDiv.appendChild(laBtn);
 
   // enable weiter?
   const btnStartToPages=document.getElementById("btnStartToPages");
-  btnStartToPages.disabled = !isStartContinueEnabled();
+  btnStartToPages.disabled = !state.currentLang;
 }
 
 /* Reaching the first flashcard normally takes five screens (profile ->
@@ -7311,6 +7318,16 @@ function setupEventListeners(){
     renderStartScreen();
   });
 
+  document.getElementById("btnStartToLanguage").addEventListener("click", ()=>{
+    switchScreen("screen-language");
+    renderLanguageScreen();
+  });
+
+  document.getElementById("btnLanguageBack").addEventListener("click", ()=>{
+    switchScreen("screen-start");
+    renderStartScreen();
+  });
+
   document.getElementById("btnStartToPages").addEventListener("click", ()=>{
     // pick bookpages
     state.selectedPages = []; // reset
@@ -7320,8 +7337,8 @@ function setupEventListeners(){
 
   // Bookpages screen
   document.getElementById("btnPagesBack").addEventListener("click", ()=>{
-    switchScreen("screen-start");
-    renderStartScreen();
+    switchScreen("screen-language");
+    renderLanguageScreen();
   });
 
   document.getElementById("btnPagesNext").addEventListener("click", ()=>{
@@ -7601,20 +7618,6 @@ function setupEventListeners(){
     renderCurrentCard();
   });
 
-  // Floating stats
-  document.getElementById("btn-floating-stats").addEventListener("click", ()=>{
-    // remember current active screen -- but never overwrite it with
-    // "screen-stats" itself (the floating button stays visible while
-    // already on the stats screen, so a second/accidental tap must not
-    // make "Zurück" point back at the stats screen it's already on).
-    const activeScr=document.querySelector(".screen.active");
-    if(activeScr && activeScr.id!=="screen-stats"){
-      state.backStackBeforeStats = activeScr.id;
-    }
-    switchScreen("screen-stats");
-    renderStatsScreen();
-  });
-
   // Floating dark mode toggle
   document.getElementById("btn-floating-theme").addEventListener("click", ()=>{
     applyDarkMode(!document.body.classList.contains("dark-theme"));
@@ -7623,17 +7626,6 @@ function setupEventListeners(){
   // Floating sound mute toggle
   document.getElementById("btn-floating-sound").addEventListener("click", ()=>{
     setSoundMuted(!soundMuted);
-  });
-
-  // Floating leaderboard button -- own backStack variable (not the stats
-  // one) so Stats -> Tabelle -> Zurück doesn't fight over a shared value
-  document.getElementById("btn-floating-leaderboard").addEventListener("click", ()=>{
-    const activeScr=document.querySelector(".screen.active");
-    if(activeScr && activeScr.id!=="screen-leaderboard"){
-      state.backStackBeforeLeaderboard = activeScr.id;
-    }
-    switchScreen("screen-leaderboard");
-    renderLeaderboardScreen();
   });
 
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
