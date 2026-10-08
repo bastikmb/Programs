@@ -4487,9 +4487,14 @@ function showCloudInfoBanner(){
   extraDiv.appendChild(banner);
 }
 
-/* Call once per finished round. Returns true if today's session actually
-   changed the streak count (i.e. this was the first round played today),
-   so the caller can show a little "Serie verlängert!" moment. */
+/* Called only once the daily goal has been reached (see call site in
+   finalizeRoundAndUpdateProfile) -- Flammen honor hitting the day's goal,
+   not just playing any round / learning a few words. Returns true if
+   today's goal-reaching session actually changed the streak count (i.e.
+   this was the first time today the goal was reached), so the caller can
+   show a little "Serie verlängert!" moment. Safe to call again later the
+   same day (e.g. a further round after the goal is already met) -- it's
+   a no-op once lastActiveDate is already today. */
 function updateStreak(prof){
   const streak = ensureStreakObj(prof);
   const today = todayKey();
@@ -4881,11 +4886,11 @@ function renderStreakBadge(){
     badge.style.display="none";
     return;
   }
-  const trainedToday = streak.lastActiveDate === todayKey();
-  badge.classList.toggle("at-risk", !trainedToday);
-  const sub = trainedToday
+  const goalReachedToday = streak.lastActiveDate === todayKey();
+  badge.classList.toggle("at-risk", !goalReachedToday);
+  const sub = goalReachedToday
     ? `Rekord: ${streak.longest} Tage`
-    : `Heute noch nicht gelernt – Serie retten!`;
+    : `Tagesziel noch nicht erreicht – Serie retten!`;
 
   // one flame per streak day, capped so a long streak doesn't fill the
   // whole badge with emoji -- the remaining days are shown as "+N" instead
@@ -5578,14 +5583,6 @@ function finalizeRoundAndUpdateProfile(){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     prof.stats.totalPoints += state.roundTotalPoints;
     prof.stats.totalTimeSec += durationSec;
-    const longestBeforeRound = ensureStreakObj(prof).longest;
-    streakChanged = updateStreak(prof);
-    const longestAfterRound = ensureStreakObj(prof).longest;
-    const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
-    const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
-    for(let n=thresholdsBefore+1; n<=thresholdsAfter; n++){
-      newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
-    }
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
     if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
@@ -5628,6 +5625,23 @@ function finalizeRoundAndUpdateProfile(){
     const goalBefore = goal.correctToday;
     goal.correctToday += state.roundCorrectCount;
     dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
+
+    // Flammen gibt es nur für das Erreichen des Tagesziels, nicht schon
+    // fürs bloße Lernen einzelner Wörter/Runden -- daher erst HIER (nach
+    // der Tagesziel-Berechnung oben) prüfen, nicht am Rundenanfang.
+    // updateStreak selbst ist am gleichen Tag ein No-op (lastActiveDate
+    // bereits heute), daher unschädlich, wenn das Ziel in einer späteren
+    // Runde desselben Tages erneut erreicht/überschritten wird.
+    if(goal.correctToday >= DAILY_GOAL_TARGET){
+      const longestBeforeRound = ensureStreakObj(prof).longest;
+      streakChanged = updateStreak(prof);
+      const longestAfterRound = ensureStreakObj(prof).longest;
+      const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
+      const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
+      for(let n=thresholdsBefore+1; n<=thresholdsAfter; n++){
+        newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
+      }
+    }
 
     if(!prof.stats.roundsCompleted) prof.stats.roundsCompleted=0; // older profiles predate this field
     prof.stats.roundsCompleted += 1;
