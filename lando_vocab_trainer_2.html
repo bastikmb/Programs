@@ -4835,7 +4835,7 @@ function renderTeamPicker(){
       const btn=document.createElement("button");
       btn.className="select-pill team-pill";
       btn.style.setProperty("--swatch", team.colorPrimary);
-      btn.innerHTML=`<span class="theme-swatch"></span> ${team.shortCode}`;
+      btn.innerHTML=`<span class="theme-swatch"></span> ${team.name}`;
       btn.title = team.name;
       const isActive = team.id===currentTeam;
       btn.setAttribute("aria-pressed", isActive ? "true":"false");
