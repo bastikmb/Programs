@@ -1184,6 +1184,22 @@ body.dark-theme .daily-goal-mini-banner {
   justify-content:center;
   flex-shrink:0;
 }
+.team-row {
+  cursor:pointer;
+}
+.team-members-list {
+  display:flex;
+  flex-direction:column;
+  gap:0.2rem;
+  margin:-0.3rem 0 0.1rem 0;
+  padding:0.6rem 0.9rem 0.6rem 3.7rem;
+  background:var(--surface-strong);
+  border:1px solid var(--border);
+  border-top:none;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  font-size:0.78rem;
+  color:var(--ink);
+}
 .problem-list {
   max-height:30vh;
   overflow:auto;
@@ -1248,26 +1264,6 @@ body.dark-theme .daily-goal-mini-banner {
   cursor:pointer;
 }
 #btn-floating-leaderboard:active {
-  transform:scale(0.97);
-}
-/* stacked 3rd in the right column, directly above the individual
-   leaderboard button */
-#btn-floating-team-leaderboard {
-  position:fixed;
-  right:1rem;
-  bottom:calc(1rem + 8.4rem + env(safe-area-inset-bottom));
-  z-index:9999;
-  border:none;
-  background:#1f2937;
-  color:#fff;
-  border-radius:999px;
-  padding:0.8rem 1rem;
-  font-size:1rem;
-  line-height:1rem;
-  box-shadow:0 10px 24px rgba(0,0,0,0.3);
-  cursor:pointer;
-}
-#btn-floating-team-leaderboard:active {
   transform:scale(0.97);
 }
 #btn-floating-theme {
@@ -1928,7 +1924,7 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
   </div>
 
-  <!-- LEADERBOARD SCREEN (cross-device "Vokabel-Bundesligatabelle") -->
+  <!-- LEADERBOARD SCREEN (cross-device "Vokabel-Bundesligatabelle" + Team-Tabelle, untereinander auf einer Seite) -->
   <div id="screen-leaderboard" class="screen">
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>⚽ Vokabel-Bundesligatabelle</span>
@@ -1938,22 +1934,15 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
-    <div class="btn-row btn-row-sticky">
-      <button id="btnLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
-    </div>
-  </div>
-
-  <!-- TEAM LEADERBOARD SCREEN -->
-  <div id="screen-team-leaderboard" class="screen">
-    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+    <h2 style="margin-top:1.5rem;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🏆 Team-Tabelle</span>
     </h2>
-    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
     <div id="teamLeaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="teamLeaderboardTableBody"></div>
 
     <div class="btn-row btn-row-sticky">
-      <button id="btnTeamLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+      <button id="btnLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
   </div>
 
@@ -1972,7 +1961,6 @@ body.dark-theme .daily-goal-mini-banner {
 
 <button id="btn-floating-theme">🌙</button>
 <button id="btn-floating-sound">🔊</button>
-<button id="btn-floating-team-leaderboard">🏆</button>
 <button id="btn-floating-leaderboard">⚽</button>
 <button id="btn-floating-stats">📊</button>
 
@@ -5820,6 +5808,8 @@ async function renderLeaderboardScreen(){
     statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
     statusEl.style.display="block";
   }
+
+  await renderTeamLeaderboardSection();
 }
 
 async function fetchLeaderboard(){
@@ -5888,11 +5878,13 @@ function renderLeaderboardRows(rows, prof){
   });
 }
 
-/* Team-vs-team leaderboard screen -- same loading/error pattern as
-   renderLeaderboardScreen(), but fetches via fetchAllTeamMembers() (not
-   the capped/ordered fetchLeaderboard()) since a team aggregate needs
-   every member, not just the individual top 50. */
-async function renderTeamLeaderboardScreen(){
+/* Team-Tabelle-Abschnitt auf derselben Seite wie die individuelle
+   Bundesligatabelle (siehe renderLeaderboardScreen(), das diese Funktion
+   am Ende aufruft) -- gleiches Lade-/Fehler-Muster, aber eigener Fetch
+   über fetchAllTeamMembers() (nicht das gedeckelte/sortierte
+   fetchLeaderboard()), da ein Team-Aggregat jedes Mitglied braucht, nicht
+   nur die individuellen Top 50. */
+async function renderTeamLeaderboardSection(){
   const statusEl = document.getElementById("teamLeaderboardStatusNote");
   const bodyEl = document.getElementById("teamLeaderboardTableBody");
   bodyEl.innerHTML = "";
@@ -5910,19 +5902,23 @@ async function renderTeamLeaderboardScreen(){
     statusEl.style.display="none";
     renderTeamLeaderboardRows(rows);
   } catch(e){
-    console.error("renderTeamLeaderboardScreen error", e);
+    console.error("renderTeamLeaderboardSection error", e);
     statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
     statusEl.style.display="block";
   }
 }
 
+/* Jede Team-Zeile ist antippbar und klappt darunter die Mitgliederliste
+   (Spitzname + eigene Tabellenpunkte, absteigend sortiert) auf/zu -- die
+   Mitgliederliste wird bei jedem Render neu gebaut, aber nur bei Klick
+   eingeblendet, damit die Tabelle auf den ersten Blick kompakt bleibt. */
 function renderTeamLeaderboardRows(rows){
   const bodyEl = document.getElementById("teamLeaderboardTableBody");
   bodyEl.innerHTML = "";
 
   const byTeam = groupMembersByTeam(rows);
   const teamEntries = Object.entries(byTeam)
-    .map(([teamId, members])=>({teamId, team:getTeamById(teamId), agg:computeTeamScore(members)}))
+    .map(([teamId, members])=>({teamId, team:getTeamById(teamId), members, agg:computeTeamScore(members)}))
     .filter(e=>e.team) // drop any unknown/stale team id defensively
     .sort((a,b)=>b.agg.score-a.agg.score);
 
@@ -5933,7 +5929,7 @@ function renderTeamLeaderboardRows(rows){
 
   teamEntries.forEach((entry, idx)=>{
     const row=document.createElement("div");
-    row.className="leaderboard-row";
+    row.className="leaderboard-row team-row";
 
     const rank=document.createElement("div");
     rank.className="rank";
@@ -5954,7 +5950,7 @@ function renderTeamLeaderboardRows(rows){
 
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
-    breakdown.textContent = `${entry.agg.memberCount} Mitglied${entry.agg.memberCount===1?"":"er"} · Ø ${entry.agg.avgFirstTryPct}% Trefferquote · Ø ${entry.agg.avgStreak} Tage Serie`;
+    breakdown.textContent = `${entry.agg.memberCount} Mitglied${entry.agg.memberCount===1?"":"er"} · Ø ${entry.agg.avgFirstTryPct}% Trefferquote · Ø ${entry.agg.avgStreak} Tage Serie · 👉 Mitglieder antippen`;
 
     row.appendChild(rank);
     row.appendChild(badge);
@@ -5962,6 +5958,21 @@ function renderTeamLeaderboardRows(rows){
     row.appendChild(score);
     row.appendChild(breakdown);
     bodyEl.appendChild(row);
+
+    const membersDiv=document.createElement("div");
+    membersDiv.className="team-members-list";
+    membersDiv.style.display="none";
+    [...entry.members].sort((a,b)=>(b.leagueScore||0)-(a.leagueScore||0)).forEach(m=>{
+      const line=document.createElement("div");
+      line.className="team-member-row";
+      line.textContent = `${m.nickname||"?"} — ${m.leagueScore||0} Pkt`;
+      membersDiv.appendChild(line);
+    });
+    bodyEl.appendChild(membersDiv);
+
+    row.addEventListener("click", ()=>{
+      membersDiv.style.display = membersDiv.style.display==="none" ? "block" : "none";
+    });
   });
 }
 
@@ -7449,17 +7460,6 @@ function setupEventListeners(){
     renderLeaderboardScreen();
   });
 
-  // Floating team-leaderboard button -- own backStack variable, same
-  // reasoning as the individual leaderboard's
-  document.getElementById("btn-floating-team-leaderboard").addEventListener("click", ()=>{
-    const activeScr=document.querySelector(".screen.active");
-    if(activeScr && activeScr.id!=="screen-team-leaderboard"){
-      state.backStackBeforeTeamLeaderboard = activeScr.id;
-    }
-    switchScreen("screen-team-leaderboard");
-    renderTeamLeaderboardScreen();
-  });
-
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
@@ -7479,8 +7479,6 @@ function setupEventListeners(){
       // summary already rendered
     } else if(target==="screen-leaderboard"){
       renderLeaderboardScreen();
-    } else if(target==="screen-team-leaderboard"){
-      renderTeamLeaderboardScreen();
     }
   });
 
@@ -7503,32 +7501,6 @@ function setupEventListeners(){
       // summary already rendered
     } else if(target==="screen-stats"){
       renderStatsScreen();
-    } else if(target==="screen-team-leaderboard"){
-      renderTeamLeaderboardScreen();
-    }
-  });
-
-  document.getElementById("btnTeamLeaderboardBack").addEventListener("click", ()=>{
-    const target=state.backStackBeforeTeamLeaderboard || "screen-start";
-    switchScreen(target);
-    if(target==="screen-start"){
-      renderStartScreen();
-    } else if(target==="screen-bookpages"){
-      renderBookPageScreen();
-    } else if(target==="screen-vocab-add"){
-      renderVocabAddScreen();
-    } else if(target==="screen-vocabpick"){
-      renderVocabPickScreen();
-    } else if(target==="screen-direction"){
-      renderDirectionScreen();
-    } else if(target==="screen-learn"){
-      renderCurrentCard();
-    } else if(target==="screen-summary"){
-      // summary already rendered
-    } else if(target==="screen-stats"){
-      renderStatsScreen();
-    } else if(target==="screen-leaderboard"){
-      renderLeaderboardScreen();
     }
   });
 }
