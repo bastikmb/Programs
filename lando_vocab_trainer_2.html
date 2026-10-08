@@ -6069,7 +6069,12 @@ function renderStartScreen(){
   } else {
     welcomeEl.textContent = "👋 Willkommen";
     summaryEl.textContent = "Kein Profil ausgewählt";
-    goToProfilesBtn.textContent = "➕ Profil erstellen";
+    // "Profil erstellen" wäre irreführend, wenn schon Profile existieren --
+    // dann will man meistens eins davon AUSWÄHLEN, nicht ein neues anlegen.
+    // Nur wenn wirklich noch gar keins existiert, ist "erstellen" korrekt.
+    goToProfilesBtn.textContent = Object.keys(state.profiles).length>0
+      ? "👤 Profil wählen"
+      : "➕ Profil erstellen";
   }
 
   renderQuickStartBlock();
