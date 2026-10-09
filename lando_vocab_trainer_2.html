@@ -2071,9 +2071,30 @@ function initFirebase(){
     fbDb = firebase.firestore();
     fbAuth = firebase.auth();
     fbAuth.signInAnonymously()
-      .then(()=>{ fbReady = true; })
+      .then(()=>{ fbReady = true; refreshStartScreenConnectionWidgets(); })
       .catch(e=>{ console.error("Firebase anon auth failed", e); fbReady=false; });
   } catch(e){ console.error("initFirebase error", e); fbReady=false; }
+}
+
+/* On every fresh app load, renderStartScreen() (and with it
+   renderLeagueRankWidget()/renderTeamRankWidget()) runs synchronously
+   right after initFirebase() merely KICKS OFF the async anonymous
+   sign-in above -- so those two tiles always render their "keine
+   Verbindung" state first, correctly reflecting fbReady at that exact
+   moment. Without this, they'd stay stuck on that message even after
+   sign-in actually succeeds a moment later, since nothing else
+   re-renders them -- the connection would only visibly "appear" once
+   some unrelated navigation happened to call renderStartScreen() again
+   (e.g. opening and leaving one of the table screens, as reported).
+   Re-renders only if the start screen is the one currently showing;
+   if the user already navigated elsewhere, the next time they return
+   renderStartScreen() runs fresh anyway, by which point sign-in has
+   long since resolved. */
+function refreshStartScreenConnectionWidgets(){
+  const startScr = document.getElementById("screen-start");
+  if(!startScr || !startScr.classList.contains("active")) return;
+  renderLeagueRankWidget();
+  renderTeamRankWidget();
 }
 
 /* ===========================================================
