@@ -103,7 +103,7 @@ body {
   background:var(--card);
   border-radius:var(--radius);
   box-shadow:var(--card-shadow);
-  padding:1.5rem 1.5rem 8.5rem;
+  padding:1.5rem 1.5rem 5rem;
   box-sizing:border-box;
   min-height:70vh;
   position:relative;
@@ -1305,14 +1305,18 @@ body.dark-theme .daily-goal-mini-banner {
    this is a phone-first app; on an unrealistically wide desktop test
    window the bar is simply wider than the 900px-capped card, which is an
    acceptable trade-off for a screen size nobody actually uses the app
-   at). bottom matches .screen's own bottom padding. (The floating round
-   theme/sound buttons no longer overlap any screen using this class --
-   they're shown only on the splash screen now.) */
+   at). bottom is just a small gap + the safe-area inset -- genuinely
+   pinned to the screen edge, not held up by extra clearance: the
+   floating round theme/sound buttons that originally justified a much
+   bigger offset here are gone from every screen except the splash
+   screen now. .screen's own bottom padding (5rem) reserves just enough
+   room above this bar for its own rendered height so scrollable content
+   never ends up hidden underneath it. */
 .btn-row-sticky {
   position:fixed;
   left:calc(1.5rem + env(safe-area-inset-left));
   right:calc(1.5rem + env(safe-area-inset-right));
-  bottom:calc(8.5rem + env(safe-area-inset-bottom));
+  bottom:calc(1rem + env(safe-area-inset-bottom));
   background:var(--card);
   padding:0.75rem 1.5rem 0;
   box-shadow:0 -8px 16px -8px rgba(0,0,0,0.12);
