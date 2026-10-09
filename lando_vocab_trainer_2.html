@@ -5656,7 +5656,7 @@ async function renderLeagueRankWidget(){
   makeTileAccessible(tile, "Vokabel-Bundesligatabelle öffnen");
   const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
   if(!fbReady){
-    tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
+    tile.innerHTML = `${head}<div class="stat-tile-sub">📡 Keine Verbindung</div>`;
     tile.classList.add("show");
     return;
   }
@@ -5671,7 +5671,7 @@ async function renderLeagueRankWidget(){
       : `${head}<div class="stat-tile-sub">noch nicht gelistet</div>`;
   } catch(e){
     console.error("renderLeagueRankWidget error", e);
-    tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
+    tile.innerHTML = `${head}<div class="stat-tile-sub">📡 Keine Verbindung</div>`;
   }
 }
 
@@ -5720,7 +5720,7 @@ async function renderTeamRankWidget(){
   const badge = `<span class="team-tile-badge" style="background:${team.colorPrimary};">${team.shortCode}</span>`;
   const nameBlock = (sub)=>`${badge}<div style="flex:1;min-width:0;"><div class="stat-tile-head">Team</div><div class="stat-tile-value" style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${team.name}</div></div>${sub}`;
   if(!fbReady){
-    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">keine Verbindung</span>`);
+    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">📡 Keine Verbindung</span>`);
     return;
   }
   tile.innerHTML = nameBlock(`<span class="stat-tile-sub">⏳</span>`);
@@ -5736,7 +5736,7 @@ async function renderTeamRankWidget(){
       : `<span class="stat-tile-sub">noch nicht gelistet</span>`);
   } catch(e){
     console.error("renderTeamRankWidget error", e);
-    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">keine Verbindung</span>`);
+    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">📡 Keine Verbindung</span>`);
   }
 }
 
@@ -6922,7 +6922,7 @@ async function renderLeaderboardScreen(){
   bodyEl.innerHTML = "";
 
   if(!fbReady){
-    statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
+    statusEl.textContent = "📡 Keine Verbindung";
     statusEl.style.display="block";
     return;
   }
@@ -6935,7 +6935,7 @@ async function renderLeaderboardScreen(){
     renderLeaderboardRows(rows, prof);
   } catch(e){
     console.error("renderLeaderboardScreen error", e);
-    statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
+    statusEl.textContent = "📡 Keine Verbindung";
     statusEl.style.display="block";
   }
 }
@@ -6966,7 +6966,7 @@ function renderLeaderboardRows(rows, prof){
   bodyEl.innerHTML = "";
 
   if(rows.length===0){
-    bodyEl.innerHTML = "<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Noch niemand in der Tabelle 👀</div>";
+    bodyEl.innerHTML = "<div class='answer-feedback close'>Noch niemand in der Tabelle 👀</div>";
     return;
   }
 
@@ -7018,7 +7018,7 @@ async function renderTeamLeaderboardScreen(){
   bodyEl.innerHTML = "";
 
   if(!fbReady){
-    statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
+    statusEl.textContent = "📡 Keine Verbindung";
     statusEl.style.display="block";
     return;
   }
@@ -7031,7 +7031,7 @@ async function renderTeamLeaderboardScreen(){
     renderTeamLeaderboardRows(rows);
   } catch(e){
     console.error("renderTeamLeaderboardScreen error", e);
-    statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
+    statusEl.textContent = "📡 Keine Verbindung";
     statusEl.style.display="block";
   }
 }
@@ -7051,7 +7051,7 @@ function renderTeamLeaderboardRows(rows){
     .sort((a,b)=>b.agg.score-a.agg.score);
 
   if(teamEntries.length===0){
-    bodyEl.innerHTML = "<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Noch kein Team in der Tabelle 👀</div>";
+    bodyEl.innerHTML = "<div class='answer-feedback close'>Noch kein Team in der Tabelle 👀</div>";
     return;
   }
 
