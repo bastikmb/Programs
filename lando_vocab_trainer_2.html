@@ -6747,13 +6747,21 @@ function finalizeRoundAndUpdateProfile(){
   // otherwise a corrected retry would dilute firstTryPct/wrongCounts/
   // correctCounts with a result that isn't really a "first try" at all.
   const originalCards = state.roundCards.filter(c=>!c.isRequeue);
-  const totalCards = originalCards.length;
+  // A round aborted early (btnAbortRound) still has the FULL originally-built
+  // card set in originalCards -- only the cards actually reached have
+  // done===true. totalCards/firstTryPct (and therefore the fastest-round and
+  // Trefferquote records below, plus roundsCompleted) must be based on what
+  // was actually played, not the full selection, otherwise a round abandoned
+  // after one word could register as e.g. a 20-word speed record.
+  const playedCards = originalCards.filter(c=>c.done);
+  const roundWasFullyPlayed = playedCards.length===originalCards.length;
+  const totalCards = playedCards.length;
   const hardWords=collectHardWords();
 
   // calc first try % -- computed up front (not just at the end) since
   // updateRecords() below needs it to judge the "best Trefferquote" record
   let firstTryCorrectCount=0;
-  for(const card of originalCards){
+  for(const card of playedCards){
     if(card.done && card.firstTry) firstTryCorrectCount++;
   }
   const firstTryPct = totalCards>0 ? Math.round(firstTryCorrectCount/totalCards*100) : 0;
@@ -6855,7 +6863,9 @@ function finalizeRoundAndUpdateProfile(){
     }
 
     if(!prof.stats.roundsCompleted) prof.stats.roundsCompleted=0; // older profiles predate this field
-    prof.stats.roundsCompleted += 1;
+    // an aborted round (btnAbortRound) must not count as "completed" --
+    // see roundWasFullyPlayed above
+    if(roundWasFullyPlayed) prof.stats.roundsCompleted += 1;
     if(!prof.stats.totalCorrectAnswersEver) prof.stats.totalCorrectAnswersEver=0; // older profiles predate this field
     prof.stats.totalCorrectAnswersEver += state.roundCorrectCount;
 
@@ -7267,7 +7277,20 @@ function renderStartScreen(){
   if(prof){
     const avatar = prof.avatar || "";
     welcomeEl.textContent = `Hallo ${state.currentProfile}! 👋`;
-    goToProfilesBtn.innerHTML = `<span class="avatar-circle">${avatar}</span>${state.currentProfile} <span style="color:var(--muted);font-weight:600;">▾</span>`;
+    // built via textContent/createElement, not innerHTML -- state.currentProfile
+    // is free-text the child typed (see createProfile()) and must never be
+    // interpreted as HTML
+    goToProfilesBtn.textContent = "";
+    const avatarSpan = document.createElement("span");
+    avatarSpan.className = "avatar-circle";
+    avatarSpan.textContent = avatar;
+    const arrowSpan = document.createElement("span");
+    arrowSpan.style.color = "var(--muted)";
+    arrowSpan.style.fontWeight = "600";
+    arrowSpan.textContent = "▾";
+    goToProfilesBtn.appendChild(avatarSpan);
+    goToProfilesBtn.appendChild(document.createTextNode(state.currentProfile + " "));
+    goToProfilesBtn.appendChild(arrowSpan);
   } else {
     welcomeEl.textContent = "👋 Willkommen";
     // "Profil erstellen" wäre irreführend, wenn schon Profile existieren --
