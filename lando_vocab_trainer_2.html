@@ -654,6 +654,23 @@ body.dark-theme .hist-badge.wrong {
 }
 .stat-tile.show { display:flex; }
 .stat-tile-wide { grid-column:1 / -1; }
+/* Marks a tile as actually clickable (a small "›" top-right) so
+   identically-styled tiles that do nothing (streak, daily goal) read
+   visibly different from the ones that open a detail screen. */
+.stat-tile-clickable {
+  position:relative;
+  padding-right:1.6rem;
+}
+.stat-tile-clickable::after {
+  content:"›";
+  position:absolute;
+  top:0.6rem;
+  right:0.6rem;
+  font-size:1rem;
+  font-weight:800;
+  color:var(--muted);
+  line-height:1;
+}
 .stat-tile-head {
   display:flex;
   align-items:center;
@@ -5551,6 +5568,27 @@ function getLevelInfo(totalPoints){
   };
 }
 
+/* Makes a dashboard tile keyboard-accessible: role/tabindex/aria-label
+   plus an Enter/Space handler that fires the same onclick -- mirrors
+   the tabindex="0" role="button" pattern .dir-btn already uses for the
+   direction buttons (static in HTML there; here the tiles are built in
+   JS, so the attributes are set here, in the same place as onclick).
+   Call this right after assigning tile.onclick. Also adds the visible
+   "›" marker (.stat-tile-clickable, see CSS) so identically-styled
+   tiles that do nothing (streak, daily goal) are visually distinct. */
+function makeTileAccessible(tile, label, addChevron=true){
+  if(addChevron) tile.classList.add("stat-tile-clickable"); // skip when the tile already has its own inline "→" cue (e.g. teamRankTile's "no team" state)
+  tile.setAttribute("role", "button");
+  tile.setAttribute("tabindex", "0");
+  tile.setAttribute("aria-label", label);
+  tile.onkeydown = (e)=>{
+    if(e.key==="Enter" || e.key===" "){
+      e.preventDefault();
+      tile.onclick();
+    }
+  };
+}
+
 function renderLevelBadge(){
   const tile = document.getElementById("levelTile");
   const prof = getCurrentProfileObj();
@@ -5572,6 +5610,7 @@ function renderLevelBadge(){
     switchScreen("screen-stats");
     renderStatsScreen();
   };
+  makeTileAccessible(tile, "Statistik öffnen");
 }
 
 /* Daily-goal tile on the start screen's stat grid. ensureDailyGoal()
@@ -5614,6 +5653,7 @@ async function renderLeagueRankWidget(){
     switchScreen("screen-leaderboard");
     renderLeaderboardScreen();
   };
+  makeTileAccessible(tile, "Vokabel-Bundesligatabelle öffnen");
   const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
   if(!fbReady){
     tile.innerHTML = `${head}<div class="stat-tile-sub">keine Verbindung</div>`;
@@ -5664,6 +5704,7 @@ async function renderTeamRankWidget(){
       switchScreen("screen-profiles");
       renderProfilesScreen();
     };
+    makeTileAccessible(tile, "Team auswählen", false);
     return;
   }
   tile.classList.add("show");
@@ -5673,6 +5714,7 @@ async function renderTeamRankWidget(){
     switchScreen("screen-team-leaderboard");
     renderTeamLeaderboardScreen();
   };
+  makeTileAccessible(tile, "Team-Tabelle öffnen");
   const team = getTeamById(prof.team);
   if(!team) { tile.classList.remove("show"); return; } // defensive: team id no longer in TEAM_LIST
   const badge = `<span class="team-tile-badge" style="background:${team.colorPrimary};">${team.shortCode}</span>`;
@@ -6014,6 +6056,7 @@ function renderBonusProgressTile(prof){
     switchScreen("screen-bonus-cards");
     renderBonusCardsScreen();
   };
+  makeTileAccessible(tile, "Bonuskarten öffnen");
 }
 
 /* Dedicated detail screen for bonus cards (opened via bonusProgressTile
