@@ -4966,6 +4966,16 @@ let state = {
   backStackBeforeStats: "screen-start", // remember last screen before going to stats
   vocabAddTarget: null, // {bookKey, pageId} while on screen-vocab-add
   isHardWordsOnlyRound: false, // true only for "Nur schwierige Wörter üben" rounds -- excludes them from the page-set bonus, since they never cover the full selection
+  // The six fields below only get a meaningful value once
+  // buildRoundCardsFromVocab() runs (start of the first round) -- listed
+  // here too, with their real defaults, so this object actually documents
+  // the full state shape instead of only the fields set before then.
+  requeuedKeys: {},             // which words (by de key) already got a within-round retry card, see maybeRequeueCard
+  roundStartTotalPoints: 0,     // prof.stats.totalPoints snapshot at round start, for live point-delta display
+  roundLevelAtStart: 1,         // computeLevel() snapshot at round start, to detect a level-up mid-round
+  roundCorrectCount: 0,         // correct answers so far this round
+  dailyGoalCountAtStart: 0,     // goal.correctToday snapshot at round start
+  dailyGoalCelebratedThisRound: false, // true once the in-round daily-goal toast has fired, so it doesn't repeat
 };
 
 /* Profile schema:
@@ -5146,6 +5156,16 @@ function switchScreen(id){
   const sc = document.getElementById(id);
   if(sc) sc.classList.add("active");
   updateFloatingButtonsVisibility();
+}
+
+/* Small convenience wrapper for the very common "navigate to a screen,
+   then render its contents" pair used all over setupEventListeners() --
+   purely mechanical, saves repeating switchScreen+render on every
+   navigation handler. renderFn is optional for the rare case a screen
+   needs no fresh render (its DOM is already current). */
+function goToScreen(id, renderFn){
+  switchScreen(id);
+  if(renderFn) renderFn();
 }
 
 /* Theme/sound toggles are only shown on the splash screen (next to the
@@ -6740,6 +6760,103 @@ function isRoundFullyCorrect(originalCards, allRoundCards){
 }
 
 /* compute round stats */
+/* Part of finalizeRoundAndUpdateProfile(): awards the one-time Seiten-Set-
+   Bonus (see ensurePageSets/buildPageSetKey/PAGESET_BONUS_RATIO) and marks
+   today as a day with at least one flawless round (gates the streak, see
+   evaluateDailyGoalAndStreak below). Mutates state.roundTotalPoints
+   in-place when a bonus is awarded, so prof.stats.totalPoints must only be
+   credited with state.roundTotalPoints AFTER this call returns. */
+function applyPageSetBonus(prof, originalCards, today){
+  let pageSetBonusAwarded = {amount:0, isNewPageSet:false};
+  const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
+  if(!isFlawless) return pageSetBonusAwarded;
+
+  // zählt für die Flamme-Bedingung unten, unabhängig davon ob das
+  // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
+  prof.stats.lastFlawlessRoundDate = today;
+
+  if(!state.isHardWordsOnlyRound){
+    const pageSets = ensurePageSets(prof);
+    const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
+    if(!pageSets[key]){
+      const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
+      if(bonus>0){
+        state.roundTotalPoints += bonus;
+        pageSetBonusAwarded = {amount:bonus, isNewPageSet:true};
+      }
+      pageSets[key] = today;
+    }
+  }
+  return pageSetBonusAwarded;
+}
+
+/* Part of finalizeRoundAndUpdateProfile(): updates the long-term per-word
+   wrongCounts/correctCounts/correctByDirection stats from this round's
+   cards. Returns a snapshot of wrongCounts taken BEFORE this round's
+   update, so the caller's "comeback" achievement check can tell a word
+   that was already hard apart from one this round just made hard. */
+function updateWordCounters(prof, originalCards){
+  if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
+  ensureCorrectByDirection(prof); // older profiles predate this field too -- seeds it from correctCounts, see comment on ensureCorrectByDirection
+  const wrongCountsBefore = {...prof.stats.wrongCounts};
+  for(const card of originalCards){
+    // only a genuine wrong-typed attempt counts against the long-term
+    // "Problemwörter" stat -- skipping or revealing without trying
+    // still marks the card as !firstTry (for the round summary and page
+    // progress), but shouldn't make a word look harder than it is.
+    // canonical key = the German word, stable no matter which direction was tested
+    const key = card.de;
+    if(card.attemptedWrong){
+      if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
+      prof.stats.wrongCounts[key]+=1;
+    } else if(card.done && card.firstTry){
+      // answered right on the first try, no skip/reveal involved
+      if(!prof.stats.correctCounts[key]) prof.stats.correctCounts[key]=0;
+      prof.stats.correctCounts[key]+=1;
+      // also tracked per direction, for the two per-page progress bars
+      // (deToEn = Deutsch->Fremdsprache, enToDe = Fremdsprache->Deutsch,
+      // named after the original English book despite now covering any language)
+      const dirBucket = prof.stats.correctByDirection[card.direction];
+      if(dirBucket){
+        if(!dirBucket[key]) dirBucket[key]=0;
+        dirBucket[key]+=1;
+      }
+    }
+  }
+  return wrongCountsBefore;
+}
+
+/* Part of finalizeRoundAndUpdateProfile(): advances the daily-goal counter
+   and -- only if today also saw a flawless round (prof.stats.lastFlawlessRoundDate,
+   set by applyPageSetBonus above) -- the streak, plus any bonus-card
+   thresholds crossed by a longer streak. */
+function evaluateDailyGoalAndStreak(prof, today){
+  const goal = ensureDailyGoal(prof);
+  const goalBefore = goal.correctToday;
+  goal.correctToday += state.roundCorrectCount;
+  const dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
+
+  let streakChanged=false;
+  let newlyUnlockedBonusCards=[];
+  // Flammen gibt es nur für das Erreichen des Tagesziels, nicht schon
+  // fürs bloße Lernen einzelner Wörter/Runden -- daher erst HIER (nach
+  // der Tagesziel-Berechnung oben) prüfen, nicht am Rundenanfang.
+  // updateStreak selbst ist am gleichen Tag ein No-op (lastActiveDate
+  // bereits heute), daher unschädlich, wenn das Ziel in einer späteren
+  // Runde desselben Tages erneut erreicht/überschritten wird.
+  if(goal.correctToday >= DAILY_GOAL_TARGET && prof.stats.lastFlawlessRoundDate === today){
+    const longestBeforeRound = ensureStreakObj(prof).longest;
+    streakChanged = updateStreak(prof);
+    const longestAfterRound = ensureStreakObj(prof).longest;
+    const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
+    const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
+    for(let n=thresholdsBefore+1; n<=thresholdsAfter; n++){
+      newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
+    }
+  }
+  return {dailyGoalJustMet, streakChanged, newlyUnlockedBonusCards};
+}
+
 function finalizeRoundAndUpdateProfile(){
   const durationSec = Math.round((Date.now()-state.roundStartTime)/1000);
   // Requeued retry cards (see maybeRequeueCard) are a second shot at a word
@@ -6778,89 +6895,25 @@ function finalizeRoundAndUpdateProfile(){
   let pageSetBonusAwarded = {amount:0, isNewPageSet:false};
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
-
     const today = todayKey();
-    const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
-    if(isFlawless){
-      // zählt für die Flamme-Bedingung unten, unabhängig davon ob das
-      // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
-      prof.stats.lastFlawlessRoundDate = today;
 
-      if(!state.isHardWordsOnlyRound){
-        const pageSets = ensurePageSets(prof);
-        const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
-        if(!pageSets[key]){
-          const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
-          if(bonus>0){
-            state.roundTotalPoints += bonus;
-            pageSetBonusAwarded = {amount:bonus, isNewPageSet:true};
-          }
-          pageSets[key] = today;
-        }
-      }
-    }
+    // mutates state.roundTotalPoints when a bonus is awarded -- must run
+    // before totalPoints is credited below
+    pageSetBonusAwarded = applyPageSetBonus(prof, originalCards, today);
 
     prof.stats.totalPoints += state.roundTotalPoints;
     prof.stats.totalTimeSec += durationSec;
     levelInfo = getLevelInfo(prof.stats.totalPoints);
     leveledUp = levelInfo.level > levelBefore;
-    if(!prof.stats.correctCounts) prof.stats.correctCounts={}; // older profiles predate this field
-    ensureCorrectByDirection(prof); // older profiles predate this field too -- seeds it from correctCounts, see comment on ensureCorrectByDirection
-    // snapshot BEFORE this round's wrongCounts update below, so the
-    // "comeback" achievement can tell a word that was already hard
-    // apart from one this round just made hard for the first time
-    const wrongCountsBefore = {...prof.stats.wrongCounts};
-    for(const card of originalCards){
-      // only a genuine wrong-typed attempt counts against the long-term
-      // "Problemwörter" stat -- skipping or revealing without trying
-      // still marks the card as !firstTry (for the round summary and page
-      // progress), but shouldn't make a word look harder than it is.
-      // canonical key = the German word, stable no matter which direction was tested
-      const key = card.de;
-      if(card.attemptedWrong){
-        if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
-        prof.stats.wrongCounts[key]+=1;
-      } else if(card.done && card.firstTry){
-        // answered right on the first try, no skip/reveal involved
-        if(!prof.stats.correctCounts[key]) prof.stats.correctCounts[key]=0;
-        prof.stats.correctCounts[key]+=1;
-        // also tracked per direction, for the two per-page progress bars
-        // (deToEn = Deutsch->Fremdsprache, enToDe = Fremdsprache->Deutsch,
-        // named after the original English book despite now covering any language)
-        const dirBucket = prof.stats.correctByDirection[card.direction];
-        if(dirBucket){
-          if(!dirBucket[key]) dirBucket[key]=0;
-          dirBucket[key]+=1;
-        }
-      }
-    }
+
+    const wrongCountsBefore = updateWordCounters(prof, originalCards);
 
     // Page progress (computePageProgressByDirection) is derived live from
     // correctByDirection above, so there's nothing further to persist here.
 
     newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct});
 
-    const goal = ensureDailyGoal(prof);
-    const goalBefore = goal.correctToday;
-    goal.correctToday += state.roundCorrectCount;
-    dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
-
-    // Flammen gibt es nur für das Erreichen des Tagesziels, nicht schon
-    // fürs bloße Lernen einzelner Wörter/Runden -- daher erst HIER (nach
-    // der Tagesziel-Berechnung oben) prüfen, nicht am Rundenanfang.
-    // updateStreak selbst ist am gleichen Tag ein No-op (lastActiveDate
-    // bereits heute), daher unschädlich, wenn das Ziel in einer späteren
-    // Runde desselben Tages erneut erreicht/überschritten wird.
-    if(goal.correctToday >= DAILY_GOAL_TARGET && prof.stats.lastFlawlessRoundDate === today){
-      const longestBeforeRound = ensureStreakObj(prof).longest;
-      streakChanged = updateStreak(prof);
-      const longestAfterRound = ensureStreakObj(prof).longest;
-      const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
-      const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
-      for(let n=thresholdsBefore+1; n<=thresholdsAfter; n++){
-        newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
-      }
-    }
+    ({dailyGoalJustMet, streakChanged, newlyUnlockedBonusCards} = evaluateDailyGoalAndStreak(prof, today));
 
     if(!prof.stats.roundsCompleted) prof.stats.roundsCompleted=0; // older profiles predate this field
     // an aborted round (btnAbortRound) must not count as "completed" --
@@ -7410,7 +7463,18 @@ function startQuickRound(){
 }
 
 function renderBookPageScreen(){
-  // book list (based on chosen language) — built-in books + the user's own
+  renderBookList();
+  renderPagesList();
+  const currentIsCustom = state.currentBookKey && isCustomBook(state.currentBookKey);
+  document.getElementById("newPageFormWrap").style.display = currentIsCustom ? "block" : "none";
+
+  // enable Weiter?
+  document.getElementById("btnPagesNext").disabled = (state.selectedPages.length===0);
+}
+
+/* Part of renderBookPageScreen(): the left-hand book-picker list (built-in
+   books + the user's own, filtered by chosen language). */
+function renderBookList(){
   const blist=document.getElementById("bookList");
   blist.innerHTML="";
   const showArchived = document.getElementById("chkShowArchivedBooks").checked;
@@ -7478,8 +7542,12 @@ function renderBookPageScreen(){
 
     blist.appendChild(wrap);
   }
+}
 
-  // pages list
+/* Part of renderBookPageScreen(): the right-hand page list for the
+   currently selected book, with per-direction progress bars and the
+   select/add/delete controls for custom books. */
+function renderPagesList(){
   const pagesList=document.getElementById("pagesList");
   pagesList.innerHTML="";
   const currentIsCustom = state.currentBookKey && isCustomBook(state.currentBookKey);
@@ -7623,10 +7691,6 @@ function renderBookPageScreen(){
       pagesList.appendChild(row);
     }
   }
-  document.getElementById("newPageFormWrap").style.display = currentIsCustom ? "block" : "none";
-
-  // enable Weiter?
-  document.getElementById("btnPagesNext").disabled = (state.selectedPages.length===0);
 }
 
 function renderVocabPickScreen(){
@@ -7871,6 +7935,17 @@ function renderCurrentCard(){
   renderAnswerBoxesLive(card, "");
 }
 
+/* Shared builder for the celebratory ".highlight-banner.<variant>" divs
+   used throughout showSummaryScreen() (achievement/record/bonuscard/
+   pageset) -- was five near-identical createElement+className+textContent
+   blocks, now one place to change if the markup ever needs to grow. */
+function addHighlightBanner(container, variant, text){
+  const banner=document.createElement("div");
+  banner.className=`highlight-banner ${variant}`;
+  banner.textContent=text;
+  container.appendChild(banner);
+}
+
 function showSummaryScreen(){
   const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
@@ -7915,37 +7990,22 @@ function showSummaryScreen(){
   const extraDiv=document.getElementById("summaryExtraBanners");
   extraDiv.innerHTML="";
   newlyUnlockedAchievements.forEach(ach=>{
-    const banner=document.createElement("div");
-    banner.className="highlight-banner achievement";
-    banner.textContent=`${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`;
-    extraDiv.appendChild(banner);
+    addHighlightBanner(extraDiv, "achievement", `${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`);
   });
   newRecords.forEach(rec=>{
-    const banner=document.createElement("div");
-    banner.className="highlight-banner record";
-    banner.textContent=`🏆 Neuer Rekord: ${rec.label} (${rec.value})!`;
-    extraDiv.appendChild(banner);
+    addHighlightBanner(extraDiv, "record", `🏆 Neuer Rekord: ${rec.label} (${rec.value})!`);
   });
   newlyUnlockedBonusCards.forEach(bc=>{
-    const banner=document.createElement("div");
-    banner.className="highlight-banner bonuscard";
-    banner.textContent=`📱 Bonuskarte freigeschaltet: ${BONUS_CARD_REWARD_TITLE} (bei ${bc.threshold} Flammen)!`;
-    extraDiv.appendChild(banner);
+    addHighlightBanner(extraDiv, "bonuscard", `📱 Bonuskarte freigeschaltet: ${BONUS_CARD_REWARD_TITLE} (bei ${bc.threshold} Flammen)!`);
   });
   if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.amount>0){
-    const banner=document.createElement("div");
-    banner.className="highlight-banner pageset";
-    banner.textContent=`🎉 Neue Seiten-Kombination zum ersten Mal fehlerfrei geschafft! +${pageSetBonusAwarded.amount} Bonuspunkte`;
-    extraDiv.appendChild(banner);
+    addHighlightBanner(extraDiv, "pageset", `🎉 Neue Seiten-Kombination zum ersten Mal fehlerfrei geschafft! +${pageSetBonusAwarded.amount} Bonuspunkte`);
   }
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
     // mid-round toast too quickly to read it) -- no sound replay, that
     // already played live in checkAnswer() the moment the goal was hit
-    const banner=document.createElement("div");
-    banner.className="highlight-banner record";
-    banner.textContent=`🎯 Tagesziel erreicht! ${DAILY_GOAL_TARGET}/${DAILY_GOAL_TARGET} heute!`;
-    extraDiv.appendChild(banner);
+    addHighlightBanner(extraDiv, "record", `🎯 Tagesziel erreicht! ${DAILY_GOAL_TARGET}/${DAILY_GOAL_TARGET} heute!`);
   }
 
   // at most one extra sound here, to avoid a cacophony when several good
@@ -8401,41 +8461,34 @@ function setupEventListeners(){
   });
 
   document.getElementById("btnGoToProfiles").addEventListener("click", ()=>{
-    switchScreen("screen-profiles");
-    renderProfilesScreen();
+    goToScreen("screen-profiles", renderProfilesScreen);
   });
 
   document.getElementById("btnProfilesBack").addEventListener("click", ()=>{
-    switchScreen("screen-start");
-    renderStartScreen();
+    goToScreen("screen-start", renderStartScreen);
   });
 
   document.getElementById("btnStartToLanguage").addEventListener("click", ()=>{
-    switchScreen("screen-language");
-    renderLanguageScreen();
+    goToScreen("screen-language", renderLanguageScreen);
   });
 
   document.getElementById("btnLanguageBack").addEventListener("click", ()=>{
-    switchScreen("screen-start");
-    renderStartScreen();
+    goToScreen("screen-start", renderStartScreen);
   });
 
   document.getElementById("btnStartToPages").addEventListener("click", ()=>{
     // pick bookpages
     state.selectedPages = []; // reset
-    switchScreen("screen-bookpages");
-    renderBookPageScreen();
+    goToScreen("screen-bookpages", renderBookPageScreen);
   });
 
   // Bookpages screen
   document.getElementById("btnPagesBack").addEventListener("click", ()=>{
-    switchScreen("screen-language");
-    renderLanguageScreen();
+    goToScreen("screen-language", renderLanguageScreen);
   });
 
   document.getElementById("btnPagesNext").addEventListener("click", ()=>{
-    switchScreen("screen-vocabpick");
-    renderVocabPickScreen();
+    goToScreen("screen-vocabpick", renderVocabPickScreen);
   });
 
   document.getElementById("btnPagesSelectAll").addEventListener("click", ()=>{
@@ -8549,14 +8602,12 @@ function setupEventListeners(){
   });
 
   document.getElementById("btnVocabAddDone").addEventListener("click", ()=>{
-    switchScreen("screen-bookpages");
-    renderBookPageScreen();
+    goToScreen("screen-bookpages", renderBookPageScreen);
   });
 
   // Vocab pick
   document.getElementById("btnVocabBack").addEventListener("click", ()=>{
-    switchScreen("screen-bookpages");
-    renderBookPageScreen();
+    goToScreen("screen-bookpages", renderBookPageScreen);
   });
 
   document.getElementById("btnVocabSelectAll").addEventListener("click", ()=>{
@@ -8572,14 +8623,12 @@ function setupEventListeners(){
   document.getElementById("btnVocabNext").addEventListener("click", ()=>{
     // forward to direction
     state.direction=null;
-    switchScreen("screen-direction");
-    renderDirectionScreen();
+    goToScreen("screen-direction", renderDirectionScreen);
   });
 
   // Direction screen
   document.getElementById("btnDirBack").addEventListener("click", ()=>{
-    switchScreen("screen-vocabpick");
-    renderVocabPickScreen();
+    goToScreen("screen-vocabpick", renderVocabPickScreen);
   });
 
   document.getElementById("directionOptions").addEventListener("click",(e)=>{
@@ -8613,9 +8662,7 @@ function setupEventListeners(){
     }
     // start round
     state.isHardWordsOnlyRound = false;
-    switchScreen("screen-learn");
-    buildRoundCardsFromVocab();
-    renderCurrentCard();
+    goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
   // Learn screen
@@ -8625,8 +8672,7 @@ function setupEventListeners(){
       finalizeRoundAndUpdateProfile();
     }
     // abort -> direction screen
-    switchScreen("screen-direction");
-    renderDirectionScreen();
+    goToScreen("screen-direction", renderDirectionScreen);
   });
   // Tapping any of these learn-screen buttons would otherwise steal focus
   // from #answerInput -- on iOS/iPadOS that dismisses the on-screen
@@ -8678,17 +8724,14 @@ function setupEventListeners(){
   // Summary screen
   document.getElementById("btnSummaryToStart").addEventListener("click", ()=>{
     // go home
-    switchScreen("screen-start");
-    renderStartScreen();
+    goToScreen("screen-start", renderStartScreen);
   });
 
   document.getElementById("btnSameRoundAgain").addEventListener("click", ()=>{
     // Replay the exact same word selection + direction as the round that
     // just finished. state.vocabPool still holds it untouched -- only
     // btnOnlyHard below overwrites it.
-    switchScreen("screen-learn");
-    buildRoundCardsFromVocab();
-    renderCurrentCard();
+    goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
   document.getElementById("btnOnlyHard").addEventListener("click", ()=>{
@@ -8707,9 +8750,7 @@ function setupEventListeners(){
     }));
     // We'll reuse current state.direction (unchanged)
     state.isHardWordsOnlyRound = true; // never covers the full page selection -- excluded from the page-set bonus, see isRoundFullyCorrect()
-    switchScreen("screen-learn");
-    buildRoundCardsFromVocab();
-    renderCurrentCard();
+    goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
   // Floating dark mode toggle
