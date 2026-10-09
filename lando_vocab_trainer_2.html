@@ -1894,7 +1894,6 @@ body.dark-theme .daily-goal-mini-banner {
       <span>📊 Statistik</span>
     </h2>
     <div id="statsProfileLabel" class="section-sub" style="margin-bottom:1rem;"></div>
-    <div id="statsRoundInProgressNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
 
     <div class="stats-row">
       <div class="stats-card">
@@ -6835,19 +6834,6 @@ function renderStatsScreen(){
   const avatarPrefix = prof.avatar ? prof.avatar+" " : "";
   labelEl.textContent = `Profil: ${avatarPrefix}${state.currentProfile}`;
 
-  // A round in progress (reached via the floating 📊 button, not "Abbrechen")
-  // isn't saved to the profile yet -- say so, instead of just showing a
-  // total that looks like the round's points vanished.
-  const noteEl = document.getElementById("statsRoundInProgressNote");
-  const roundInProgress = state.backStackBeforeStats==="screen-learn"
-    && state.roundCards.length>0 && state.roundIndex<state.roundCards.length;
-  if(roundInProgress){
-    noteEl.textContent = `ℹ️ Du bist gerade mitten in einer Runde (${state.roundTotalPoints} Punkte bisher) -- die zählen erst dazu, wenn die Runde fertig ist oder du "Abbrechen" drückst.`;
-    noteEl.style.display="block";
-  } else {
-    noteEl.style.display="none";
-  }
-
   document.getElementById("statTotalPoints").textContent = String(prof.stats.totalPoints);
   const minTotal = (prof.stats.totalTimeSec/60).toFixed(1);
   document.getElementById("statTotalTime").textContent = String(minTotal);
@@ -8574,92 +8560,34 @@ function setupEventListeners(){
     setSoundMuted(!soundMuted);
   });
 
+  // The four back-targets below (backStackBeforeStats/-Leaderboard/
+  // -TeamLeaderboard/-BonusCards) are each set from exactly one place
+  // (the start-screen tile that opens that detail screen), always to
+  // "screen-start" -- so "screen-start" is the only branch that can
+  // ever run. Kept as a fallback-checked `target` (not hardcoded)
+  // so a future second entry point stays safe by construction.
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
-    if(target==="screen-start"){
-      renderStartScreen();
-    } else if(target==="screen-bookpages"){
-      renderBookPageScreen();
-    } else if(target==="screen-vocab-add"){
-      renderVocabAddScreen();
-    } else if(target==="screen-vocabpick"){
-      renderVocabPickScreen();
-    } else if(target==="screen-direction"){
-      renderDirectionScreen();
-    } else if(target==="screen-learn"){
-      renderCurrentCard();
-    } else if(target==="screen-summary"){
-      // summary already rendered
-    } else if(target==="screen-leaderboard"){
-      renderLeaderboardScreen();
-    }
+    if(target==="screen-start") renderStartScreen();
   });
 
   document.getElementById("btnLeaderboardBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeLeaderboard || "screen-start";
     switchScreen(target);
-    if(target==="screen-start"){
-      renderStartScreen();
-    } else if(target==="screen-bookpages"){
-      renderBookPageScreen();
-    } else if(target==="screen-vocab-add"){
-      renderVocabAddScreen();
-    } else if(target==="screen-vocabpick"){
-      renderVocabPickScreen();
-    } else if(target==="screen-direction"){
-      renderDirectionScreen();
-    } else if(target==="screen-learn"){
-      renderCurrentCard();
-    } else if(target==="screen-summary"){
-      // summary already rendered
-    } else if(target==="screen-stats"){
-      renderStatsScreen();
-    }
+    if(target==="screen-start") renderStartScreen();
   });
 
   document.getElementById("btnTeamLeaderboardBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeTeamLeaderboard || "screen-start";
     switchScreen(target);
-    if(target==="screen-start"){
-      renderStartScreen();
-    } else if(target==="screen-bookpages"){
-      renderBookPageScreen();
-    } else if(target==="screen-vocab-add"){
-      renderVocabAddScreen();
-    } else if(target==="screen-vocabpick"){
-      renderVocabPickScreen();
-    } else if(target==="screen-direction"){
-      renderDirectionScreen();
-    } else if(target==="screen-learn"){
-      renderCurrentCard();
-    } else if(target==="screen-summary"){
-      // summary already rendered
-    } else if(target==="screen-stats"){
-      renderStatsScreen();
-    }
+    if(target==="screen-start") renderStartScreen();
   });
 
   document.getElementById("btnBonusCardsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeBonusCards || "screen-start";
     switchScreen(target);
-    if(target==="screen-start"){
-      renderStartScreen();
-    } else if(target==="screen-bookpages"){
-      renderBookPageScreen();
-    } else if(target==="screen-vocab-add"){
-      renderVocabAddScreen();
-    } else if(target==="screen-vocabpick"){
-      renderVocabPickScreen();
-    } else if(target==="screen-direction"){
-      renderDirectionScreen();
-    } else if(target==="screen-learn"){
-      renderCurrentCard();
-    } else if(target==="screen-summary"){
-      // summary already rendered
-    } else if(target==="screen-stats"){
-      renderStatsScreen();
-    }
+    if(target==="screen-start") renderStartScreen();
   });
 }
 
