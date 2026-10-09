@@ -1608,6 +1608,7 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
 
     <div id="bonusProgressTile" class="stat-tile bonus-progress-tile"></div>
+    <div id="dueReviewTile" class="stat-tile bonus-progress-tile"></div>
 
     <div class="btn-row btn-row-sticky">
       <button id="btnStartToLanguage" class="btn" disabled>Weiter ➡</button>
@@ -5139,14 +5140,15 @@ function createProfile(name){
         wrongCounts:{},
         correctCounts:{},
         correctByDirection:{deToEn:{}, enToDe:{}},
-        streak:{current:0, longest:0, lastActiveDate:null},
+        streak:{current:0, longest:0, lastActiveDate:null, lastFreezeUsedDate:null},
         records:{fastestRoundSec:null, fastestRoundWordCount:0,
           highestCombo:0, bestFirstTryPct:0, mostPointsInRound:0},
         dailyGoal:{date:null, correctToday:0},
         achievements:{unlocked:{}},
         bonusCards:{redeemed:{}},
         roundsCompleted:0,
-        totalCorrectAnswersEver:0
+        totalCorrectAnswersEver:0,
+        wordSchedule:{}
       }
     };
     saveProfiles();
@@ -5174,14 +5176,15 @@ function sanitizeImportedProfile(raw){
       wrongCounts: obj(stats.wrongCounts),
       correctCounts: obj(stats.correctCounts),
       correctByDirection: {deToEn:{}, enToDe:{}, ...obj(stats.correctByDirection)},
-      streak: {current:0, longest:0, lastActiveDate:null, ...obj(stats.streak)},
+      streak: {current:0, longest:0, lastActiveDate:null, lastFreezeUsedDate:null, ...obj(stats.streak)},
       records: {fastestRoundSec:null, fastestRoundWordCount:0, highestCombo:0,
         bestFirstTryPct:0, mostPointsInRound:0, ...obj(stats.records)},
       dailyGoal: {date:null, correctToday:0, ...obj(stats.dailyGoal)},
       achievements: {unlocked:{}, ...obj(stats.achievements)},
       bonusCards: {redeemed:{}, ...obj(stats.bonusCards)},
       roundsCompleted: Number(stats.roundsCompleted) || 0,
-      totalCorrectAnswersEver: Number(stats.totalCorrectAnswersEver) || 0
+      totalCorrectAnswersEver: Number(stats.totalCorrectAnswersEver) || 0,
+      wordSchedule: obj(stats.wordSchedule)
     }
   };
 }
@@ -5286,9 +5289,18 @@ function daysBetweenKeys(dateStrA, dateStrB){
   return Math.round((b-a)/86400000);
 }
 
+function addDaysToDateKey(dateKey, days){
+  const d = new Date(dateKey+"T00:00:00");
+  d.setDate(d.getDate()+days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
 function ensureStreakObj(prof){
   if(!prof.stats.streak){
-    prof.stats.streak = {current:0, longest:0, lastActiveDate:null};
+    prof.stats.streak = {current:0, longest:0, lastActiveDate:null, lastFreezeUsedDate:null};
   }
   return prof.stats.streak;
 }
@@ -5645,26 +5657,47 @@ function showSyncFailureHintOnce(){
   extraDiv.appendChild(banner);
 }
 
+const STREAK_FREEZE_COOLDOWN_DAYS = 7; // höchstens ein Jokertag pro Woche
+
+/* True wenn noch kein Jokertag innerhalb der letzten STREAK_FREEZE_COOLDOWN_DAYS
+   verbraucht wurde -- siehe updateStreak(). */
+function canUseStreakFreeze(streak, today){
+  if(!streak.lastFreezeUsedDate) return true;
+  return daysBetweenKeys(streak.lastFreezeUsedDate, today) >= STREAK_FREEZE_COOLDOWN_DAYS;
+}
+
 /* Called only once the daily goal has been reached (see call site in
    finalizeRoundAndUpdateProfile) -- Flammen honor hitting the day's goal,
-   not just playing any round / learning a few words. Returns true if
-   today's goal-reaching session actually changed the streak count (i.e.
-   this was the first time today the goal was reached), so the caller can
-   show a little "Serie verlängert!" moment. Safe to call again later the
-   same day (e.g. a further round after the goal is already met) -- it's
-   a no-op once lastActiveDate is already today. */
+   not just playing any round / learning a few words. Returns
+   {changed, freezeUsed}: changed is true if today's goal-reaching session
+   actually changed the streak count (i.e. this was the first time today
+   the goal was reached), so the caller can show a little "Serie
+   verlängert!" moment; freezeUsed is true if exactly one missed day was
+   forgiven via the weekly Jokertag (see canUseStreakFreeze) instead of
+   resetting the streak. Safe to call again later the same day (e.g. a
+   further round after the goal is already met) -- it's a no-op once
+   lastActiveDate is already today. */
 function updateStreak(prof){
   const streak = ensureStreakObj(prof);
   const today = todayKey();
   if(streak.lastActiveDate === today){
-    return false; // already trained today, nothing to update
+    return {changed:false, freezeUsed:false}; // already trained today, nothing to update
   }
+  let freezeUsed = false;
   if(streak.lastActiveDate){
     const diff = daysBetweenKeys(streak.lastActiveDate, today);
     if(diff === 1){
       streak.current += 1; // trained yesterday -> streak continues
+    } else if(diff === 2 && canUseStreakFreeze(streak, today)){
+      // genau ein Tag verpasst UND in den letzten 7 Tagen noch kein
+      // Jokertag verbraucht -- Serie bleibt erhalten statt auf 1
+      // zurückzufallen, damit ein einzelner schlechter/vergessener Tag
+      // nicht gleich die ganze Serie zunichtemacht
+      streak.current += 1;
+      streak.lastFreezeUsedDate = today;
+      freezeUsed = true;
     } else if(diff > 1){
-      streak.current = 1; // a day was missed -> streak restarts
+      streak.current = 1; // mehr als ein Tag verpasst (oder Jokertag schon verbraucht) -> Serie beginnt neu
     }
     // diff <= 0 (clock went backwards) -> leave current untouched
   } else {
@@ -5672,7 +5705,7 @@ function updateStreak(prof){
   }
   streak.lastActiveDate = today;
   if(streak.current > streak.longest) streak.longest = streak.current;
-  return true;
+  return {changed:true, freezeUsed};
 }
 
 /* ===========================================================
@@ -5692,10 +5725,24 @@ const LEVEL_TITLES = [
   "Sprachlegende"
 ];
 
+// Ab hier (= Anzahl der LEVEL_TITLES-Einträge) wächst die Punktekurve nur
+// noch linear statt quadratisch weiter -- rein quadratisch würden die
+// Level-Abstände immer weiter auseinanderklaffen, bis ein Level praktisch
+// unerreichbar fern wirkt. Ab Level 10 gibt es ohnehin keinen neuen Titel
+// mehr (nur noch "(Stufe N)"), ein guter natürlicher Umschlagpunkt.
+const LEVEL_SOFT_CAP = LEVEL_TITLES.length;
+
 /* Points needed to REACH a given level (level 1 starts at 0 points).
-   Quadratic curve: leveling up gets gradually harder. */
+   Quadratic curve bis LEVEL_SOFT_CAP, danach linear mit dem Punktabstand
+   fort, der zuletzt INNERHALB der quadratischen Kurve gebraucht wurde --
+   so bleiben spätere Level weiterhin spürbar, aber erreichbar, statt sich
+   endlos zu beschleunigen. */
 function pointsForLevel(level){
-  return Math.pow(Math.max(0, level-1), 2) * 40;
+  if(level<=LEVEL_SOFT_CAP){
+    return Math.pow(Math.max(0, level-1), 2) * 40;
+  }
+  const stepAtCap = pointsForLevel(LEVEL_SOFT_CAP) - pointsForLevel(LEVEL_SOFT_CAP-1);
+  return pointsForLevel(LEVEL_SOFT_CAP) + (level-LEVEL_SOFT_CAP)*stepAtCap;
 }
 
 function computeLevel(totalPoints){
@@ -6215,6 +6262,68 @@ function renderBonusProgressTile(prof){
   makeTileAccessible(tile, "Bonuskarten öffnen");
 }
 
+/* Always-visible teaser tile for the day-based Leitner review queue (see
+   updateWordSchedule/collectDueWords), same pattern as
+   renderBonusProgressTile above -- shows a positive "nothing due" state
+   rather than hiding when empty, so the tile isn't just absent half the
+   time. Antippen startet die Wiederholungsrunde direkt, ohne über die
+   normale Seiten-/Wortauswahl zu gehen (siehe startDueReviewRound). */
+function renderDueReviewTile(prof){
+  const tile = document.getElementById("dueReviewTile");
+  if(!prof){
+    tile.classList.remove("show");
+    return;
+  }
+  const due = collectDueWords(prof);
+  if(due.length>0){
+    tile.innerHTML = `
+      <span style="font-size:1.2rem;">📅</span>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-tile-head">${due.length} Wort${due.length===1?"":"e"} heute fällig</div>
+        <div class="stat-tile-sub">Antippen zum Üben</div>
+      </div>
+    `;
+    tile.style.cursor = "pointer";
+    tile.onclick = startDueReviewRound;
+    makeTileAccessible(tile, "Fällige Wiederholungen üben");
+  } else {
+    tile.innerHTML = `
+      <span style="font-size:1.2rem;">📅</span>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-tile-head">Keine Wiederholungen fällig 👍</div>
+      </div>
+    `;
+    tile.style.cursor = "default";
+    tile.onclick = null;
+    tile.onkeydown = null;
+    tile.classList.remove("stat-tile-clickable");
+    tile.removeAttribute("role");
+    tile.removeAttribute("tabindex");
+    tile.removeAttribute("aria-label");
+  }
+  tile.classList.add("show");
+}
+
+/* Startet eine Runde direkt aus den fälligen Wiederholungen (siehe
+   collectDueWords), analog zu btnOnlyHard weiter unten -- deckt nie eine
+   volle Seiten-Auswahl ab, daher isHardWordsOnlyRound wie dort. direction
+   bewusst "mixed": eine Wiedervorlage soll beide Richtungen trainieren,
+   nicht nur die zuletzt gewählte. */
+function startDueReviewRound(){
+  const prof = getCurrentProfileObj();
+  if(!prof) return;
+  const due = collectDueWords(prof);
+  if(due.length===0) return;
+  state.vocabPool = due.map(w=>({
+    de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId
+  }));
+  state.direction = "mixed";
+  state.isHardWordsOnlyRound = true; // deckt nie eine volle Seiten-Auswahl ab -- kein Seiten-Set-Bonus, siehe isRoundFullyCorrect()
+  switchScreen("screen-learn");
+  buildRoundCardsFromVocab();
+  renderCurrentCard();
+}
+
 /* Dedicated detail screen for bonus cards (opened via bonusProgressTile
    on the start screen, see above) -- a deliberate navigation, not an
    inline expand, so a parent reading along doesn't have the start
@@ -6340,6 +6449,17 @@ function computePageProgressByDirection(pageId){
    locked badge. The other four (first_round, fast_round, comeback_word)
    are binary or depend on a single round's size/duration, so there's no
    honest running number to show -- they show their description only. */
+
+// "Blitzschnell" braucht sowohl Tempo ALS AUCH Trefferquote -- ohne die
+// Trefferquote-Schwelle ließe sich das Achievement allein durch
+// stures Aufdecken/Durchklicken jeder Karte erreichen (revealSolution
+// löst eine Karte sofort auf), was dem eigentlichen Sinn (schnell UND
+// richtig) widerspräche. Der Zeitwert selbst wurde von 3 auf 5 Sek./Wort
+// gelockert -- 3 Sek. war für ein noch tippendes Kind unrealistisch eng
+// und verleitete eher zum Raten als zu sauberem Antworten.
+const FAST_ROUND_SEC_PER_WORD = 5;
+const FAST_ROUND_MIN_FIRST_TRY_PCT = 70;
+
 const ACHIEVEMENTS = [
   {id:"first_round", icon:"🥇", title:"Erste Runde", desc:"Deine erste Runde abgeschlossen",
     check:(p,ctx)=>p.stats.roundsCompleted===1},
@@ -6363,8 +6483,10 @@ const ACHIEVEMENTS = [
   {id:"level_10", icon:"🏆", title:"Level 10", desc:"Level 10 erreicht",
     check:(p,ctx)=>ctx.levelInfo.level>=10,
     progress:p=>({current:computeLevel(p.stats.totalPoints), target:10})},
-  {id:"fast_round", icon:"⚡", title:"Blitzschnell", desc:"Besonders schnelle Runde",
-    check:(p,ctx)=>ctx.totalCards>=10 && ctx.durationSec<=ctx.totalCards*3},
+  {id:"fast_round", icon:"⚡", title:"Blitzschnell", desc:"Schnell UND richtig unterwegs",
+    check:(p,ctx)=>ctx.totalCards>=10
+      && ctx.durationSec<=ctx.totalCards*FAST_ROUND_SEC_PER_WORD
+      && ctx.firstTryPct>=FAST_ROUND_MIN_FIRST_TRY_PCT},
   {id:"comeback_word", icon:"💪", title:"Comeback", desc:"Ein schwieriges Wort endlich gemeistert",
     check:(p,ctx)=>ctx.comebackHappened},
   {id:"daily_goal_hit", icon:"🎯", title:"Tagesziel", desc:"Das Tagesziel erreicht",
@@ -6848,6 +6970,42 @@ function collectHardWords(){
   return hard;
 }
 
+/* Looks up a word's CURRENT book/page vocab entry by its German text --
+   prof.stats.wordSchedule (see updateWordSchedule) only stores the word
+   key itself, not which book/page it came from, since a word's page can
+   be edited/moved over time and the book data stays the single source of
+   truth for de/foreign/icon/example/pageId. Scans built-in and custom
+   books; returns null if the word no longer exists anywhere (e.g. its
+   custom page was deleted) so collectDueWords() can just skip it. */
+function findVocabEntryByDe(deWord){
+  const allBooks = {...BOOKS, ...customBooks};
+  for(const bookKey of Object.keys(allBooks)){
+    const pages = allBooks[bookKey].pages || {};
+    for(const pageId of Object.keys(pages)){
+      const found = (pages[pageId]||[]).find(v=>v.de===deWord);
+      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId};
+    }
+  }
+  return null;
+}
+
+/* Words whose Leitner-Box-Fälligkeit (see updateWordSchedule) heute oder
+   früher erreicht ist -- powers the "Fällige Wiederholungen"-Kachel on
+   the start screen and startDueReviewRound(). */
+function collectDueWords(prof){
+  const schedule = ensureWordSchedule(prof);
+  const today = todayKey();
+  const due = [];
+  for(const key of Object.keys(schedule)){
+    const entry = schedule[key];
+    if(entry && entry.dueDate && entry.dueDate<=today){
+      const vocab = findVocabEntryByDe(key);
+      if(vocab) due.push(vocab);
+    }
+  }
+  return due;
+}
+
 /* "Fehlerfrei abgeschlossen" heißt NICHT "alles im ersten Versuch
    richtig" -- Wiederholungen über die normale Requeue-Mechanik sind
    erlaubt. Es bedeutet: jedes Wort der Runde wurde am Ende mindestens
@@ -6933,6 +7091,44 @@ function updateWordCounters(prof, originalCards){
   return wrongCountsBefore;
 }
 
+/* Tage bis zur nächsten Fälligkeit je Leitner-Box (Index = Box-1) --
+   siehe updateWordSchedule()/collectDueWords(). Eine frisch falsch
+   beantwortete Karte fällt auf Box 1 zurück (morgen schon wieder fällig),
+   jede richtige Box-Stufe verlängert das Intervall. */
+const LEITNER_BOX_INTERVALS_DAYS = [1, 2, 4, 7, 14, 30];
+const LEITNER_MAX_BOX = LEITNER_BOX_INTERVALS_DAYS.length;
+
+function ensureWordSchedule(prof){
+  if(!prof.stats.wordSchedule){
+    prof.stats.wordSchedule = {};
+  }
+  return prof.stats.wordSchedule;
+}
+
+/* Part of finalizeRoundAndUpdateProfile(): Leitner-artiges tagesbasiertes
+   Wiedervorlage-System, ergänzend zu den reinen wrongCounts/correctCounts
+   oben (die zählen nur "wie oft insgesamt", sagen aber nichts darüber,
+   WANN ein Wort als nächstes dran sein sollte). Jede tatsächlich (nicht
+   geskippt/aufgedeckt) aufgelöste Karte wandert bei richtiger Antwort eine
+   Box weiter nach oben (längeres Intervall bis zur nächsten Fälligkeit)
+   oder fällt bei einem Fehlversuch zurück auf Box 1. Gleiche
+   attemptedWrong/firstTry-Unterscheidung wie updateWordCounters() oben,
+   damit Skip/Aufdecken auch hier die Wiedervorlage nicht verfälscht --
+   siehe dortiger Kommentar. */
+function updateWordSchedule(prof, originalCards, today){
+  const schedule = ensureWordSchedule(prof);
+  for(const card of originalCards){
+    const key = card.de;
+    if(card.attemptedWrong){
+      schedule[key] = {box:1, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[0])};
+    } else if(card.done && card.firstTry){
+      const prevBox = (schedule[key] && schedule[key].box) || 0;
+      const box = Math.min(prevBox+1, LEITNER_MAX_BOX);
+      schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1])};
+    }
+  }
+}
+
 /* Part of finalizeRoundAndUpdateProfile(): advances the daily-goal counter
    and -- only if today also saw a flawless round (prof.stats.lastFlawlessRoundDate,
    set by applyPageSetBonus above) -- the streak, plus any bonus-card
@@ -6944,6 +7140,7 @@ function evaluateDailyGoalAndStreak(prof, today){
   const dailyGoalJustMet = goalBefore<DAILY_GOAL_TARGET && goal.correctToday>=DAILY_GOAL_TARGET;
 
   let streakChanged=false;
+  let streakFreezeUsed=false;
   let newlyUnlockedBonusCards=[];
   // Flammen gibt es nur für das Erreichen des Tagesziels, nicht schon
   // fürs bloße Lernen einzelner Wörter/Runden -- daher erst HIER (nach
@@ -6953,7 +7150,9 @@ function evaluateDailyGoalAndStreak(prof, today){
   // Runde desselben Tages erneut erreicht/überschritten wird.
   if(goal.correctToday >= DAILY_GOAL_TARGET && prof.stats.lastFlawlessRoundDate === today){
     const longestBeforeRound = ensureStreakObj(prof).longest;
-    streakChanged = updateStreak(prof);
+    const result = updateStreak(prof);
+    streakChanged = result.changed;
+    streakFreezeUsed = result.freezeUsed;
     const longestAfterRound = ensureStreakObj(prof).longest;
     const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
     const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
@@ -6961,7 +7160,7 @@ function evaluateDailyGoalAndStreak(prof, today){
       newlyUnlockedBonusCards.push({threshold:n*BONUS_CARD_INTERVAL});
     }
   }
-  return {dailyGoalJustMet, streakChanged, newlyUnlockedBonusCards};
+  return {dailyGoalJustMet, streakChanged, streakFreezeUsed, newlyUnlockedBonusCards};
 }
 
 const MAX_ROUND_DURATION_SEC = 7200; // 2h -- a round genuinely in progress never takes this long; a larger gap means the tab sat inactive/in the background (e.g. overnight) and shouldn't inflate totalTimeSec
@@ -6995,6 +7194,7 @@ function finalizeRoundAndUpdateProfile(){
   // profile update
   const prof=getCurrentProfileObj();
   let streakChanged=false;
+  let streakFreezeUsed=false;
   let leveledUp=false;
   let levelInfo=null;
   let newRecords=[];
@@ -7016,13 +7216,14 @@ function finalizeRoundAndUpdateProfile(){
     leveledUp = levelInfo.level > levelBefore;
 
     const wrongCountsBefore = updateWordCounters(prof, originalCards);
+    updateWordSchedule(prof, originalCards, today);
 
     // Page progress (computePageProgressByDirection) is derived live from
     // correctByDirection above, so there's nothing further to persist here.
 
     newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct});
 
-    ({dailyGoalJustMet, streakChanged, newlyUnlockedBonusCards} = evaluateDailyGoalAndStreak(prof, today));
+    ({dailyGoalJustMet, streakChanged, streakFreezeUsed, newlyUnlockedBonusCards} = evaluateDailyGoalAndStreak(prof, today));
 
     if(!prof.stats.roundsCompleted) prof.stats.roundsCompleted=0; // older profiles predate this field
     // an aborted round (btnAbortRound) must not count as "completed" --
@@ -7050,6 +7251,7 @@ function finalizeRoundAndUpdateProfile(){
     firstTryPct,
     hardWords,
     streakChanged,
+    streakFreezeUsed,
     streak: prof ? ensureStreakObj(prof) : null,
     leveledUp,
     levelInfo,
@@ -7442,6 +7644,7 @@ function renderStartScreen(){
   renderStreakBadge();
   const prof = getCurrentProfileObj();
   renderBonusProgressTile(prof);
+  renderDueReviewTile(prof);
   renderLevelBadge();
   renderDailyGoalWidget();
   renderLeagueRankWidget();
@@ -8080,7 +8283,7 @@ function addHighlightBanner(container, variant, text){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
@@ -8089,7 +8292,9 @@ function showSummaryScreen(){
 
   const streakEl = document.getElementById("sumStreak");
   if(streak && streak.current>0){
-    streakEl.textContent = `🔥 ${streak.current} Tag${streak.current===1?"":"e"}` + (streakChanged ? " (verlängert!)" : "");
+    const streakNote = streakFreezeUsed ? " (Jokertag genutzt 🛟, Serie bleibt erhalten!)"
+      : streakChanged ? " (verlängert!)" : "";
+    streakEl.textContent = `🔥 ${streak.current} Tag${streak.current===1?"":"e"}` + streakNote;
   } else {
     streakEl.textContent = "–";
   }
