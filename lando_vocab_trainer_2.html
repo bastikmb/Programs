@@ -958,6 +958,16 @@ body.dark-theme .highlight-banner.bonuscard {
   border-color:#3b82f6;
   color:#bfdbfe;
 }
+.highlight-banner.pageset {
+  background:linear-gradient(135deg,#fce7f3,#fbcfe8);
+  border:1px solid #ec4899;
+  color:#9d174d;
+}
+body.dark-theme .highlight-banner.pageset {
+  background:linear-gradient(135deg,#4a0f2e,#5c1538);
+  border-color:#ec4899;
+  color:#fbcfe8;
+}
 /* neutral informational banner (e.g. the one-time "you're now in the
    leaderboard" notice) -- not a celebration, so no pop animation */
 .highlight-banner.info {
@@ -4955,6 +4965,7 @@ let state = {
   roundComboBonus: 0,    // total bonus points earned from combos this round
   backStackBeforeStats: "screen-start", // remember last screen before going to stats
   vocabAddTarget: null, // {bookKey, pageId} while on screen-vocab-add
+  isHardWordsOnlyRound: false, // true only for "Nur schwierige Wörter üben" rounds -- excludes them from the page-set bonus, since they never cover the full selection
 };
 
 /* Profile schema:
@@ -5319,6 +5330,29 @@ function ensureBonusCards(prof){
   }
   return prof.stats.bonusCards;
 }
+
+/* ===========================================================
+   SEITEN-SET-BONUS (Punktebonus für eine neue, fehlerfrei
+   abgeschlossene Seiten-Auswahl -- siehe isRoundFullyCorrect())
+   =========================================================== */
+
+/* Welche Buch+Seiten-Kombinationen dieses Profil bereits mindestens
+   einmal fehlerfrei durchgespielt hat -- Key = Buch + sortierte
+   Seiten-IDs, Wert = ISO-Zeitstempel des ersten fehlerfreien
+   Durchgangs. Lazy-init wie ensureAchievements/ensureBonusCards,
+   damit Bestandsprofile ohne Migration auskommen. */
+function ensurePageSets(prof){
+  if(!prof.stats.completedPageSets){
+    prof.stats.completedPageSets = {};
+  }
+  return prof.stats.completedPageSets;
+}
+
+function buildPageSetKey(bookKey, selectedPages){
+  return bookKey + "|" + [...selectedPages].sort().join(",");
+}
+
+const PAGESET_BONUS_RATIO = 0.5; // +50% der in der Runde erzielten Punkte
 
 function getBonusCardThresholds(prof){
   const longest = (prof.stats.streak && prof.stats.streak.longest) || 0;
@@ -6272,9 +6306,13 @@ function buildRoundCardsFromVocab(){
       score:10,
       firstTry:true,
       done:false,
-      attemptedWrong:false // true only once the user actually typed a wrong answer
+      attemptedWrong:false, // true only once the user actually typed a wrong answer
                            // (kept separate from firstTry so skip/reveal without a
                            // real attempt don't pollute the long-term "Problemwörter" stat)
+      resolvedCorrectly:false // true only via the correct branch of checkAnswer() --
+                           // unlike firstTry (which stays false forever after any
+                           // wrong attempt), this tracks "was this word EVER actually
+                           // answered right", used by isRoundFullyCorrect()
     });
   }
 
@@ -6683,6 +6721,24 @@ function collectHardWords(){
   return hard;
 }
 
+/* "Fehlerfrei abgeschlossen" heißt NICHT "alles im ersten Versuch
+   richtig" -- Wiederholungen über die normale Requeue-Mechanik sind
+   erlaubt. Es bedeutet: jedes Wort der Runde wurde am Ende mindestens
+   einmal TATSÄCHLICH richtig beantwortet (nicht geskippt, nicht
+   aufgedeckt) -- entweder direkt oder bei seiner einen Retry-Karte
+   (siehe maybeRequeueCard). card.resolvedCorrectly wird nur im
+   korrekten Zweig von checkAnswer() gesetzt, nie bei Skip/Aufdecken --
+   anders als firstTry, das nach jedem Fehlversuch dauerhaft false
+   bleibt, auch wenn das Wort am selben Slot doch noch richtig wird. */
+function isRoundFullyCorrect(originalCards, allRoundCards){
+  if(originalCards.length===0) return false;
+  return originalCards.every(oc=>{
+    if(oc.resolvedCorrectly) return true;
+    const retry = allRoundCards.find(c=>c.isRequeue && c.de===oc.de);
+    return !!(retry && retry.resolvedCorrectly);
+  });
+}
+
 /* compute round stats */
 function finalizeRoundAndUpdateProfile(){
   const durationSec = Math.round((Date.now()-state.roundStartTime)/1000);
@@ -6711,8 +6767,31 @@ function finalizeRoundAndUpdateProfile(){
   let dailyGoalJustMet=false;
   let newlyUnlockedAchievements=[];
   let newlyUnlockedBonusCards=[];
+  let pageSetBonusAwarded = {amount:0, isNewPageSet:false};
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
+
+    const today = todayKey();
+    const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
+    if(isFlawless){
+      // zählt für die Flamme-Bedingung unten, unabhängig davon ob das
+      // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
+      prof.stats.lastFlawlessRoundDate = today;
+
+      if(!state.isHardWordsOnlyRound){
+        const pageSets = ensurePageSets(prof);
+        const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
+        if(!pageSets[key]){
+          const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
+          if(bonus>0){
+            state.roundTotalPoints += bonus;
+            pageSetBonusAwarded = {amount:bonus, isNewPageSet:true};
+          }
+          pageSets[key] = today;
+        }
+      }
+    }
+
     prof.stats.totalPoints += state.roundTotalPoints;
     prof.stats.totalTimeSec += durationSec;
     levelInfo = getLevelInfo(prof.stats.totalPoints);
@@ -6764,7 +6843,7 @@ function finalizeRoundAndUpdateProfile(){
     // updateStreak selbst ist am gleichen Tag ein No-op (lastActiveDate
     // bereits heute), daher unschädlich, wenn das Ziel in einer späteren
     // Runde desselben Tages erneut erreicht/überschritten wird.
-    if(goal.correctToday >= DAILY_GOAL_TARGET){
+    if(goal.correctToday >= DAILY_GOAL_TARGET && prof.stats.lastFlawlessRoundDate === today){
       const longestBeforeRound = ensureStreakObj(prof).longest;
       streakChanged = updateStreak(prof);
       const longestAfterRound = ensureStreakObj(prof).longest;
@@ -6805,7 +6884,8 @@ function finalizeRoundAndUpdateProfile(){
     newRecords,
     dailyGoalJustMet,
     newlyUnlockedAchievements,
-    newlyUnlockedBonusCards
+    newlyUnlockedBonusCards,
+    pageSetBonusAwarded
   };
 }
 
@@ -7299,6 +7379,7 @@ function startQuickRound(){
   state.currentBookKey = last.bookKey;
   state.selectedPages = validPages;
   state.direction = last.direction;
+  state.isHardWordsOnlyRound = false;
   renderVocabPickScreen();
   switchScreen("screen-learn");
   buildRoundCardsFromVocab();
@@ -7768,7 +7849,7 @@ function renderCurrentCard(){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
@@ -7828,6 +7909,12 @@ function showSummaryScreen(){
     banner.textContent=`📱 Bonuskarte freigeschaltet: ${BONUS_CARD_REWARD_TITLE} (bei ${bc.threshold} Flammen)!`;
     extraDiv.appendChild(banner);
   });
+  if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.amount>0){
+    const banner=document.createElement("div");
+    banner.className="highlight-banner pageset";
+    banner.textContent=`🎉 Neue Seiten-Kombination zum ersten Mal fehlerfrei geschafft! +${pageSetBonusAwarded.amount} Bonuspunkte`;
+    extraDiv.appendChild(banner);
+  }
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
     // mid-round toast too quickly to read it) -- no sound replay, that
@@ -7842,7 +7929,7 @@ function showSummaryScreen(){
   // things happen in the same round -- achievement/record beats a plain
   // level-up (level-up already played live in checkAnswer() the moment it
   // happened, this is just a reminder chime for whichever is most noteworthy)
-  if(newlyUnlockedAchievements.length>0 || newRecords.length>0 || newlyUnlockedBonusCards.length>0) playSound("achievement");
+  if(newlyUnlockedAchievements.length>0 || newRecords.length>0 || newlyUnlockedBonusCards.length>0 || pageSetBonusAwarded.isNewPageSet) playSound("achievement");
   else if(leveledUp) playSound("levelup");
 
   switchScreen("screen-summary");
@@ -7875,6 +7962,7 @@ function maybeRequeueCard(card){
     example:card.example, direction:card.direction,
     prompt:card.prompt, answer:card.answer,
     score:5, firstTry:true, done:false, attemptedWrong:false,
+    resolvedCorrectly:false,
     isRequeue:true
   });
 }
@@ -8050,6 +8138,7 @@ function checkAnswer(){
   if(good){
     // correct
     card.done=true;
+    card.resolvedCorrectly=true;
 
     // combo bonus for consecutive correct answers
     state.currentCombo++;
@@ -8500,6 +8589,7 @@ function setupEventListeners(){
       saveProfiles();
     }
     // start round
+    state.isHardWordsOnlyRound = false;
     switchScreen("screen-learn");
     buildRoundCardsFromVocab();
     renderCurrentCard();
@@ -8593,6 +8683,7 @@ function setupEventListeners(){
       pageId:h.pageId
     }));
     // We'll reuse current state.direction (unchanged)
+    state.isHardWordsOnlyRound = true; // never covers the full page selection -- excluded from the page-set bonus, see isRoundFullyCorrect()
     switchScreen("screen-learn");
     buildRoundCardsFromVocab();
     renderCurrentCard();
