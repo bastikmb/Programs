@@ -1246,10 +1246,14 @@ body.dark-theme .daily-goal-mini-banner {
 }
 
 
+/* Shown only on the splash screen, flanking the "Los geht's" pill --
+   see updateFloatingButtonsVisibility()/positionSplashFloatingButtons().
+   top/left are set by JS, not here: the pill is drawn inside a
+   responsively-scaled SVG, so its actual on-screen position shifts with
+   viewport size in a way fixed CSS offsets can't track. */
 #btn-floating-theme {
   position:fixed;
-  left:1rem;
-  bottom:calc(1rem + env(safe-area-inset-bottom));
+  display:none;
   z-index:9999;
   border:none;
   background:#1f2937;
@@ -1264,11 +1268,9 @@ body.dark-theme .daily-goal-mini-banner {
 #btn-floating-theme:active {
   transform:scale(0.97);
 }
-/* stacked directly above the theme toggle, same left edge */
 #btn-floating-sound {
   position:fixed;
-  left:1rem;
-  bottom:calc(1rem + 4.2rem + env(safe-area-inset-bottom));
+  display:none;
   z-index:9999;
   border:none;
   background:#1f2937;
@@ -1304,9 +1306,9 @@ body.dark-theme .daily-goal-mini-banner {
    this is a phone-first app; on an unrealistically wide desktop test
    window the bar is simply wider than the 900px-capped card, which is an
    acceptable trade-off for a screen size nobody actually uses the app
-   at). bottom matches .screen's own bottom padding, which already
-   reserves exactly this much clearance above the floating round buttons
-   (theme + sound, stacked bottom-left). */
+   at). bottom matches .screen's own bottom padding. (The floating round
+   theme/sound buttons no longer overlap any screen using this class --
+   they're shown only on the splash screen now.) */
 .btn-row-sticky {
   position:fixed;
   left:calc(1.5rem + env(safe-area-inset-left));
@@ -1925,7 +1927,7 @@ body.dark-theme .daily-goal-mini-banner {
     </div>
   </div>
 
-  <!-- LEADERBOARD SCREEN (cross-device "Vokabel-Bundesligatabelle" + Team-Tabelle, untereinander auf einer Seite) -->
+  <!-- LEADERBOARD SCREEN (cross-device "Vokabel-Bundesligatabelle") -->
   <div id="screen-leaderboard" class="screen">
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>⚽ Vokabel-Bundesligatabelle</span>
@@ -1935,7 +1937,14 @@ body.dark-theme .daily-goal-mini-banner {
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
-    <h2 id="teamTableHeading" style="margin-top:1.5rem;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+    <div class="btn-row btn-row-sticky">
+      <button id="btnLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
+  <!-- TEAM LEADERBOARD SCREEN (eigener Screen, getrennt von der individuellen Tabelle) -->
+  <div id="screen-team-leaderboard" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🏆 Team-Tabelle</span>
     </h2>
     <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
@@ -1943,7 +1952,7 @@ body.dark-theme .daily-goal-mini-banner {
     <div class="leaderboard-table" id="teamLeaderboardTableBody"></div>
 
     <div class="btn-row btn-row-sticky">
-      <button id="btnLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+      <button id="btnTeamLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
   </div>
 
@@ -5073,6 +5082,44 @@ function switchScreen(id){
   screens.forEach(s=>s.classList.remove("active"));
   const sc = document.getElementById(id);
   if(sc) sc.classList.add("active");
+  updateFloatingButtonsVisibility();
+}
+
+/* Theme/sound toggles are only shown on the splash screen (next to the
+   "Los geht's" pill), not floating over every internal screen where
+   they'd compete with a round in progress. */
+function updateFloatingButtonsVisibility(){
+  const themeBtn = document.getElementById("btn-floating-theme");
+  const soundBtn = document.getElementById("btn-floating-sound");
+  const splashEl = document.getElementById("screen-splash");
+  const onSplash = !!(splashEl && splashEl.classList.contains("active"));
+  themeBtn.style.display = onSplash ? "block" : "none";
+  soundBtn.style.display = onSplash ? "block" : "none";
+  if(onSplash) positionSplashFloatingButtons();
+}
+
+/* Places the two floating buttons directly left/right of the
+   "Los geht's" pill, vertically centered on it. Computed from the
+   pill's actual rendered bounding box rather than fixed CSS offsets,
+   because it's drawn inside a responsively-scaled SVG (viewBox 390x844,
+   width:100% clamped by max-height) -- its on-screen pixel position
+   shifts with viewport size/aspect ratio in a way no fixed value could
+   track. */
+function positionSplashFloatingButtons(){
+  const themeBtn = document.getElementById("btn-floating-theme");
+  const soundBtn = document.getElementById("btn-floating-sound");
+  const pill = document.getElementById("splashStartGroup");
+  if(!themeBtn || !soundBtn || !pill) return;
+  const rect = pill.getBoundingClientRect();
+  if(rect.width===0 || rect.height===0) return; // not laid out yet
+  const gap = 12;
+  const midY = rect.top + rect.height/2;
+  soundBtn.style.bottom = "auto";
+  soundBtn.style.left = Math.max(8, rect.left - gap - soundBtn.offsetWidth) + "px";
+  soundBtn.style.top = (midY - soundBtn.offsetHeight/2) + "px";
+  themeBtn.style.bottom = "auto";
+  themeBtn.style.left = (rect.right + gap) + "px";
+  themeBtn.style.top = (midY - themeBtn.offsetHeight/2) + "px";
 }
 
 /* Gating for the start screen's own "Weiter" button, which now only
@@ -5590,11 +5637,9 @@ async function renderTeamRankWidget(){
   tile.classList.add("show");
   tile.classList.remove("no-team");
   tile.onclick = ()=>{
-    state.backStackBeforeLeaderboard = "screen-start";
-    switchScreen("screen-leaderboard");
-    renderLeaderboardScreen();
-    const heading = document.getElementById("teamTableHeading");
-    if(heading) heading.scrollIntoView({behavior:"smooth", block:"start"});
+    state.backStackBeforeTeamLeaderboard = "screen-start";
+    switchScreen("screen-team-leaderboard");
+    renderTeamLeaderboardScreen();
   };
   const team = getTeamById(prof.team);
   if(!team) { tile.classList.remove("show"); return; } // defensive: team id no longer in TEAM_LIST
@@ -6830,8 +6875,6 @@ async function renderLeaderboardScreen(){
     statusEl.textContent = "📡 Keine Verbindung — Tabelle konnte nicht geladen werden.";
     statusEl.style.display="block";
   }
-
-  await renderTeamLeaderboardSection();
 }
 
 async function fetchLeaderboard(){
@@ -6900,13 +6943,13 @@ function renderLeaderboardRows(rows, prof){
   });
 }
 
-/* Team-Tabelle-Abschnitt auf derselben Seite wie die individuelle
-   Bundesligatabelle (siehe renderLeaderboardScreen(), das diese Funktion
-   am Ende aufruft) -- gleiches Lade-/Fehler-Muster, aber eigener Fetch
-   über fetchAllTeamMembers() (nicht das gedeckelte/sortierte
-   fetchLeaderboard()), da ein Team-Aggregat jedes Mitglied braucht, nicht
-   nur die individuellen Top 50. */
-async function renderTeamLeaderboardSection(){
+/* Eigener Team-Tabelle-Screen (getrennt von der individuellen
+   Bundesligatabelle, siehe renderLeaderboardScreen()) -- gleiches
+   Lade-/Fehler-Muster, aber eigener Fetch über fetchAllTeamMembers()
+   (nicht das gedeckelte/sortierte fetchLeaderboard()), da ein
+   Team-Aggregat jedes Mitglied braucht, nicht nur die individuellen
+   Top 50. */
+async function renderTeamLeaderboardScreen(){
   const statusEl = document.getElementById("teamLeaderboardStatusNote");
   const bodyEl = document.getElementById("teamLeaderboardTableBody");
   bodyEl.innerHTML = "";
@@ -6924,7 +6967,7 @@ async function renderTeamLeaderboardSection(){
     statusEl.style.display="none";
     renderTeamLeaderboardRows(rows);
   } catch(e){
-    console.error("renderTeamLeaderboardSection error", e);
+    console.error("renderTeamLeaderboardScreen error", e);
     statusEl.textContent = "📡 Keine Verbindung — Team-Tabelle konnte nicht geladen werden.";
     statusEl.style.display="block";
   }
@@ -8541,6 +8584,28 @@ function setupEventListeners(){
       renderStatsScreen();
     }
   });
+
+  document.getElementById("btnTeamLeaderboardBack").addEventListener("click", ()=>{
+    const target=state.backStackBeforeTeamLeaderboard || "screen-start";
+    switchScreen(target);
+    if(target==="screen-start"){
+      renderStartScreen();
+    } else if(target==="screen-bookpages"){
+      renderBookPageScreen();
+    } else if(target==="screen-vocab-add"){
+      renderVocabAddScreen();
+    } else if(target==="screen-vocabpick"){
+      renderVocabPickScreen();
+    } else if(target==="screen-direction"){
+      renderDirectionScreen();
+    } else if(target==="screen-learn"){
+      renderCurrentCard();
+    } else if(target==="screen-summary"){
+      // summary already rendered
+    } else if(target==="screen-stats"){
+      renderStatsScreen();
+    }
+  });
 }
 
 /* ===========================================================
@@ -8580,6 +8645,11 @@ function initApp(){
   initHeroBanner();
   renderStartScreen();
   setupEventListeners();
+  updateFloatingButtonsVisibility(); // splash is the default active screen, but switchScreen() (which normally triggers this) is never called for it
+  window.addEventListener("resize", ()=>{
+    const splashEl = document.getElementById("screen-splash");
+    if(splashEl && splashEl.classList.contains("active")) positionSplashFloatingButtons();
+  });
 }
 
 /* ===========================================================
