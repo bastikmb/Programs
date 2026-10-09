@@ -732,9 +732,8 @@ body.dark-theme .stat-tile.at-risk {
   cursor:pointer;
 }
 
-/* bonus-card progress tile -- only shown while no card is currently
-   available to redeem (see renderBonusProgressTile); the rich redeem UI
-   in #bonusCardsBlock takes over once one actually is */
+/* bonus-card progress tile -- teaser only, opens screen-bonus-cards on
+   click for the actual redeem UI/history (see renderBonusProgressTile) */
 .bonus-progress-tile {
   flex-direction:row;
   align-items:center;
@@ -1589,15 +1588,6 @@ body.dark-theme .daily-goal-mini-banner {
 
     <div id="bonusProgressTile" class="stat-tile bonus-progress-tile"></div>
 
-    <div id="bonusCardsBlock" class="bonus-cards-block" style="display:none;">
-      <div class="section-title">🎁 Bonuskarten</div>
-      <div id="bonusCardsAvailable" class="bonus-card-list"></div>
-      <div id="bonusCardsHistorySection" style="display:none;margin-top:0.5rem;">
-        <div class="stat-tile-sub" style="margin-bottom:0.4rem;">Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</div>
-        <div id="bonusCardsRedeemedList" class="bonus-card-list"></div>
-      </div>
-    </div>
-
     <div class="btn-row btn-row-sticky">
       <button id="btnStartToLanguage" class="btn" disabled>Weiter ➡</button>
     </div>
@@ -1953,6 +1943,26 @@ body.dark-theme .daily-goal-mini-banner {
 
     <div class="btn-row btn-row-sticky">
       <button id="btnTeamLeaderboardBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
+  <!-- BONUS CARDS SCREEN (eigener Screen, öffnet beim Klick auf die Bonuskarten-Kachel auf der Startseite) -->
+  <div id="screen-bonus-cards" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>🎁 Bonuskarten</span>
+    </h2>
+    <div class="section-sub" style="margin-bottom:1rem;">Bei jeder 3er-Schwelle der Lernserie gibt's eine neue Bonuskarte. Zeig sie deinen Eltern, um sie einzulösen.</div>
+
+    <div id="bonusCardsAvailable" class="bonus-card-list"></div>
+
+    <div style="margin-top:1rem;">
+      <div class="stat-tile-sub" style="margin-bottom:0.4rem;">Eingelöste Bonuskarten (<span id="bonusCardsRedeemedCount">0</span>)</div>
+      <div id="bonusCardsRedeemedList" class="bonus-card-list"></div>
+      <div id="bonusCardsRedeemedEmpty" class="stat-tile-sub" style="display:none;">Noch keine Bonuskarte eingelöst.</div>
+    </div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnBonusCardsBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
   </div>
 
@@ -5942,15 +5952,14 @@ function redeemBonusCard(threshold){
   if(!confirm(`Bonuskarte (${BONUS_CARD_REWARD_TITLE}, ${threshold} Flammen) jetzt als eingelöst markieren? Das kann danach nicht mehr zurückgenommen werden.`)) return;
   ensureBonusCards(prof).redeemed[threshold] = new Date().toISOString();
   saveProfiles();
-  renderBonusCardsBlock();
+  renderBonusCardsScreen();
   renderBonusProgressTile(prof);
 }
 
-/* Compact "how close to the next card" tile in the stat grid -- only
-   shown while nothing is currently available to redeem (available.length
-   === 0), so it never competes with the rich redeem UI in
-   #bonusCardsBlock below for the same message; once a card becomes
-   available this tile just hides and that block takes over. */
+/* Compact tile in the start screen's stat grid -- always just a teaser
+   (progress bar, or "X Karte(n) verfügbar") that opens the dedicated
+   screen-bonus-cards screen on click. The actual redeem UI and history
+   live only there now, not expanded inline on the start screen. */
 function renderBonusProgressTile(prof){
   const tile = document.getElementById("bonusProgressTile");
   if(!prof){
@@ -5959,52 +5968,58 @@ function renderBonusProgressTile(prof){
   }
   const {available} = getBonusCardThresholds(prof);
   if(available.length>0){
-    tile.classList.remove("show");
-    return;
+    tile.innerHTML = `
+      <span style="font-size:1.2rem;">🎁</span>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-tile-head">${available.length} Bonuskarte${available.length===1?"":"n"} verfügbar!</div>
+        <div class="stat-tile-sub">Antippen zum Einlösen</div>
+      </div>
+    `;
+  } else {
+    const {remaining, pct} = getNextBonusCardProgress(prof);
+    tile.innerHTML = `
+      <span style="font-size:1.2rem;">🎁</span>
+      <div style="flex:1;min-width:0;">
+        <div class="stat-tile-head" style="margin-bottom:0.3rem;">Nächste Bonuskarte: noch ${remaining} Flamme${remaining===1?"":"n"} 🔥</div>
+        <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
+      </div>
+    `;
   }
-  const {remaining, pct} = getNextBonusCardProgress(prof);
-  tile.innerHTML = `
-    <span style="font-size:1.2rem;">🎁</span>
-    <div style="flex:1;min-width:0;">
-      <div class="stat-tile-head" style="margin-bottom:0.3rem;">Nächste Bonuskarte: noch ${remaining} Flamme${remaining===1?"":"n"} 🔥</div>
-      <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
-    </div>
-  `;
   tile.classList.add("show");
   tile.style.cursor = "pointer";
   tile.onclick = ()=>{
-    state.showRedeemedBonusCards = true;
-    renderBonusCardsBlock();
+    state.backStackBeforeBonusCards = "screen-start";
+    switchScreen("screen-bonus-cards");
+    renderBonusCardsScreen();
   };
 }
 
-/* Shown directly under the streak badge, not on a separate screen --
-   this is deliberately a parent-facing moment (the child shows/screenshots
-   the card for a parent), so it sits where it's fastest to reach, right
-   next to the streak data that drives it. The timestamp on an unredeemed
-   card ticks live every second (self-cleaning once screen-start isn't
-   active anymore) so a parent glancing at it always sees "right now", not
-   the frozen moment the threshold was unlocked. */
-function renderBonusCardsBlock(){
+/* Dedicated detail screen for bonus cards (opened via bonusProgressTile
+   on the start screen, see above) -- a deliberate navigation, not an
+   inline expand, so a parent reading along doesn't have the start
+   screen's layout shift under them. The timestamp on an unredeemed card
+   ticks live every second (self-cleaning once this screen isn't active
+   anymore) so a parent glancing at it always sees "right now", not the
+   frozen moment the threshold was unlocked. */
+function renderBonusCardsScreen(){
   if(state.bonusCardTimestampInterval){
     clearInterval(state.bonusCardTimestampInterval);
     state.bonusCardTimestampInterval=null;
   }
-  const block = document.getElementById("bonusCardsBlock");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    block.style.display="none";
-    return;
-  }
-  const {available, redeemed} = getBonusCardThresholds(prof);
-  if(available.length===0 && redeemed.length===0){
-    block.style.display="none";
-    return;
-  }
-  block.style.display="block";
-
   const availDiv = document.getElementById("bonusCardsAvailable");
-  availDiv.innerHTML="";
+  const redeemedListDiv = document.getElementById("bonusCardsRedeemedList");
+  const redeemedEmpty = document.getElementById("bonusCardsRedeemedEmpty");
+  availDiv.innerHTML = "";
+  redeemedListDiv.innerHTML = "";
+  if(!prof){
+    document.getElementById("bonusCardsRedeemedCount").textContent = "0";
+    redeemedEmpty.style.display = "block";
+    return;
+  }
+
+  const {available, redeemed} = getBonusCardThresholds(prof);
+
   available.forEach(({threshold})=>{
     const card=document.createElement("div");
     card.className="bonus-card";
@@ -6021,32 +6036,28 @@ function renderBonusCardsBlock(){
     card.appendChild(btn);
     availDiv.appendChild(card);
   });
-
-  const histSection = document.getElementById("bonusCardsHistorySection");
-  const redeemedListDiv = document.getElementById("bonusCardsRedeemedList");
-  redeemedListDiv.innerHTML="";
-  if(redeemed.length>0 && state.showRedeemedBonusCards){
-    histSection.style.display="block";
-    document.getElementById("bonusCardsRedeemedCount").textContent=String(redeemed.length);
-    redeemed.sort((a,b)=>b.threshold-a.threshold).forEach(({threshold, redeemedAt})=>{
-      const card=document.createElement("div");
-      card.className="bonus-card redeemed";
-      card.innerHTML = `
-        <div class="bonus-card-icon">📱</div>
-        <div class="bonus-card-title">${BONUS_CARD_REWARD_TITLE}</div>
-        <div class="bonus-card-sub">War bei ${threshold} Flammen freigeschaltet</div>
-        <div class="bonus-card-timestamp">✅ Eingelöst am ${formatGermanDateTime(new Date(redeemedAt))}</div>
-      `;
-      redeemedListDiv.appendChild(card);
-    });
-  } else {
-    histSection.style.display="none";
+  if(available.length===0){
+    availDiv.innerHTML = "<div class='stat-tile-sub'>Gerade keine Bonuskarte verfügbar.</div>";
   }
+
+  document.getElementById("bonusCardsRedeemedCount").textContent = String(redeemed.length);
+  redeemedEmpty.style.display = redeemed.length===0 ? "block" : "none";
+  redeemed.sort((a,b)=>b.threshold-a.threshold).forEach(({threshold, redeemedAt})=>{
+    const card=document.createElement("div");
+    card.className="bonus-card redeemed";
+    card.innerHTML = `
+      <div class="bonus-card-icon">📱</div>
+      <div class="bonus-card-title">${BONUS_CARD_REWARD_TITLE}</div>
+      <div class="bonus-card-sub">War bei ${threshold} Flammen freigeschaltet</div>
+      <div class="bonus-card-timestamp">✅ Eingelöst am ${formatGermanDateTime(new Date(redeemedAt))}</div>
+    `;
+    redeemedListDiv.appendChild(card);
+  });
 
   if(available.length>0){
     state.bonusCardTimestampInterval = setInterval(()=>{
-      const startScr = document.getElementById("screen-start");
-      if(!startScr || !startScr.classList.contains("active")){
+      const scr = document.getElementById("screen-bonus-cards");
+      if(!scr || !scr.classList.contains("active")){
         clearInterval(state.bonusCardTimestampInterval);
         state.bonusCardTimestampInterval=null;
         return;
@@ -7105,7 +7116,6 @@ function renderProfilesScreen(){
 function renderStartScreen(){
   applyProfileTheme();
   renderStreakBadge();
-  renderBonusCardsBlock();
   const prof = getCurrentProfileObj();
   renderBonusProgressTile(prof);
   renderLevelBadge();
@@ -8587,6 +8597,28 @@ function setupEventListeners(){
 
   document.getElementById("btnTeamLeaderboardBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeTeamLeaderboard || "screen-start";
+    switchScreen(target);
+    if(target==="screen-start"){
+      renderStartScreen();
+    } else if(target==="screen-bookpages"){
+      renderBookPageScreen();
+    } else if(target==="screen-vocab-add"){
+      renderVocabAddScreen();
+    } else if(target==="screen-vocabpick"){
+      renderVocabPickScreen();
+    } else if(target==="screen-direction"){
+      renderDirectionScreen();
+    } else if(target==="screen-learn"){
+      renderCurrentCard();
+    } else if(target==="screen-summary"){
+      // summary already rendered
+    } else if(target==="screen-stats"){
+      renderStatsScreen();
+    }
+  });
+
+  document.getElementById("btnBonusCardsBack").addEventListener("click", ()=>{
+    const target=state.backStackBeforeBonusCards || "screen-start";
     switchScreen(target);
     if(target==="screen-start"){
       renderStartScreen();
