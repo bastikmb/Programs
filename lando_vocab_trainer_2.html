@@ -927,46 +927,36 @@ body.dark-theme .level-up-banner {
   font-weight:700;
   font-size:0.95rem;
   animation:levelUpPop 0.5s cubic-bezier(.34,1.56,.64,1);
+  /* each .highlight-banner.<variant> rule below only needs to set these
+     four custom properties -- the gradient/border/color plumbing itself
+     lives here once instead of being repeated per variant+theme pair */
+  background:linear-gradient(135deg,var(--banner-c1),var(--banner-c2));
+  border:1px solid var(--banner-border);
+  color:var(--banner-text);
 }
 .highlight-banner.record {
-  background:linear-gradient(135deg,#fef9c3,#fde68a);
-  border:1px solid #f59e0b;
-  color:#92400e;
+  --banner-c1:#fef9c3; --banner-c2:#fde68a; --banner-border:#f59e0b; --banner-text:#92400e;
 }
 body.dark-theme .highlight-banner.record {
-  background:linear-gradient(135deg,#3a2f0d,#4a3a10);
-  border-color:#d97706;
-  color:#fcd34d;
+  --banner-c1:#3a2f0d; --banner-c2:#4a3a10; --banner-border:#d97706; --banner-text:#fcd34d;
 }
 .highlight-banner.achievement {
-  background:linear-gradient(135deg,#ede9fe,#ddd6fe);
-  border:1px solid #8b5cf6;
-  color:#5b21b6;
+  --banner-c1:#ede9fe; --banner-c2:#ddd6fe; --banner-border:#8b5cf6; --banner-text:#5b21b6;
 }
 body.dark-theme .highlight-banner.achievement {
-  background:linear-gradient(135deg,#2e1065,#3b1a7a);
-  border-color:#8b5cf6;
-  color:#ddd6fe;
+  --banner-c1:#2e1065; --banner-c2:#3b1a7a; --banner-border:#8b5cf6; --banner-text:#ddd6fe;
 }
 .highlight-banner.bonuscard {
-  background:linear-gradient(135deg,#dbeafe,#bfdbfe);
-  border:1px solid #3b82f6;
-  color:#1e3a8a;
+  --banner-c1:#dbeafe; --banner-c2:#bfdbfe; --banner-border:#3b82f6; --banner-text:#1e3a8a;
 }
 body.dark-theme .highlight-banner.bonuscard {
-  background:linear-gradient(135deg,#1e2f5c,#1e3a73);
-  border-color:#3b82f6;
-  color:#bfdbfe;
+  --banner-c1:#1e2f5c; --banner-c2:#1e3a73; --banner-border:#3b82f6; --banner-text:#bfdbfe;
 }
 .highlight-banner.pageset {
-  background:linear-gradient(135deg,#fce7f3,#fbcfe8);
-  border:1px solid #ec4899;
-  color:#9d174d;
+  --banner-c1:#fce7f3; --banner-c2:#fbcfe8; --banner-border:#ec4899; --banner-text:#9d174d;
 }
 body.dark-theme .highlight-banner.pageset {
-  background:linear-gradient(135deg,#4a0f2e,#5c1538);
-  border-color:#ec4899;
-  color:#fbcfe8;
+  --banner-c1:#4a0f2e; --banner-c2:#5c1538; --banner-border:#ec4899; --banner-text:#fbcfe8;
 }
 /* neutral informational banner (e.g. the one-time "you're now in the
    leaderboard" notice) -- not a celebration, so no pop animation */
@@ -5166,6 +5156,36 @@ function createProfile(name){
   return state.profiles[n];
 }
 
+/* Defensive against a hand-edited or corrupted "Daten sichern" backup file
+   (see the importFileInput handler) -- fills in any missing stats
+   sub-objects with the same defaults createProfile() uses above, so a
+   later read like prof.stats.wrongCounts[key] can't throw just because an
+   older or malformed backup predates that field. */
+function sanitizeImportedProfile(raw){
+  if(typeof raw !== "object" || raw===null) raw = {};
+  const stats = (typeof raw.stats === "object" && raw.stats!==null) ? raw.stats : {};
+  const obj = o => (typeof o === "object" && o!==null) ? o : {};
+  return {
+    ...raw,
+    stats: {
+      ...stats,
+      totalPoints: Number(stats.totalPoints) || 0,
+      totalTimeSec: Number(stats.totalTimeSec) || 0,
+      wrongCounts: obj(stats.wrongCounts),
+      correctCounts: obj(stats.correctCounts),
+      correctByDirection: {deToEn:{}, enToDe:{}, ...obj(stats.correctByDirection)},
+      streak: {current:0, longest:0, lastActiveDate:null, ...obj(stats.streak)},
+      records: {fastestRoundSec:null, fastestRoundWordCount:0, highestCombo:0,
+        bestFirstTryPct:0, mostPointsInRound:0, ...obj(stats.records)},
+      dailyGoal: {date:null, correctToday:0, ...obj(stats.dailyGoal)},
+      achievements: {unlocked:{}, ...obj(stats.achievements)},
+      bonusCards: {redeemed:{}, ...obj(stats.bonusCards)},
+      roundsCompleted: Number(stats.roundsCompleted) || 0,
+      totalCorrectAnswersEver: Number(stats.totalCorrectAnswersEver) || 0
+    }
+  };
+}
+
 /* ===========================================================
    HELPERS
    =========================================================== */
@@ -5186,6 +5206,17 @@ function switchScreen(id){
 function goToScreen(id, renderFn){
   switchScreen(id);
   if(renderFn) renderFn();
+}
+
+/* Forces a CSS reflow between removing and re-adding a CSS class, so a
+   pop/blink/combo animation actually restarts even when the class was
+   already present a moment ago (just toggling a class the browser still
+   considers "on" doesn't replay its animation). Used by every banner/
+   indicator that can be triggered again within the same screen. */
+function pulseElement(el, className){
+  el.classList.remove(className);
+  void el.offsetWidth; // force reflow so the animation replays
+  el.classList.add(className);
 }
 
 /* Theme/sound toggles are only shown on the splash screen (next to the
@@ -5874,18 +5905,14 @@ async function renderTeamRankWidget(){
 function showLevelUpBannerInRound(levelInfo){
   const el = document.getElementById("learnLevelUpBanner");
   el.textContent = `🎉 Level Up! Jetzt Level ${levelInfo.level} – ${levelInfo.title}!`;
-  el.classList.remove("level-up-banner");
-  void el.offsetWidth; // force reflow so the pop animation replays
-  el.classList.add("level-up-banner");
+  pulseElement(el, "level-up-banner");
   el.style.display="block";
 }
 
 function showDailyGoalBannerInRound(){
   const el = document.getElementById("learnDailyGoalBanner");
   el.textContent = `🎯 Tagesziel erreicht! ${DAILY_GOAL_TARGET}/${DAILY_GOAL_TARGET} heute!`;
-  el.classList.remove("daily-goal-mini-banner");
-  void el.offsetWidth; // force reflow so the pop animation replays
-  el.classList.add("daily-goal-mini-banner");
+  pulseElement(el, "daily-goal-mini-banner");
   el.style.display="block";
 }
 
@@ -6079,10 +6106,13 @@ function renderTeamPicker(){
    COMBO-BONUS (Belohnung für mehrere richtige Antworten in Folge)
    =========================================================== */
 
+const COMBO_BONUS_MIN_STREAK = 2; // first correct answer in a row never scores a bonus
+const COMBO_BONUS_CAP = 5; // so long rounds don't let the bonus dwarf the base points
+
 function comboBonusForStreak(combo){
   // no bonus for the first correct answer in a row, then it scales up gently
-  // (capped at +5 so long rounds don't let the bonus dwarf the base points)
-  return combo>=2 ? Math.min(combo-1, 5) : 0;
+  // (capped so long rounds don't let the bonus dwarf the base points)
+  return combo>=COMBO_BONUS_MIN_STREAK ? Math.min(combo-1, COMBO_BONUS_CAP) : 0;
 }
 
 function updateComboIndicator(){
@@ -6091,9 +6121,7 @@ function updateComboIndicator(){
     const bonus = comboBonusForStreak(state.currentCombo);
     el.textContent = `🔥 ${state.currentCombo}er-Combo! +${bonus} Bonus`;
     el.style.display="block";
-    el.classList.remove("combo-pop");
-    void el.offsetWidth;
-    el.classList.add("combo-pop");
+    pulseElement(el, "combo-pop");
   } else {
     el.style.display="none";
   }
@@ -6936,8 +6964,10 @@ function evaluateDailyGoalAndStreak(prof, today){
   return {dailyGoalJustMet, streakChanged, newlyUnlockedBonusCards};
 }
 
+const MAX_ROUND_DURATION_SEC = 7200; // 2h -- a round genuinely in progress never takes this long; a larger gap means the tab sat inactive/in the background (e.g. overnight) and shouldn't inflate totalTimeSec
+
 function finalizeRoundAndUpdateProfile(){
-  const durationSec = Math.round((Date.now()-state.roundStartTime)/1000);
+  const durationSec = Math.min(MAX_ROUND_DURATION_SEC, Math.round((Date.now()-state.roundStartTime)/1000));
   // Requeued retry cards (see maybeRequeueCard) are a second shot at a word
   // already represented by its original card, so they're excluded here --
   // otherwise a corrected retry would dilute firstTryPct/wrongCounts/
@@ -7323,8 +7353,25 @@ function renderTeamLeaderboardRows(rows){
     });
     bodyEl.appendChild(membersDiv);
 
-    row.addEventListener("click", ()=>{
-      membersDiv.style.display = membersDiv.style.display==="none" ? "block" : "none";
+    // keyboard/screen-reader support for expanding the member list --
+    // same role/tabindex/keydown shape as makeTileAccessible(), spelled
+    // out here since this is a plain row, not one of the "stat tile"
+    // elements that helper targets
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-expanded", "false");
+    row.setAttribute("aria-label", `${entry.team.name}, Mitglieder anzeigen`);
+    const toggleMembers = ()=>{
+      const nowOpen = membersDiv.style.display==="none";
+      membersDiv.style.display = nowOpen ? "block" : "none";
+      row.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+    };
+    row.addEventListener("click", toggleMembers);
+    row.addEventListener("keydown", (e)=>{
+      if(e.key==="Enter" || e.key===" "){
+        e.preventDefault();
+        toggleMembers();
+      }
     });
   });
 }
@@ -8053,7 +8100,7 @@ function showSummaryScreen(){
   const levelBanner = document.getElementById("levelUpBanner");
   if(leveledUp && levelInfo){
     levelBanner.innerHTML = `🎉 Level Up! Du bist jetzt Level ${levelInfo.level} – ${levelInfo.title}!`;
-    levelBanner.classList.remove("level-up-banner"); void levelBanner.offsetWidth; levelBanner.classList.add("level-up-banner");
+    pulseElement(levelBanner, "level-up-banner");
     levelBanner.style.display="block";
   } else {
     levelBanner.style.display="none";
@@ -8298,6 +8345,11 @@ function showContinueOverlay(message, kind, example, onContinue){
   overlay.focus();
 }
 
+// fraction of the target word's length a wrong answer's Levenshtein
+// distance may be within to still count as "close" (gentler feedback
+// message) rather than "far off" -- see checkAnswer() below
+const ANSWER_CLOSE_THRESHOLD_RATIO = 0.3;
+
 function checkAnswer(){
   const card = state.roundCards[state.roundIndex];
   const inputVal=document.getElementById("answerInput").value;
@@ -8328,9 +8380,7 @@ function checkAnswer(){
     // actively counting up with each correct answer.
     const totalPointsEl = document.getElementById("learnTotalPoints");
     totalPointsEl.textContent = "Gesamt: "+state.roundTotalPoints;
-    totalPointsEl.classList.remove("combo-pop");
-    void totalPointsEl.offsetWidth; // force reflow so the pop animation replays
-    totalPointsEl.classList.add("combo-pop");
+    pulseElement(totalPointsEl, "combo-pop");
 
     // Mid-round level-up check (see roundStartTotalPoints/roundLevelAtStart
     // in buildRoundCardsFromVocab): the profile itself isn't updated until
@@ -8360,9 +8410,7 @@ function checkAnswer(){
 
     // blink effect
     const area=document.getElementById("learnCardArea");
-    area.classList.remove("correct-blink");
-    void area.offsetWidth; // force reflow
-    area.classList.add("correct-blink");
+    pulseElement(area, "correct-blink");
 
     // show success message + example sentence in an overlay the child has
     // to actively dismiss, instead of a fixed pause that hid it again
@@ -8389,7 +8437,7 @@ function checkAnswer(){
     // friendly feedback based on how close the answer was
     const target = pickDisplayAlternative(correct, inputVal);
     const dist = levenshtein(normalizeForMatch(inputVal), normalizeForMatch(target));
-    const closeThreshold = Math.max(1, Math.round(normalizeForMatch(target).length*0.3));
+    const closeThreshold = Math.max(1, Math.round(normalizeForMatch(target).length*ANSWER_CLOSE_THRESHOLD_RATIO));
     if(dist<=closeThreshold){
       showAnswerFeedback(pickRandom(CLOSE_MESSAGES), "close");
     } else {
@@ -8526,7 +8574,8 @@ function setupEventListeners(){
         const importedCustomBooks = isNewFormat ? (imported.customBooks||{}) : {};
 
         for(const name of Object.keys(importedProfiles)){
-          state.profiles[name] = importedProfiles[name];
+          if(RESERVED_PROFILE_NAMES.includes(name)) continue; // skip rather than fail the whole import
+          state.profiles[name] = sanitizeImportedProfile(importedProfiles[name]);
         }
         saveProfiles();
 
@@ -8925,6 +8974,53 @@ function initApp(){
     if(splashEl && splashEl.classList.contains("active")) positionSplashFloatingButtons();
   });
 }
+
+/* ===========================================================
+   GLOBAL ERROR HANDLER (safety net)
+   =========================================================== */
+
+/* Every localStorage/Firebase call already has its own try/catch, but an
+   uncaught error anywhere else (e.g. inside a render function) previously
+   left the child looking at a frozen, unresponsive screen with no
+   explanation and no way forward except guessing to reload. This is just
+   a last-resort net, not a replacement for the specific try/catch blocks
+   elsewhere. */
+let fatalErrorOverlayShown = false;
+function showFatalErrorOverlay(){
+  if(fatalErrorOverlayShown) return;
+  fatalErrorOverlayShown = true;
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:1.5rem;";
+  const box = document.createElement("div");
+  box.style.cssText = "background:#fff;color:#111;border-radius:16px;padding:1.5rem;max-width:22rem;text-align:center;font-family:inherit;box-shadow:0 10px 30px rgba(0,0,0,0.3);";
+  const title = document.createElement("div");
+  title.style.cssText = "font-size:1.4rem;margin-bottom:0.6rem;font-weight:700;";
+  title.textContent = "😵 Huch, da ist etwas schiefgelaufen";
+  const text = document.createElement("div");
+  text.style.cssText = "margin-bottom:1rem;font-size:0.95rem;";
+  text.textContent = "Keine Sorge, dein bisheriger Fortschritt ist gespeichert. Bitte lade die Seite einmal neu.";
+  const btn = document.createElement("button");
+  btn.textContent = "🔄 Neu laden";
+  btn.style.cssText = "padding:0.7rem 1.2rem;border-radius:10px;border:none;background:#2563eb;color:#fff;font-weight:700;font-size:1rem;cursor:pointer;";
+  btn.addEventListener("click", ()=>location.reload());
+  box.appendChild(title);
+  box.appendChild(text);
+  box.appendChild(btn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+window.addEventListener("error", (e)=>{
+  // resource load errors (e.g. a missing book cover image) also fire this
+  // event, but with the failing element as e.target instead of window --
+  // only react to an actual uncaught script error here
+  if(e.target && e.target !== window) return;
+  console.error("Unhandled error", e.error || e.message);
+  showFatalErrorOverlay();
+});
+window.addEventListener("unhandledrejection", (e)=>{
+  console.error("Unhandled promise rejection", e.reason);
+  showFatalErrorOverlay();
+});
 
 /* ===========================================================
    RUN INIT + TEST ASSERTS
