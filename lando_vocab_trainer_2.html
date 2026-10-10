@@ -6754,9 +6754,9 @@ const ACHIEVEMENTS = [
   {id:"hattrick", icon:"🎩", title:"Hattrick", desc:"3 perfekte Runden direkt hintereinander",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=3,
     progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:3})},
-  {id:"full_book_mastery", icon:"🧠", title:"Vollbesetzt", desc:"Alle Wörter eines Buches auf höchster Leitner-Box",
+  {id:"full_book_mastery", icon:"🧠", title:"Vollbesetzt", desc:"Jedes Wort eines Buches wirklich auswendig gelernt",
     check:(p,ctx)=>Object.keys({...BOOKS, ...customBooks}).some(bk=>isBookFullyMastered(p, bk))},
-  {id:"globetrotter", icon:"🌍", title:"Weltenbummler", desc:"10 verschiedene Seiten-Sets abgeschlossen",
+  {id:"globetrotter", icon:"🌍", title:"Weltenbummler", desc:"10 verschiedene Seiten fehlerfrei gelernt",
     check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=10,
     progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:10})},
   {id:"bookworm", icon:"📚", title:"Bücherwurm", desc:"In 3 verschiedenen Büchern gespielt",
@@ -6772,14 +6772,14 @@ const ACHIEVEMENTS = [
       const done = langs.filter(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]).length;
       return {current:done, target:langs.length||1};
     }},
-  {id:"catchup_pro", icon:"🔁", title:"Nachhol-Profi", desc:"20 Wörter über Schwierige Wörter/Fällige Wiederholungen nachträglich korrigiert",
+  {id:"catchup_pro", icon:"🔁", title:"Nachhol-Profi", desc:"20 schwierige Wörter beim Üben später doch noch richtig hinbekommen",
     check:(p,ctx)=>(p.stats.catchUpWordsCount||0)>=20,
     progress:p=>({current:p.stats.catchUpWordsCount||0, target:20})},
   {id:"comeback_pause", icon:"🌅", title:"Wiedereinstieg", desc:"Nach mindestens 7 Tagen Pause wieder gelernt",
     check:(p,ctx)=>ctx.gapDaysSinceLastActive!=null && ctx.gapDaysSinceLastActive>=7},
   {id:"teamplayer", icon:"🤝", title:"Teamplayer", desc:"Einem Team beigetreten",
     check:(p,ctx)=>!!p.team},
-  {id:"ballon_dor", icon:"🏅", title:"Ballon D'or", desc:"Alle Bücher einer Sprache vollständig auf höchster Leitner-Box",
+  {id:"ballon_dor", icon:"🏅", title:"Ballon D'or", desc:"Jedes Wort in allen Büchern einer Sprache wirklich auswendig gelernt",
     check:(p,ctx)=>getAvailableLanguages().some(l=>isLanguageFullyMastered(p, l))}
 ];
 
