@@ -1912,6 +1912,7 @@ body.dark-theme .daily-goal-mini-banner {
         <div><span class="muted">Serie:</span> <span id="sumStreak" class="bold">–</span></div>
         <div><span class="muted">Bester Combo:</span> <span id="sumBestCombo" class="bold">–</span></div>
         <div><span class="muted">Combo-Bonus:</span> <span id="sumComboBonus" class="bold">+0</span></div>
+        <div><span class="muted">Perfekte Runde:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
       </div>
     </div>
 
@@ -5520,6 +5521,7 @@ function ensurePendingPageSetWords(prof){
 }
 
 const PAGESET_BONUS_RATIO = 0.5; // +50% der in der Runde erzielten Punkte
+const PERFECT_ROUND_BONUS = 5; // bei JEDER Runde ohne Skip/Aufdecken, nicht nur bei neuen Seiten-Sets
 
 function getBonusCardThresholds(prof){
   const longest = (prof.stats.streak && prof.stats.streak.longest) || 0;
@@ -6538,6 +6540,20 @@ function computePageProgressByDirection(pageId){
   return { deToEn: pctFor(byDir.deToEn||{}), enToDe: pctFor(byDir.enToDe||{}) };
 }
 
+/* Alternative zur klassischen "eine Runde komplett fehlerfrei"-Regel in
+   applyPageSetBonus: eine Seiten-Kombination gilt auch als abgeschlossen,
+   wenn jede ihrer Seiten laut computePageProgressByDirection in BEIDEN
+   Richtungen bereits bei 100% steht -- jedes Wort wurde dann irgendwann
+   schon mal auf Anhieb richtig beantwortet, nur eben nicht zwingend alle
+   in derselben, einzigen Runde. */
+function isPageSetWordProgressComplete(selectedPages){
+  if(!selectedPages || selectedPages.length===0) return false;
+  return selectedPages.every(pageId=>{
+    const pct = computePageProgressByDirection(pageId);
+    return !!pct && pct.deToEn===100 && pct.enToDe===100;
+  });
+}
+
 /* ===========================================================
    ACHIEVEMENTS
    =========================================================== */
@@ -7135,9 +7151,8 @@ function isRoundFullyCorrect(originalCards, allRoundCards){
    evaluateDailyGoalAndStreak below). Mutates state.roundTotalPoints
    in-place when a bonus is awarded, so prof.stats.totalPoints must only be
    credited with state.roundTotalPoints AFTER this call returns. */
-function applyPageSetBonus(prof, originalCards, today){
-  let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0};
-  const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
+function applyPageSetBonus(prof, originalCards, today, isFlawless){
+  let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0, viaProgress:false};
 
   // zählt für die Flamme-Bedingung unten, unabhängig davon ob das
   // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
@@ -7148,26 +7163,40 @@ function applyPageSetBonus(prof, originalCards, today){
     // Seiten-Set ab, können aber einzelne zuvor offene Wörter nachholen.
     const newlyCompleted = clearPendingBadWords(prof, originalCards, today);
     if(newlyCompleted.length>0){
-      pageSetBonusAwarded = {amount:0, isNewPageSet:true, catchUpCount:newlyCompleted.length};
+      pageSetBonusAwarded = {amount:0, isNewPageSet:true, catchUpCount:newlyCompleted.length, viaProgress:false};
     }
     return pageSetBonusAwarded;
   }
 
   const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
-  if(!isFlawless){
-    recordPendingBadWords(prof, originalCards, key);
+  const pageSets = ensurePageSets(prof);
+  const pending = ensurePendingPageSetWords(prof);
+
+  if(isFlawless){
+    delete pending[key];
+    if(!pageSets[key]){
+      const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
+      if(bonus>0){
+        state.roundTotalPoints += bonus;
+        pageSetBonusAwarded = {amount:bonus, isNewPageSet:true, catchUpCount:0, viaProgress:false};
+      }
+      pageSets[key] = today;
+    }
     return pageSetBonusAwarded;
   }
 
-  delete ensurePendingPageSetWords(prof)[key];
-  const pageSets = ensurePageSets(prof);
-  if(!pageSets[key]){
-    const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
-    if(bonus>0){
-      state.roundTotalPoints += bonus;
-      pageSetBonusAwarded = {amount:bonus, isNewPageSet:true, catchUpCount:0};
-    }
+  // Nicht fehlerfrei: offene Wörter merken -- AUSSER der Wortfortschritt
+  // ist für diese Kombination ohnehin schon komplett (jedes Wort je
+  // einzeln in beiden Richtungen schon mal richtig) -- dann zählt das
+  // Set direkt, ohne Bonuspunkte (wie beim Nachhol-Pfad über schwierige
+  // Wörter).
+  if(!pageSets[key] && isPageSetWordProgressComplete(state.selectedPages)){
     pageSets[key] = today;
+    delete pending[key];
+    pageSetBonusAwarded.isNewPageSet = true;
+    pageSetBonusAwarded.viaProgress = true;
+  } else if(!pageSets[key]){
+    recordPendingBadWords(prof, originalCards, key);
   }
   return pageSetBonusAwarded;
 }
@@ -7365,14 +7394,21 @@ function finalizeRoundAndUpdateProfile(){
   let dailyGoalJustMet=false;
   let newlyUnlockedAchievements=[];
   let newlyUnlockedBonusCards=[];
-  let pageSetBonusAwarded = {amount:0, isNewPageSet:false};
+  let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0, viaProgress:false};
+  let perfectRoundBonusAwarded = false;
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     const today = todayKey();
 
+    const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
+    if(isFlawless){
+      state.roundTotalPoints += PERFECT_ROUND_BONUS;
+      perfectRoundBonusAwarded = true;
+    }
+
     // mutates state.roundTotalPoints when a bonus is awarded -- must run
     // before totalPoints is credited below
-    pageSetBonusAwarded = applyPageSetBonus(prof, originalCards, today);
+    pageSetBonusAwarded = applyPageSetBonus(prof, originalCards, today, isFlawless);
 
     prof.stats.totalPoints += state.roundTotalPoints;
     prof.stats.totalTimeSec += durationSec;
@@ -7423,7 +7459,8 @@ function finalizeRoundAndUpdateProfile(){
     dailyGoalJustMet,
     newlyUnlockedAchievements,
     newlyUnlockedBonusCards,
-    pageSetBonusAwarded
+    pageSetBonusAwarded,
+    perfectRoundBonusAwarded
   };
 }
 
@@ -8516,7 +8553,7 @@ function addHighlightBanner(container, variant, text){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded, perfectRoundBonusAwarded} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
@@ -8534,6 +8571,7 @@ function showSummaryScreen(){
 
   document.getElementById("sumBestCombo").textContent = state.bestCombo>=2 ? `${state.bestCombo}er 🔥` : "–";
   document.getElementById("sumComboBonus").textContent = `+${state.roundComboBonus}`;
+  document.getElementById("sumPerfectBonus").textContent = perfectRoundBonusAwarded ? `+${PERFECT_ROUND_BONUS}` : "+0";
 
   const levelBanner = document.getElementById("levelUpBanner");
   if(leveledUp && levelInfo){
@@ -8574,6 +8612,8 @@ function showSummaryScreen(){
   } else if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.catchUpCount>0){
     const label = pageSetBonusAwarded.catchUpCount===1 ? "Seiten-Set" : "Seiten-Sets";
     addHighlightBanner(extraDiv, "pageset", `🗺️ ${pageSetBonusAwarded.catchUpCount} ${label} durch Nachholen vervollständigt!`);
+  } else if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.viaProgress){
+    addHighlightBanner(extraDiv, "pageset", `🗺️ Seiten-Set abgeschlossen -- alle Wörter schon vorher gelernt!`);
   }
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
