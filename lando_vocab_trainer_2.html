@@ -6542,15 +6542,26 @@ function computePageProgressByDirection(pageId){
 
 /* Alternative zur klassischen "eine Runde komplett fehlerfrei"-Regel in
    applyPageSetBonus: eine Seiten-Kombination gilt auch als abgeschlossen,
-   wenn jede ihrer Seiten laut computePageProgressByDirection in BEIDEN
-   Richtungen bereits bei 100% steht -- jedes Wort wurde dann irgendwann
-   schon mal auf Anhieb richtig beantwortet, nur eben nicht zwingend alle
-   in derselben, einzigen Runde. */
+   wenn JEDES Wort jeder ihrer Seiten schon mindestens einmal in
+   IRGENDEINER Richtung (de→fremd ODER fremd→de) auf Anhieb richtig
+   beantwortet wurde -- muss nicht dieselbe Richtung für alle Wörter sein,
+   und nicht zwingend alle in derselben Runde. Bewusst NICHT über die
+   beiden computePageProgressByDirection-Prozentsätze geprüft: bei
+   "gemischter" Richtung wird pro Runde jedes Wort nur in EINER
+   zufälligen Richtung abgefragt, sodass Wort A z.B. nur de→fremd und
+   Wort B nur fremd→de gelernt sein kann -- dann steht keiner der beiden
+   Balken bei 100%, obwohl jedes Wort für sich schon "kann" ist. */
 function isPageSetWordProgressComplete(selectedPages){
   if(!selectedPages || selectedPages.length===0) return false;
+  const profile = getCurrentProfileObj();
+  if(!profile || !state.currentBookKey) return false;
+  const book = getBookDef(state.currentBookKey);
+  if(!book) return false;
+  const byDir = ensureCorrectByDirection(profile);
   return selectedPages.every(pageId=>{
-    const pct = computePageProgressByDirection(pageId);
-    return !!pct && pct.deToEn===100 && pct.enToDe===100;
+    const words = book.pages[pageId];
+    if(!words || words.length===0) return false;
+    return words.every(w=>(byDir.deToEn[w.de]>0) || (byDir.enToDe[w.de]>0));
   });
 }
 
