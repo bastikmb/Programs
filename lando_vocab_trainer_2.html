@@ -5647,10 +5647,14 @@ function median(values){
    member, not its average. */
 function computeTeamScore(memberRows){
   if(memberRows.length===0) return {score:0, memberCount:0, avgFirstTryPct:0, avgStreak:0};
+  // bevorzugt displayScore (leagueScore + Fleißbonus, siehe
+  // applyDiligenceBonus) -- Fallback auf leagueScore, falls die Rows
+  // den Bonus (noch) nicht durchlaufen haben
+  const scoreOf = r => (r.displayScore!=null ? r.displayScore : r.leagueScore) || 0;
   const sum = key => memberRows.reduce((s,r)=>s+(r[key]||0),0);
   const memberCount = memberRows.length;
   return {
-    score: Math.round(median(memberRows.map(r=>r.leagueScore||0))),
+    score: Math.round(median(memberRows.map(scoreOf))),
     memberCount,
     avgFirstTryPct: Math.round(sum("bestFirstTryPct")/memberCount),
     avgStreak: Math.round(sum("longestStreak")/memberCount)
@@ -6048,7 +6052,8 @@ async function renderTeamRankWidget(){
   tile.innerHTML = nameBlock(`<span class="stat-tile-sub">⏳</span>`);
   try{
     const rows = await fetchAllTeamMembers();
-    const byTeam = groupMembersByTeam(rows);
+    const bonusedRows = applyDiligenceBonus(rows);
+    const byTeam = groupMembersByTeam(bonusedRows);
     const teamEntries = Object.entries(byTeam)
       .map(([teamId, members])=>({teamId, agg:computeTeamScore(members)}))
       .sort((a,b)=>b.agg.score-a.agg.score);
@@ -7751,7 +7756,7 @@ async function renderTeamLeaderboardScreen(){
   try{
     const rows = await fetchAllTeamMembers();
     statusEl.style.display="none";
-    renderTeamLeaderboardRows(rows);
+    renderTeamLeaderboardRows(applyDiligenceBonus(rows));
   } catch(e){
     console.error("renderTeamLeaderboardScreen error", e);
     statusEl.textContent = "📡 Keine Verbindung";
@@ -7813,10 +7818,11 @@ function renderTeamLeaderboardRows(rows){
     const membersDiv=document.createElement("div");
     membersDiv.className="team-members-list";
     membersDiv.style.display="none";
-    [...entry.members].sort((a,b)=>(b.leagueScore||0)-(a.leagueScore||0)).forEach(m=>{
+    [...entry.members].sort((a,b)=>(b.displayScore||0)-(a.displayScore||0)).forEach(m=>{
       const line=document.createElement("div");
       line.className="team-member-row";
-      line.textContent = `${m.nickname||"?"} — ${m.leagueScore||0} Pkt`;
+      const diligenceNote = m.diligenceBonus>0 ? ` (🏃 +${m.diligenceBonus})` : "";
+      line.textContent = `${m.nickname||"?"} — ${m.displayScore||0} Pkt${diligenceNote}`;
       membersDiv.appendChild(line);
     });
     bodyEl.appendChild(membersDiv);
