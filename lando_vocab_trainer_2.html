@@ -5057,6 +5057,40 @@ function saveProfiles() {
   }
 }
 
+/* Einmalig (idempotent) beim App-Start: Abzeichen, die sich fair aus
+   bereits länger bestehenden, persistierten Daten ableiten lassen (Team,
+   Gesamtpunkte, Serie, Seiten-Sets, Leitner-Box), werden für ALLE Profile
+   sofort nachgeholt -- schon aktive Spieler müssen dafür nicht erst eine
+   neue Runde spielen. Abzeichen, die auf NEU eingeführten Zählern beruhen
+   (booksPlayed, languagesPlayed, perfectRoundsCount,
+   consecutivePerfectRounds, catchUpWordsCount) oder auf einem rein
+   rundenbezogenen Ereignis (marathon, comeback_pause) bleiben bewusst
+   außen vor -- dafür gibt es keine ehrliche rückwirkende Datengrundlage
+   (siehe Chat-Diskussion zur Punkte-Rückwirkung). Läuft still im
+   Hintergrund, ohne die übliche Freischalt-Banner-UI auszulösen (die
+   hängt an newlyUnlockedAchievements aus finalizeRoundAndUpdateProfile,
+   nicht an diesem Pfad). */
+const RETROFITTABLE_ACHIEVEMENT_IDS = [
+  "teamplayer", "millionaire", "streak_100", "globetrotter",
+  "full_book_mastery", "ballon_dor"
+];
+function retrofitRetroactiveAchievements(){
+  let anyChanged = false;
+  for(const prof of Object.values(state.profiles)){
+    const unlocked = ensureAchievements(prof).unlocked;
+    const ctx = {streak: ensureStreakObj(prof)};
+    for(const id of RETROFITTABLE_ACHIEVEMENT_IDS){
+      if(unlocked[id]) continue;
+      const def = ACHIEVEMENTS.find(a=>a.id===id);
+      if(def && def.check(prof, ctx)){
+        unlocked[id] = todayKey();
+        anyChanged = true;
+      }
+    }
+  }
+  if(anyChanged) saveProfiles();
+}
+
 /* Persists WHICH profile is active (separate from saveProfiles(), which
    persists the profiles' own data) -- called at every point
    state.currentProfile is assigned, so the choice survives closing and
@@ -9626,6 +9660,7 @@ function initHeroBanner(){
 function initApp(){
   loadProfiles();
   loadCustomBooks();
+  retrofitRetroactiveAchievements();
   let darkOn = false;
   try { darkOn = localStorage.getItem("vocabDarkMode")==="1"; } catch(e){ /* ignore */ }
   applyDarkMode(darkOn);
