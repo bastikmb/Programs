@@ -1980,7 +1980,7 @@ body.dark-theme .daily-goal-mini-banner {
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🏆 Team-Tabelle</span>
     </h2>
-    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Median der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
     <div id="teamLeaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="teamLeaderboardTableBody"></div>
 
@@ -5630,17 +5630,27 @@ function computeLeagueScore(stats){
   return base + achievementBonus + recordBonus + explorerBonus;
 }
 
-/* Team-vs-Team aggregate for the team leaderboard -- AVERAGE, not SUM,
+function median(values){
+  if(values.length===0) return 0;
+  const sorted = [...values].sort((a,b)=>a-b);
+  const mid = Math.floor(sorted.length/2);
+  return sorted.length%2!==0 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+}
+
+/* Team-vs-Team aggregate for the team leaderboard -- MEDIAN, not AVERAGE,
    of member leagueScores: mirrors computeLeagueScore()'s own per-round
    (not per-total) normalization philosophy one layer up, so a 1-member
    "team" can compete on equal footing with a 5-member one instead of
-   always losing to whichever team has the most members. */
+   always losing to whichever team has the most members. Median instead
+   of mean so a single very weak or very strong outlier member can't pull
+   the whole team's score with them -- the team is judged by its typical
+   member, not its average. */
 function computeTeamScore(memberRows){
   if(memberRows.length===0) return {score:0, memberCount:0, avgFirstTryPct:0, avgStreak:0};
   const sum = key => memberRows.reduce((s,r)=>s+(r[key]||0),0);
   const memberCount = memberRows.length;
   return {
-    score: Math.round(sum("leagueScore")/memberCount),
+    score: Math.round(median(memberRows.map(r=>r.leagueScore||0))),
     memberCount,
     avgFirstTryPct: Math.round(sum("bestFirstTryPct")/memberCount),
     avgStreak: Math.round(sum("longestStreak")/memberCount)
