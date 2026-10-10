@@ -2079,12 +2079,14 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
            && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 10
+           && request.resource.data.distinctPageSetsCompleted is number
+           && request.resource.data.distinctPageSetsCompleted >= 0 && request.resource.data.distinctPageSetsCompleted <= 1000
            && (request.resource.data.team == null ||
                (request.resource.data.team is string && request.resource.data.team.size() <= 20))
            && request.resource.data.keys().hasOnly(
                 ["cloudId","nickname","leagueScore","totalPoints",
                  "roundsCompleted","bestFirstTryPct","longestStreak",
-                 "achievementsUnlocked","team","updatedAt","appVersion"])
+                 "achievementsUnlocked","distinctPageSetsCompleted","team","updatedAt","appVersion"])
            && request.resource.data.updatedAt == request.time;
        }
      }
