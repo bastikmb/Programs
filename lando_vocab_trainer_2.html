@@ -1944,7 +1944,7 @@ body.dark-theme .daily-goal-mini-banner {
       <span>⚽ Vokabel-Bundesligatabelle</span>
     </h2>
     <div id="leaderboardProfileLabel" class="section-sub" style="margin-bottom:0.5rem;"></div>
-    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie, plus Bonus für Abzeichen und Bestleistungen.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie, plus Bonus für Abzeichen, Bestleistungen und verschiedene gemeisterte Seiten-Sets.</div>
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
@@ -5526,7 +5526,20 @@ function computeLeagueScore(stats){
   const pointsBonus = Math.min(30, Math.round((((stats.records&&stats.records.mostPointsInRound)||0)/150)*30)); // full bonus from 150+ pts in one round
   const recordBonus = comboBonus + pointsBonus; // max +60
 
-  return base + achievementBonus + recordBonus;
+  // Explorer-Bonus: belohnt BREITE (wie viele verschiedene Seiten-Sets
+  // schon mal fehlerfrei gemeistert wurden, siehe completedPageSets/
+  // applyPageSetBonus) statt den oben per-Runde gemittelten volumeScore
+  // anzufassen. Grund: wer sich wiederholt an NEUEN, noch unbekannten
+  // Seiten versucht, hat dort zwangsläufig mehr Fehlversuche/Tipps und
+  // zieht damit den Lebenszeit-Durchschnitt totalPoints/roundsCompleted
+  // nach unten -- ohne diesen separaten Bonus würde Erkunden also den
+  // eigenen volumeScore eher bestrafen als belohnen. Absichtlich klein
+  // gedeckelt wie die anderen Boni, damit viel Breite bei dauerhaft
+  // schwacher Qualität echtes Können+Konstanz trotzdem nicht überholt.
+  const distinctPageSetsCompleted = Object.keys(stats.completedPageSets||{}).length;
+  const explorerBonus = Math.min(80, distinctPageSetsCompleted * 8); // volle Punktzahl ab 10 verschiedenen Sets
+
+  return base + achievementBonus + recordBonus + explorerBonus;
 }
 
 /* Team-vs-Team aggregate for the team leaderboard -- AVERAGE, not SUM,
@@ -5593,6 +5606,7 @@ function doSyncProfileToLeaderboard(prof){
       bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
       longestStreak: (prof.stats.streak&&prof.stats.streak.longest)||0,
       achievementsUnlocked: Object.keys(ensureAchievements(prof).unlocked).length,
+      distinctPageSetsCompleted: Object.keys(ensurePageSets(prof)).length,
       team: prof.team || null,
       appVersion: "1.0"
     };
@@ -7499,7 +7513,7 @@ function renderLeaderboardRows(rows, prof){
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
     const diligenceNote = r.diligenceBonus>0 ? ` · 🏃 Fleißbonus +${r.diligenceBonus}` : "";
-    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen${diligenceNote}`;
+    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen · 🗺️ ${r.distinctPageSetsCompleted||0} Seiten-Sets${diligenceNote}`;
 
     row.appendChild(rank);
     row.appendChild(name);
