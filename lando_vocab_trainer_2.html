@@ -2078,7 +2078,7 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.longestStreak is number
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
-           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 10
+           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 23
            && request.resource.data.distinctPageSetsCompleted is number
            && request.resource.data.distinctPageSetsCompleted >= 0 && request.resource.data.distinctPageSetsCompleted <= 1000
            && (request.resource.data.team == null ||
@@ -5609,7 +5609,10 @@ function computeLeagueScore(stats){
   // badge/record collector can't outrank genuine skill+consistency, only
   // meaningfully nudge the ranking.
   const achievementsUnlocked = Object.keys((stats.achievements&&stats.achievements.unlocked)||{}).length;
-  const achievementBonus = achievementsUnlocked * 10; // max +100 (10 achievements total)
+  // max +100 unabhängig davon, wie viele Abzeichen es insgesamt gibt --
+  // ACHIEVEMENTS.length-basiert statt einem festen Punktwert pro Abzeichen,
+  // damit neue Abzeichen den Deckel nicht automatisch mitwachsen lassen
+  const achievementBonus = Math.min(100, Math.round((achievementsUnlocked/ACHIEVEMENTS.length)*100));
   const comboBonus = Math.min(30, ((stats.records&&stats.records.highestCombo)||0) * 2); // full bonus from a 15+ combo
   const pointsBonus = Math.min(30, Math.round((((stats.records&&stats.records.mostPointsInRound)||0)/150)*30)); // full bonus from 150+ pts in one round
   const recordBonus = comboBonus + pointsBonus; // max +60
@@ -6637,7 +6640,48 @@ const ACHIEVEMENTS = [
     check:(p,ctx)=>ctx.comebackHappened},
   {id:"daily_goal_hit", icon:"🎯", title:"Tagesziel", desc:"Das Tagesziel erreicht",
     check:(p,ctx)=>ctx.dailyGoalJustMet,
-    progress:p=>({current:ensureDailyGoal(p).correctToday, target:DAILY_GOAL_TARGET})}
+    progress:p=>({current:ensureDailyGoal(p).correctToday, target:DAILY_GOAL_TARGET})},
+  {id:"streak_100", icon:"🌙", title:"Serientäter", desc:"100 Tage in Folge gelernt",
+    check:(p,ctx)=>ctx.streak.longest>=100,
+    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:100})},
+  {id:"marathon", icon:"🏔️", title:"Marathon", desc:"Eine einzelne Runde mit 50+ Wörtern abgeschlossen",
+    check:(p,ctx)=>ctx.totalCards>=50},
+  {id:"millionaire", icon:"💰", title:"Punktemillionär", desc:"5.000 Gesamtpunkte erreicht",
+    check:(p,ctx)=>(p.stats.totalPoints||0)>=5000,
+    progress:p=>({current:p.stats.totalPoints||0, target:5000})},
+  {id:"perfectionist", icon:"👑", title:"Perfektionist", desc:"10 perfekte Runden insgesamt",
+    check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=10,
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:10})},
+  {id:"hattrick", icon:"🎩", title:"Hattrick", desc:"3 perfekte Runden direkt hintereinander",
+    check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=3,
+    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:3})},
+  {id:"full_book_mastery", icon:"🧠", title:"Vollbesetzt", desc:"Alle Wörter eines Buches auf höchster Leitner-Box",
+    check:(p,ctx)=>Object.keys({...BOOKS, ...customBooks}).some(bk=>isBookFullyMastered(p, bk))},
+  {id:"globetrotter", icon:"🌍", title:"Weltenbummler", desc:"10 verschiedene Seiten-Sets abgeschlossen",
+    check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=10,
+    progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:10})},
+  {id:"bookworm", icon:"📚", title:"Bücherwurm", desc:"In 3 verschiedenen Büchern gespielt",
+    check:(p,ctx)=>Object.keys(p.stats.booksPlayed||{}).length>=3,
+    progress:p=>({current:Object.keys(p.stats.booksPlayed||{}).length, target:3})},
+  {id:"polyglot", icon:"🗣️", title:"Polyglott", desc:"In jeder verfügbaren Sprache mindestens eine Runde gespielt",
+    check:(p,ctx)=>{
+      const langs = getAvailableLanguages();
+      return langs.length>0 && langs.every(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]);
+    },
+    progress:p=>{
+      const langs = getAvailableLanguages();
+      const done = langs.filter(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]).length;
+      return {current:done, target:langs.length||1};
+    }},
+  {id:"catchup_pro", icon:"🔁", title:"Nachhol-Profi", desc:"20 Wörter über Schwierige Wörter/Fällige Wiederholungen nachträglich korrigiert",
+    check:(p,ctx)=>(p.stats.catchUpWordsCount||0)>=20,
+    progress:p=>({current:p.stats.catchUpWordsCount||0, target:20})},
+  {id:"comeback_pause", icon:"🌅", title:"Wiedereinstieg", desc:"Nach mindestens 7 Tagen Pause wieder gelernt",
+    check:(p,ctx)=>ctx.gapDaysSinceLastActive!=null && ctx.gapDaysSinceLastActive>=7},
+  {id:"teamplayer", icon:"🤝", title:"Teamplayer", desc:"Einem Team beigetreten",
+    check:(p,ctx)=>!!p.team},
+  {id:"ballon_dor", icon:"🏅", title:"Ballon D'or", desc:"Alle Bücher einer Sprache vollständig auf höchster Leitner-Box",
+    check:(p,ctx)=>getAvailableLanguages().some(l=>isLanguageFullyMastered(p, l))}
 ];
 
 /* Returns the newly-unlocked definitions (already-unlocked ones are
@@ -7189,9 +7233,12 @@ function applyPageSetBonus(prof, originalCards, today, isFlawless){
   if(state.isHardWordsOnlyRound){
     // Schwierige-Wörter-/Fälligkeits-Runden decken nie ein komplettes
     // Seiten-Set ab, können aber einzelne zuvor offene Wörter nachholen.
-    const newlyCompleted = clearPendingBadWords(prof, originalCards, today);
+    const {newlyCompleted, clearedWords} = clearPendingBadWords(prof, originalCards, today);
     if(newlyCompleted.length>0){
       pageSetBonusAwarded = {amount:0, isNewPageSet:true, catchUpCount:newlyCompleted.length, viaProgress:false};
+    }
+    if(clearedWords.length>0){
+      prof.stats.catchUpWordsCount = (prof.stats.catchUpWordsCount||0) + clearedWords.length;
     }
     return pageSetBonusAwarded;
   }
@@ -7255,13 +7302,16 @@ function clearPendingBadWords(prof, originalCards, today){
   const pending = ensurePendingPageSetWords(prof);
   const pageSets = ensurePageSets(prof);
   const newlyCompleted = [];
+  const clearedWords = []; // distinkte Wörter, die diesmal aus mind. einem offenen Set entfernt wurden -- für "Nachhol-Profi"
   for(const oc of originalCards){
     const retry = state.roundCards.find(c=>c.isRequeue && c.de===oc.de);
     const clearedNow = oc.resolvedCorrectly || !!(retry && retry.resolvedCorrectly);
     if(!clearedNow) continue;
+    let wordWasPending = false;
     for(const key of Object.keys(pending)){
       const words = pending[key];
       if(words && words[oc.de]){
+        wordWasPending = true;
         delete words[oc.de];
         if(Object.keys(words).length===0){
           delete pending[key];
@@ -7272,8 +7322,9 @@ function clearPendingBadWords(prof, originalCards, today){
         }
       }
     }
+    if(wordWasPending) clearedWords.push(oc.de);
   }
-  return newlyCompleted;
+  return {newlyCompleted, clearedWords};
 }
 
 /* Part of finalizeRoundAndUpdateProfile(): updates the long-term per-word
@@ -7324,6 +7375,41 @@ function ensureWordSchedule(prof){
     prof.stats.wordSchedule = {};
   }
   return prof.stats.wordSchedule;
+}
+
+/* Für die Abzeichen "Vollbesetzt"/"Ballon D'or": true, sobald JEDES Wort
+   jeder Seite dieses Buches auf der höchsten Leitner-Box steht. Ein nie
+   geübtes Wort hat keinen schedule-Eintrag und zählt als Box 0 (nicht
+   gemeistert). Richtung spielt keine Rolle -- die Box ist pro Wort
+   gemeinsam für beide Richtungen (siehe updateWordSchedule). */
+function isBookFullyMastered(prof, bookKey){
+  const book = getBookDef(bookKey);
+  if(!book) return false;
+  const schedule = ensureWordSchedule(prof);
+  for(const words of Object.values(book.pages)){
+    for(const w of words){
+      const entry = schedule[w.de];
+      if(!entry || entry.box < LEITNER_MAX_BOX) return false;
+    }
+  }
+  return true;
+}
+
+/* "Ballon D'or": alle Bücher EINER Sprache (inkl. archivierter eigener
+   Bücher -- ein Wort soll nicht aus der Wertung fallen, nur weil sein
+   Buch später archiviert wurde) jeweils vollständig auf höchster Box. */
+function isLanguageFullyMastered(prof, lang){
+  const books = getBooksForLang(lang, true);
+  if(books.length===0) return false;
+  return books.every(({key})=>isBookFullyMastered(prof, key));
+}
+
+/* Alle Sprachen, für die es mindestens ein Buch gibt (eingebaut oder
+   eigenes) -- dynamisch statt fest verdrahtet, damit "Polyglott"/
+   "Ballon D'or" nicht von Sprachen abhängen, die eine Familie nie nutzt. */
+function getAvailableLanguages(){
+  const allBooks = {...BOOKS, ...customBooks};
+  return [...new Set(Object.values(allBooks).map(b=>b.lang))];
 }
 
 /* Part of finalizeRoundAndUpdateProfile(): Leitner-artiges tagesbasiertes
@@ -7428,10 +7514,28 @@ function finalizeRoundAndUpdateProfile(){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     const today = todayKey();
 
+    // Vor evaluateDailyGoalAndStreak() (die lastActiveDate gleich auf heute
+    // setzt) den bisherigen Stand sichern -- für "Wiedereinstieg" muss die
+    // Lücke zum VORHERIGEN aktiven Tag gemessen werden, nicht zu heute.
+    const lastActiveDateBeforeRound = ensureStreakObj(prof).lastActiveDate;
+    const gapDaysSinceLastActive = lastActiveDateBeforeRound
+      ? daysBetweenKeys(lastActiveDateBeforeRound, today) : null;
+
     const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
     if(isFlawless){
       state.roundTotalPoints += PERFECT_ROUND_BONUS;
       perfectRoundBonusAwarded = true;
+    }
+    // Zählt nur bei tatsächlich komplett gespielten Runden -- ein
+    // abgebrochener Versuch soll weder "Perfektionist" voranbringen noch
+    // eine laufende "Hattrick"-Serie kaputt machen.
+    if(roundWasFullyPlayed){
+      if(isFlawless){
+        prof.stats.perfectRoundsCount = (prof.stats.perfectRoundsCount||0) + 1;
+        prof.stats.consecutivePerfectRounds = (prof.stats.consecutivePerfectRounds||0) + 1;
+      } else {
+        prof.stats.consecutivePerfectRounds = 0;
+      }
     }
 
     // mutates state.roundTotalPoints when a bonus is awarded -- must run
@@ -7448,6 +7552,19 @@ function finalizeRoundAndUpdateProfile(){
 
     // Page progress (computePageProgressByDirection) is derived live from
     // correctByDirection above, so there's nothing further to persist here.
+
+    // Für "Bücherwurm"/"Polyglott": nur bei normalen Runden vermerken --
+    // Schwierige-Wörter-/Fälligkeits-Runden können Wörter aus mehreren
+    // Büchern mischen und sind keiner einzelnen Buchauswahl zuzuordnen.
+    if(!state.isHardWordsOnlyRound){
+      const playedBook = getBookDef(state.currentBookKey);
+      if(playedBook){
+        if(!prof.stats.booksPlayed) prof.stats.booksPlayed = {};
+        prof.stats.booksPlayed[state.currentBookKey] = true;
+        if(!prof.stats.languagesPlayed) prof.stats.languagesPlayed = {};
+        prof.stats.languagesPlayed[playedBook.lang] = true;
+      }
+    }
 
     newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct});
 
@@ -7467,7 +7584,7 @@ function finalizeRoundAndUpdateProfile(){
 
     const achievementCtx = {
       streak: ensureStreakObj(prof), levelInfo, totalCards, firstTryPct,
-      durationSec, dailyGoalJustMet, comebackHappened
+      durationSec, dailyGoalJustMet, comebackHappened, gapDaysSinceLastActive
     };
     newlyUnlockedAchievements = checkAchievements(prof, achievementCtx);
 
