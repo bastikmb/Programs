@@ -688,6 +688,7 @@ body.dark-theme .hist-badge.wrong {
   opacity:0.75;
 }
 .speak-btn:hover { opacity:1; background:var(--accent-bg); }
+.speak-btn.active { opacity:1; background:var(--accent-bg); }
 .no-speech .speak-btn { display:none!important; }
 .stat-tile-head {
   display:flex;
@@ -1866,6 +1867,7 @@ body.dark-theme .daily-goal-mini-banner {
         <div id="learnIcon" class="learn-icon">❓</div>
         <div id="learnPromptText">...</div>
         <button id="btnSpeakPrompt" class="speak-btn" type="button" title="Wort vorlesen" aria-label="Wort vorlesen">🗣️</button>
+        <button id="btnAutoSpeakToggle" class="speak-btn" type="button" title="Automatisches Vorlesen" aria-label="Automatisches Vorlesen ausschalten">🗣️</button>
       </div>
 
       <div class="learn-expected-wrapper" id="expectedAnswerBoxes"></div>
@@ -5159,6 +5161,23 @@ function speakText(text, bcpLang){
     utter.lang = bcpLang;
     window.speechSynthesis.speak(utter);
   } catch(e){ console.error("speakText error", e); }
+}
+
+// Default AN -- automatisches Vorlesen nach richtiger Antwort/Aufdecken
+// ist der neue gewünschte Normalfall, siehe showContinueOverlay() und
+// checkAnswer()s korrekter Zweig (ersetzt dort den Soundeffekt, wenn die
+// Sprachausgabe tatsächlich feuert).
+let autoSpeakEnabled = true;
+
+function setAutoSpeakEnabled(enabled){
+  autoSpeakEnabled = enabled;
+  try { localStorage.setItem("vocabAutoSpeak", enabled ? "1" : "0"); } catch(e){ /* ignore */ }
+  const btn = document.getElementById("btnAutoSpeakToggle");
+  if(btn){
+    btn.textContent = enabled ? "🗣️" : "🙊";
+    btn.classList.toggle("active", enabled);
+    btn.setAttribute("aria-label", enabled ? "Automatisches Vorlesen ausschalten" : "Automatisches Vorlesen einschalten");
+  }
 }
 
 /* createProfile */
@@ -8689,6 +8708,11 @@ function showContinueOverlay(message, kind, example, onContinue, speakInfo){
       e.stopPropagation();
       speakText(speakInfo.text, speakInfo.lang);
     };
+    // automatisches Vorlesen nach richtiger Antwort/Aufdecken -- beide
+    // Aufrufer (checkAnswer()s korrekter Zweig, revealSolution()) laufen
+    // hier durch, daher an dieser EINEN Stelle statt zweimal. Siehe
+    // btnAutoSpeakToggle/setAutoSpeakEnabled() für den Ein-/Ausschalter.
+    if(autoSpeakEnabled) speakText(speakInfo.text, speakInfo.lang);
   } else {
     speakBtn.style.display = "none";
     speakBtn.onclick = null;
@@ -8735,8 +8759,16 @@ function checkAnswer(){
     const comboBonus = comboBonusForStreak(state.currentCombo);
     state.roundComboBonus += comboBonus;
     updateComboIndicator();
-    if(state.currentCombo>=2) playSound("combo",{combo:state.currentCombo});
-    else playSound("correct");
+    // Sprachausgabe ersetzt den Soundeffekt, wenn sie gleich tatsächlich
+    // abspielen wird (siehe showContinueOverlay weiter unten) -- sonst
+    // (Auto-Vorlesen aus, Browser ohne Web-Speech-Support, oder Karte
+    // ohne speechLang) bleibt der Ton als Rückfallebene, damit immer
+    // IRGENDeine akustische Rückmeldung kommt.
+    const autoSpeakWillFire = autoSpeakEnabled && speechSynthesisSupported() && !!card.foreign && !!card.speechLang;
+    if(!autoSpeakWillFire){
+      if(state.currentCombo>=2) playSound("combo",{combo:state.currentCombo});
+      else playSound("correct");
+    }
 
     // add score (+ combo bonus)
     state.roundTotalPoints += card.score + comboBonus;
@@ -9267,6 +9299,12 @@ function setupEventListeners(){
     setSoundMuted(!soundMuted);
   });
 
+  // statisches Element (anders als btnSpeakPrompt, das pro Karte in
+  // renderCurrentCard neu zugewiesen wird) -- einmalig hier verdrahten
+  document.getElementById("btnAutoSpeakToggle").addEventListener("click", ()=>{
+    setAutoSpeakEnabled(!autoSpeakEnabled);
+  });
+
   // The four back-targets below (backStackBeforeStats/-Leaderboard/
   // -TeamLeaderboard/-BonusCards) are each set from exactly one place
   // (the start-screen tile that opens that detail screen), always to
@@ -9334,6 +9372,9 @@ function initApp(){
   try { mutedInit = localStorage.getItem("vocabSoundMuted")==="1"; } catch(e){ /* ignore */ }
   setSoundMuted(mutedInit);
   if(!speechSynthesisSupported()) document.body.classList.add("no-speech"); // blendet .speak-btn per CSS aus (siehe .no-speech .speak-btn Regel)
+  let autoSpeakInit = true;
+  try { const stored = localStorage.getItem("vocabAutoSpeak"); if(stored!==null) autoSpeakInit = stored==="1"; } catch(e){ /* ignore */ }
+  setAutoSpeakEnabled(autoSpeakInit);
   initFirebase();
   initHeroBanner();
   renderStartScreen();
