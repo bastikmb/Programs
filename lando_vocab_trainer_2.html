@@ -5507,6 +5507,18 @@ function buildPageSetKey(bookKey, selectedPages){
   return bookKey + "|" + [...selectedPages].sort().join(",");
 }
 
+/* Wörter, die in einer nicht-fehlerfreien Seiten-Set-Runde geskippt
+   oder aufgedeckt wurden (siehe recordPendingBadWords) und deshalb noch
+   nachgeholt werden müssen, damit das Set rückwirkend als fehlerfrei
+   zählt (siehe clearPendingBadWords). Form: { [pageSetKey]: { [deWort]:
+   true, ... } }. Lazy-init wie ensurePageSets. */
+function ensurePendingPageSetWords(prof){
+  if(!prof.stats.pendingPageSetWords){
+    prof.stats.pendingPageSetWords = {};
+  }
+  return prof.stats.pendingPageSetWords;
+}
+
 const PAGESET_BONUS_RATIO = 0.5; // +50% der in der Runde erzielten Punkte
 
 function getBonusCardThresholds(prof){
@@ -7124,27 +7136,87 @@ function isRoundFullyCorrect(originalCards, allRoundCards){
    in-place when a bonus is awarded, so prof.stats.totalPoints must only be
    credited with state.roundTotalPoints AFTER this call returns. */
 function applyPageSetBonus(prof, originalCards, today){
-  let pageSetBonusAwarded = {amount:0, isNewPageSet:false};
+  let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0};
   const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
-  if(!isFlawless) return pageSetBonusAwarded;
 
   // zählt für die Flamme-Bedingung unten, unabhängig davon ob das
   // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
-  prof.stats.lastFlawlessRoundDate = today;
+  if(isFlawless) prof.stats.lastFlawlessRoundDate = today;
 
-  if(!state.isHardWordsOnlyRound){
-    const pageSets = ensurePageSets(prof);
-    const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
-    if(!pageSets[key]){
-      const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
-      if(bonus>0){
-        state.roundTotalPoints += bonus;
-        pageSetBonusAwarded = {amount:bonus, isNewPageSet:true};
-      }
-      pageSets[key] = today;
+  if(state.isHardWordsOnlyRound){
+    // Schwierige-Wörter-/Fälligkeits-Runden decken nie ein komplettes
+    // Seiten-Set ab, können aber einzelne zuvor offene Wörter nachholen.
+    const newlyCompleted = clearPendingBadWords(prof, originalCards, today);
+    if(newlyCompleted.length>0){
+      pageSetBonusAwarded = {amount:0, isNewPageSet:true, catchUpCount:newlyCompleted.length};
     }
+    return pageSetBonusAwarded;
+  }
+
+  const key = buildPageSetKey(state.currentBookKey, state.selectedPages);
+  if(!isFlawless){
+    recordPendingBadWords(prof, originalCards, key);
+    return pageSetBonusAwarded;
+  }
+
+  delete ensurePendingPageSetWords(prof)[key];
+  const pageSets = ensurePageSets(prof);
+  if(!pageSets[key]){
+    const bonus = Math.round(state.roundTotalPoints * PAGESET_BONUS_RATIO);
+    if(bonus>0){
+      state.roundTotalPoints += bonus;
+      pageSetBonusAwarded = {amount:bonus, isNewPageSet:true, catchUpCount:0};
+    }
+    pageSets[key] = today;
   }
   return pageSetBonusAwarded;
+}
+
+// Merkt sich, welche Wörter dieser Versuch des Seiten-Sets noch offen
+// liess (geskippt/aufgedeckt, auch nach Retry nicht korrigiert). Ersetzt
+// die Liste komplett -- der jeweils letzte volle Versuch ist massgeblich;
+// frühere Teilerfolge über "schwierige Wörter" bleiben erhalten, weil
+// clearPendingBadWords sie schon vorher aus der Liste entfernt hat.
+function recordPendingBadWords(prof, originalCards, key){
+  const pending = ensurePendingPageSetWords(prof);
+  const badWords = {};
+  for(const oc of originalCards){
+    const retry = state.roundCards.find(c=>c.isRequeue && c.de===oc.de);
+    const resolved = oc.resolvedCorrectly || !!(retry && retry.resolvedCorrectly);
+    if(!resolved) badWords[oc.de] = true;
+  }
+  if(Object.keys(badWords).length>0) pending[key] = badWords;
+  else delete pending[key];
+}
+
+// Wird nach jeder Schwierige-Wörter-/Fälligkeits-Runde aufgerufen: streicht
+// jedes jetzt richtig beantwortete Wort aus allen noch offenen Seiten-Sets.
+// Wird ein Set dadurch komplett leer, gilt es rückwirkend als abgeschlossen
+// -- nur für die Fortschritts-/Explorer-Zählung, ohne Bonuspunkte (die
+// bleiben an die direkte Fehlerfreiheit der Originalrunde gebunden).
+function clearPendingBadWords(prof, originalCards, today){
+  const pending = ensurePendingPageSetWords(prof);
+  const pageSets = ensurePageSets(prof);
+  const newlyCompleted = [];
+  for(const oc of originalCards){
+    const retry = state.roundCards.find(c=>c.isRequeue && c.de===oc.de);
+    const clearedNow = oc.resolvedCorrectly || !!(retry && retry.resolvedCorrectly);
+    if(!clearedNow) continue;
+    for(const key of Object.keys(pending)){
+      const words = pending[key];
+      if(words && words[oc.de]){
+        delete words[oc.de];
+        if(Object.keys(words).length===0){
+          delete pending[key];
+          if(!pageSets[key]){
+            pageSets[key] = today;
+            newlyCompleted.push(key);
+          }
+        }
+      }
+    }
+  }
+  return newlyCompleted;
 }
 
 /* Part of finalizeRoundAndUpdateProfile(): updates the long-term per-word
@@ -8499,6 +8571,9 @@ function showSummaryScreen(){
   });
   if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.amount>0){
     addHighlightBanner(extraDiv, "pageset", `🎉 Neue Seiten-Kombination zum ersten Mal fehlerfrei geschafft! +${pageSetBonusAwarded.amount} Bonuspunkte`);
+  } else if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.catchUpCount>0){
+    const label = pageSetBonusAwarded.catchUpCount===1 ? "Seiten-Set" : "Seiten-Sets";
+    addHighlightBanner(extraDiv, "pageset", `🗺️ ${pageSetBonusAwarded.catchUpCount} ${label} durch Nachholen vervollständigt!`);
   }
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
