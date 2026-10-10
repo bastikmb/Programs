@@ -671,6 +671,24 @@ body.dark-theme .hist-badge.wrong {
   color:var(--muted);
   line-height:1;
 }
+/* Sprich-Buttons (🗣️, siehe speakText()) -- kleine, konsistente
+   Icon-Buttons an den drei Einsatzorten (Lernkarte, Erfolgs-Overlay,
+   Vokabelliste). .no-speech wird in initApp() gesetzt, wenn der
+   Browser keine Web Speech API hat -- blendet dann alle sauber aus,
+   statt dass sie wirkungslos dastehen. */
+.speak-btn {
+  background:none;
+  border:none;
+  font-size:1.1rem;
+  line-height:1;
+  padding:0.2rem 0.35rem;
+  cursor:pointer;
+  border-radius:8px;
+  color:var(--ink);
+  opacity:0.75;
+}
+.speak-btn:hover { opacity:1; background:var(--accent-bg); }
+.no-speech .speak-btn { display:none!important; }
 .stat-tile-head {
   display:flex;
   align-items:center;
@@ -1847,6 +1865,7 @@ body.dark-theme .daily-goal-mini-banner {
       <div class="learn-word-prompt">
         <div id="learnIcon" class="learn-icon">❓</div>
         <div id="learnPromptText">...</div>
+        <button id="btnSpeakPrompt" class="speak-btn" type="button" title="Wort vorlesen" aria-label="Wort vorlesen">🗣️</button>
       </div>
 
       <div class="learn-expected-wrapper" id="expectedAnswerBoxes"></div>
@@ -1995,6 +2014,7 @@ body.dark-theme .daily-goal-mini-banner {
   <div class="feedback-overlay-inner">
     <div id="feedbackOverlayMsg" class="feedback-overlay-msg"></div>
     <div id="feedbackOverlayExample" class="feedback-overlay-example" style="display:none;"></div>
+    <button id="btnSpeakOverlay" class="speak-btn" type="button" title="Wort vorlesen" aria-label="Wort vorlesen" style="display:none;">🗣️</button>
     <div class="feedback-overlay-hint">👉 Antippen zum Weitermachen</div>
   </div>
 </div>
@@ -4810,6 +4830,16 @@ const LANG_DISPLAY_NAMES = { en:"Englisch", la:"Latein", fr:"Französisch" };
 function getLangDisplayName(lang){
   return LANG_DISPLAY_NAMES[lang] || lang;
 }
+
+// Buchsprache (2-Buchstaben-Code wie in BOOKS[x].lang) -> BCP-47-Sprachcode
+// für SpeechSynthesisUtterance.lang -- siehe speakText(). "la" (Latein) hat
+// auf den meisten Browsern keine eigene Stimme, bleibt aber drin: der
+// Browser fällt dann selbst auf eine Standardstimme zurück statt zu
+// crashen, nur die Aussprache ist dann unvollkommen.
+const BOOK_LANG_TO_SPEECH_LANG = { en:"en-US", fr:"fr-FR", la:"la" };
+function resolveSpeechLang(bookLang){
+  return BOOK_LANG_TO_SPEECH_LANG[bookLang] || null;
+}
 function getBooksForLang(lang, includeArchived){
   const list=[];
   for(const [key,book] of Object.entries(BOOKS)){
@@ -5106,6 +5136,29 @@ function setSoundMuted(muted){
     btn.textContent = muted ? "🔇" : "🔊";
     btn.setAttribute("aria-label", muted ? "Ton einschalten" : "Ton ausschalten");
   }
+}
+
+/* ===========================================================
+   SPEECH SYNTHESIS (Vokabeln vorlesen, Web Speech API) -- getrennt von
+   den obigen Soundeffekten: speakText() ist eine bewusste, vom Kind
+   selbst ausgelöste Aktion (Button-Klick), keine Spiel-Rückmeldung,
+   daher NICHT an soundMuted gekoppelt -- wer die Klick-/Erfolgs-Töne
+   stummschaltet, will trotzdem noch gezielt ein Wort vorgelesen
+   bekommen können.
+   =========================================================== */
+
+function speechSynthesisSupported(){
+  return typeof window.speechSynthesis !== "undefined";
+}
+
+function speakText(text, bcpLang){
+  if(!speechSynthesisSupported() || !text || !bcpLang) return;
+  try{
+    window.speechSynthesis.cancel(); // verhindert überlappende/gestapelte Sprachausgabe bei schnellem Mehrfachklick
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = bcpLang;
+    window.speechSynthesis.speak(utter);
+  } catch(e){ console.error("speakText error", e); }
 }
 
 /* createProfile */
@@ -6333,7 +6386,7 @@ function startDueReviewRound(){
   const due = collectDueWords(prof);
   if(due.length===0) return;
   state.vocabPool = due.map(w=>({
-    de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId
+    de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId, lang:w.lang
   }));
   state.direction = "mixed";
   state.isHardWordsOnlyRound = true; // deckt nie eine volle Seiten-Auswahl ab -- kein Seiten-Set-Bonus, siehe isRoundFullyCorrect()
@@ -6567,6 +6620,7 @@ function buildRoundCardsFromVocab(){
       foreign:v.foreign,
       pageId:v.pageId,
       example:v.example||null,
+      speechLang:v.lang||null, // BCP-47-Code für speakText(), siehe resolveSpeechLang()
       direction:directionForCard, // 'deToEn' | 'enToDe' -- which way THIS card asked, even in mixed mode
       prompt:promptText,
       answer:answerText,
@@ -6981,7 +7035,8 @@ function collectHardWords(){
         de:card.de,
         foreign:card.foreign,
         pageId:card.pageId,
-        example:card.example
+        example:card.example,
+        speechLang:card.speechLang||null
       });
     }
   }
@@ -7001,7 +7056,7 @@ function findVocabEntryByDe(deWord){
     const pages = allBooks[bookKey].pages || {};
     for(const pageId of Object.keys(pages)){
       const found = (pages[pageId]||[]).find(v=>v.de===deWord);
-      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId};
+      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId, lang:resolveSpeechLang(allBooks[bookKey].lang)};
     }
   }
   return null;
@@ -8092,6 +8147,7 @@ function renderVocabPickScreen(){
   }
   state.vocabPool = [];
   const currentBook = getBookDef(state.currentBookKey);
+  const currentBookSpeechLang = resolveSpeechLang(currentBook && currentBook.lang);
   for(const pid of state.selectedPages){
     const arr = (currentBook && currentBook.pages[pid]) || [];
     for(const v of arr){
@@ -8102,7 +8158,8 @@ function renderVocabPickScreen(){
         icon:v.icon,
         example:v.example,
         active: previousActive.has(key) ? previousActive.get(key) : true,
-        pageId:pid
+        pageId:pid,
+        lang:currentBookSpeechLang
       });
     }
   }
@@ -8129,12 +8186,29 @@ function renderVocabPickScreen(){
       const d=document.createElement("div");
       d.className="vocab-de";
       d.textContent=voc.de;
+      const foreignRow=document.createElement("div");
+      foreignRow.style.cssText="display:flex;align-items:center;gap:0.3rem;";
       const f=document.createElement("div");
       f.className="vocab-foreign";
       f.textContent=voc.foreign;
+      foreignRow.appendChild(f);
+      if(voc.lang){
+        const speakBtn=document.createElement("button");
+        speakBtn.className="speak-btn";
+        speakBtn.type="button";
+        speakBtn.title="Wort vorlesen";
+        speakBtn.setAttribute("aria-label", `${voc.foreign} vorlesen`);
+        speakBtn.style.fontSize="0.85rem";
+        speakBtn.textContent="🗣️";
+        speakBtn.addEventListener("click",(e)=>{
+          e.stopPropagation();
+          speakText(voc.foreign, voc.lang);
+        });
+        foreignRow.appendChild(speakBtn);
+      }
 
       texts.appendChild(d);
-      texts.appendChild(f);
+      texts.appendChild(foreignRow);
 
       const correctCount = correctCounts[voc.de] || 0;
       const wrongCount = wrongCounts[voc.de] || 0;
@@ -8322,6 +8396,14 @@ function renderCurrentCard(){
   document.getElementById("learnPromptText").textContent=card.prompt;
   document.getElementById("cardScore").textContent=String(card.score);
 
+  // Liest exakt den gerade sichtbaren Prompt vor -- nie die (noch
+  // verborgene) Antwort, siehe Design-Entscheidung in der Session-Planung.
+  // .onclick= statt addEventListener, weil dieser Button bei jeder neuen
+  // Karte hier neu zugewiesen wird (gleiches Muster wie die Start-Screen-
+  // Kacheln, siehe makeTileAccessible-Kommentar).
+  const promptLang = card.direction==="enToDe" ? card.speechLang : "de-DE";
+  document.getElementById("btnSpeakPrompt").onclick = ()=> speakText(card.prompt, promptLang);
+
   const ansInp=document.getElementById("answerInput");
   ansInp.value="";
   ansInp.focus();
@@ -8442,6 +8524,7 @@ function maybeRequeueCard(card){
     icon:card.icon, de:card.de, foreign:card.foreign, pageId:card.pageId,
     example:card.example, direction:card.direction,
     prompt:card.prompt, answer:card.answer,
+    speechLang:card.speechLang,
     score:5, firstTry:true, done:false, attemptedWrong:false,
     resolvedCorrectly:false,
     isRequeue:true
@@ -8576,10 +8659,16 @@ function showExampleSentence(example){
    overlay that stays open until the user taps/clicks it (or presses
    Enter/Space) -- replaces the old fixed-duration auto-advance, which hid
    the message again before it could actually be read. */
-function showContinueOverlay(message, kind, example, onContinue){
+/* speakInfo optional: {text, lang} -- an dieser Stelle ist die Antwort
+   bereits aufgelöst (richtig beantwortet ODER aufgedeckt), daher
+   unproblematisch, hier IMMER card.foreign anzubieten statt nur den
+   gerade sichtbaren Prompt (siehe btnSpeakPrompt in renderCurrentCard
+   für den Fall VOR der Auflösung). */
+function showContinueOverlay(message, kind, example, onContinue, speakInfo){
   const overlay = document.getElementById("feedbackOverlay");
   const msgEl = document.getElementById("feedbackOverlayMsg");
   const exampleEl = document.getElementById("feedbackOverlayExample");
+  const speakBtn = document.getElementById("btnSpeakOverlay");
 
   msgEl.textContent = message;
   msgEl.className = "feedback-overlay-msg " + kind;
@@ -8589,6 +8678,20 @@ function showContinueOverlay(message, kind, example, onContinue){
     exampleEl.style.display = "block";
   } else {
     exampleEl.style.display = "none";
+  }
+
+  if(speakInfo && speakInfo.text && speakInfo.lang){
+    speakBtn.style.display = "inline-block";
+    // stopPropagation: der Overlay selbst schließt sich bei JEDEM Klick
+    // (continueOnce unten) -- ohne das würde ein Klick auf den
+    // Sprich-Button das Overlay sofort mit wegklicken, statt nur vorzulesen
+    speakBtn.onclick = (e)=>{
+      e.stopPropagation();
+      speakText(speakInfo.text, speakInfo.lang);
+    };
+  } else {
+    speakBtn.style.display = "none";
+    speakBtn.onclick = null;
   }
 
   overlay.style.display = "flex";
@@ -8686,7 +8789,7 @@ function checkAnswer(){
       state.roundIndex++;
       setLearnControlsDisabled(false);
       renderCurrentCard();
-    });
+    }, {text:card.foreign, lang:card.speechLang});
   } else {
     // wrong -> combo breaks
     state.currentCombo = 0;
@@ -8758,7 +8861,7 @@ function revealSolution(){
     state.roundIndex++;
     setLearnControlsDisabled(false);
     renderCurrentCard();
-  });
+  }, {text:card.foreign, lang:card.speechLang});
 }
 
 /* ===========================================================
@@ -9146,7 +9249,8 @@ function setupEventListeners(){
       icon:h.icon,
       example:h.example,
       active:true,
-      pageId:h.pageId
+      pageId:h.pageId,
+      lang:h.speechLang
     }));
     // We'll reuse current state.direction (unchanged)
     state.isHardWordsOnlyRound = true; // never covers the full page selection -- excluded from the page-set bonus, see isRoundFullyCorrect()
@@ -9229,6 +9333,7 @@ function initApp(){
   let mutedInit = false;
   try { mutedInit = localStorage.getItem("vocabSoundMuted")==="1"; } catch(e){ /* ignore */ }
   setSoundMuted(mutedInit);
+  if(!speechSynthesisSupported()) document.body.classList.add("no-speech"); // blendet .speak-btn per CSS aus (siehe .no-speech .speak-btn Regel)
   initFirebase();
   initHeroBanner();
   renderStartScreen();
