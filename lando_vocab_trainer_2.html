@@ -5870,8 +5870,12 @@ async function renderLeagueRankWidget(){
   tile.classList.add("show");
   try{
     const rows = await fetchLeaderboard();
+    // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle, sonst würde
+    // der hier gezeigte Platz nicht zu dem passen, was renderLeaderboardRows
+    // beim Öffnen der Tabelle tatsächlich anzeigt
+    const bonusedRows = applyDiligenceBonus(rows);
     const ownDocId = getCloudDocId(prof);
-    const idx = rows.findIndex(r=>r.cloudId===ownDocId);
+    const idx = bonusedRows.findIndex(r=>r.cloudId===ownDocId);
     tile.innerHTML = idx>=0
       ? `${head}<div class="stat-tile-value">Platz ${idx+1}</div>`
       : `${head}<div class="stat-tile-sub">noch nicht gelistet</div>`;
@@ -7402,6 +7406,42 @@ async function fetchLeaderboard(){
   return snap.docs.map(d=>d.data());
 }
 
+// Platz 1/2/3 nach roundsCompleted INNERHALB der aktuell geladenen Tabelle
+// bekommen diesen Bonus, alle anderen nichts -- bewusst nur 3 Plätze, damit
+// nicht "wer oft genug spielt" irgendwann den Bonus erreicht, sondern nur
+// die tatsächlich Fleißigsten im Vergleich zu allen anderen gerade
+// angezeigten Kindern.
+const DILIGENCE_BONUS_BY_RANK = [100, 50, 10];
+
+/* Fleiß-Bonus für Vielspieler -- bewusst NICHT Teil von computeLeagueScore()
+   und NICHT in die gespeicherte/synchronisierte leagueScore eingerechnet,
+   sonst würde die Punktzahl eines Kindes davon abhängen, welche anderen
+   Kinder gerade zufällig mit in der Tabelle stehen bzw. wann wer zuletzt
+   synct hat -- ein unlösbares Henne-Ei-Problem beim Schreiben (ein Client
+   kennt beim eigenen Sync nicht die aktuellen Werte aller anderen).
+   Stattdessen rein auf Anzeigeebene: aus den bereits geladenen Zeilen wird
+   ermittelt, wer die meisten Runden abgeschlossen hat, und NUR für die
+   Anzeige/Sortierung der Tabelle ein Bonus aufaddiert. Der rohe
+   leagueScore-Kern (Qualität: Punkte/Runde, Trefferquote, Serie) bleibt
+   dadurch komplett unangetastet -- der Fleiß-Bonus kann ihn nur um max.
+   +100 nach oben verschieben, nicht verwässern. */
+function applyDiligenceBonus(rows){
+  const byRounds = [...rows].sort((a,b)=>(b.roundsCompleted||0)-(a.roundsCompleted||0));
+  const bonusByCloudId = {};
+  for(let i=0; i<DILIGENCE_BONUS_BY_RANK.length && i<byRounds.length; i++){
+    if((byRounds[i].roundsCompleted||0)>0){
+      bonusByCloudId[byRounds[i].cloudId] = DILIGENCE_BONUS_BY_RANK[i];
+    }
+  }
+  return rows
+    .map(r=>({
+      ...r,
+      diligenceBonus: bonusByCloudId[r.cloudId]||0,
+      displayScore: (r.leagueScore||0) + (bonusByCloudId[r.cloudId]||0)
+    }))
+    .sort((a,b)=>b.displayScore-a.displayScore);
+}
+
 /* Unlike fetchLeaderboard(), NOT limited to the top 50 by individual score
    and NOT ordered -- a team aggregate needs every member, including ones
    who'd never crack the individual top 50. 500 is comfortably above this
@@ -7427,12 +7467,17 @@ function renderLeaderboardRows(rows, prof){
     return;
   }
 
+  // Fleiß-Bonus verschiebt die Reihenfolge ggü. der reinen leagueScore --
+  // siehe applyDiligenceBonus() für warum das nur hier auf Anzeigeebene
+  // passiert statt in der gespeicherten Punktzahl.
+  const bonusedRows = applyDiligenceBonus(rows);
+
   const nameCounts = {};
-  rows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
+  bonusedRows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
 
   const ownDocId = prof ? getCloudDocId(prof) : null;
 
-  rows.forEach((r, idx)=>{
+  bonusedRows.forEach((r, idx)=>{
     const row=document.createElement("div");
     row.className = "leaderboard-row" + (r.cloudId===ownDocId ? " own" : "");
 
@@ -7447,13 +7492,14 @@ function renderLeaderboardRows(rows, prof){
 
     const score=document.createElement("div");
     score.className="score";
-    score.textContent = String(r.leagueScore||0);
+    score.textContent = String(r.displayScore);
 
     const roundsCompleted = Math.max(1, r.roundsCompleted||0);
     const avgPts = Math.round((r.totalPoints||0)/roundsCompleted);
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
-    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen`;
+    const diligenceNote = r.diligenceBonus>0 ? ` · 🏃 Fleißbonus +${r.diligenceBonus}` : "";
+    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen${diligenceNote}`;
 
     row.appendChild(rank);
     row.appendChild(name);
