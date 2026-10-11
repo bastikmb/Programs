@@ -6576,16 +6576,19 @@ function renderDueReviewTile(prof){
 
 /* Startet eine Runde direkt aus den fälligen Wiederholungen (siehe
    collectDueWords), analog zu btnOnlyHard weiter unten -- deckt nie eine
-   volle Seiten-Auswahl ab, daher isHardWordsOnlyRound wie dort. direction
-   bewusst "mixed": eine Wiedervorlage soll beide Richtungen trainieren,
-   nicht nur die zuletzt gewählte. */
+   volle Seiten-Auswahl ab, daher isHardWordsOnlyRound wie dort. Jedes
+   Wort wird in der Richtung abgefragt, in der es ursprünglich gelernt
+   wurde (w.direction, siehe updateWordSchedule) -- state.direction
+   bleibt nur als "mixed"-Fallback für Alt-Einträge ohne gespeicherte
+   Richtung relevant (siehe buildRoundCardsFromVocab). */
 function startDueReviewRound(){
   const prof = getCurrentProfileObj();
   if(!prof) return;
   const due = collectDueWords(prof);
   if(due.length===0) return;
   state.vocabPool = due.map(w=>({
-    de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId, lang:w.lang
+    de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId, lang:w.lang,
+    direction:w.direction || null
   }));
   state.direction = "mixed";
   state.isHardWordsOnlyRound = true; // deckt nie eine volle Seiten-Auswahl ab -- kein Seiten-Set-Bonus, siehe isRoundFullyCorrect()
@@ -6859,7 +6862,11 @@ function buildRoundCardsFromVocab(){
   for(const v of state.vocabPool){
     if(!v.active) continue;
 
-    let directionForCard = state.direction;
+    // v.direction (falls gesetzt) geht vor state.direction -- so kann z.B.
+    // startDueReviewRound() pro Wort seine ursprüngliche Lernrichtung
+    // vorgeben, während normale Seiten-/Buchrunden (ohne v.direction)
+    // weiterhin einheitlich state.direction verwenden.
+    let directionForCard = v.direction || state.direction;
     if(directionForCard==="mixed"){
       directionForCard = (Math.random()<0.5) ? "deToEn" : "enToDe";
     }
@@ -7338,7 +7345,7 @@ function collectDueWords(prof){
     const entry = schedule[key];
     if(entry && entry.dueDate && entry.dueDate<=today){
       const vocab = findVocabEntryByDe(key);
-      if(vocab) due.push(vocab);
+      if(vocab) due.push({...vocab, direction: entry.direction || null});
     }
   }
   return due;
@@ -7572,12 +7579,21 @@ function updateWordSchedule(prof, originalCards, today){
   const schedule = ensureWordSchedule(prof);
   for(const card of originalCards){
     const key = card.de;
+    const existing = schedule[key];
+    // Einmal gesetzt, nie wieder überschrieben -- auch wenn das Wort
+    // später (z.B. in einer "gemischt"-Seitenrunde) zufällig in der
+    // anderen Richtung drankommt, bleibt die URSPRÜNGLICHE Lernrichtung
+    // erhalten (siehe collectDueWords/startDueReviewRound). Bei bereits
+    // bestehenden Einträgen ohne direction-Feld (Profile von vor diesem
+    // Update) wird die aktuelle Kartenrichtung als bestmögliche Annahme
+    // übernommen.
+    const originalDirection = (existing && existing.direction) || card.direction;
     if(card.attemptedWrong){
-      schedule[key] = {box:1, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[0])};
+      schedule[key] = {box:1, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[0]), direction:originalDirection};
     } else if(card.done && card.firstTry){
-      const prevBox = (schedule[key] && schedule[key].box) || 0;
+      const prevBox = (existing && existing.box) || 0;
       const box = Math.min(prevBox+1, LEITNER_MAX_BOX);
-      schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1])};
+      schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1]), direction:originalDirection};
     }
   }
 }
