@@ -2846,7 +2846,7 @@ const BOOKS = {
         {de:"furchterregend", foreign:"scary", icon:"😱"},
         {de:"Leiter/in", foreign:"leader", icon:"🧑‍✈️"},
         {de:"Gruppe", foreign:"group", icon:"👥", example:"The whole group had to work together."},
-        {de:"Vergangenheitsform von „don't“ bzw. „doesn't“", foreign:"didn't (= did not)", icon:"🚫", example:"I didn't know it was your birthday today."},
+        {de:"Vergangenheitsform von „don't“ bzw. „doesn't“", foreign:"didn't (= did not)", icon:"🚫", example:"I didn't know it was your birthday today.", onlyDirection:"deToEn"},
         {de:"hoch", foreign:"high", icon:"⬆️", example:"This house is 12 metres high."},
         {de:"zuerst", foreign:"at first", icon:"1️⃣", example:"At first I didn't like Jo but now we're friends."},
         {de:"Sprung", foreign:"jump", icon:"🤸", example:"Lara wanted to do a last big jump."},
@@ -2876,8 +2876,8 @@ const BOOKS = {
         {de:"sich erinnern", foreign:"to remember", icon:"🧠"},
         {de:"gar nichts", foreign:"not ... anything", icon:"🚫"},
         {de:"(aus)wählen", foreign:"to choose", icon:"☑️", example:"He is choosing a book to read."},
-        {de:"Vergangenheitsform von „isn't“", foreign:"wasn't (= was not)", icon:"🚫", example:"Zoe wasn't in London last year."},
-        {de:"Vergangenheitsform von „aren't“", foreign:"weren't (= were not)", icon:"🚫", example:"Kim and Jo weren't happy."},
+        {de:"Vergangenheitsform von „isn't“", foreign:"wasn't (= was not)", icon:"🚫", example:"Zoe wasn't in London last year.", onlyDirection:"deToEn"},
+        {de:"Vergangenheitsform von „aren't“", foreign:"weren't (= were not)", icon:"🚫", example:"Kim and Jo weren't happy.", onlyDirection:"deToEn"},
         {de:"planen", foreign:"to plan", icon:"🗓️", example:"We planned our trip last year."},
         {de:"Flugzeug", foreign:"plane", icon:"✈️"},
         {de:"Zug", foreign:"train", icon:"🚆"},
@@ -3345,7 +3345,7 @@ const BOOKS = {
         {de:"Angst machen", foreign:"to scare", icon:"😱", example:"The dog scared me."},
         {de:"(Lied)text", foreign:"lyrics", icon:"🎵", example:"I know all the lyrics to this song."},
         {de:"schlaflos", foreign:"sleepless", icon:"😴"},
-        {de:"Vergangenheitsform von „can't“", foreign:"couldn't (= could not)", icon:"🚫", example:"I'm sad because my friend couldn't come to the party."},
+        {de:"Vergangenheitsform von „can't“", foreign:"couldn't (= could not)", icon:"🚫", example:"I'm sad because my friend couldn't come to the party.", onlyDirection:"deToEn"},
         {de:"kriechen / schleichen", foreign:"to creep", icon:"🐛"},
         {de:"solch(er/es)", foreign:"such", icon:"❓"},
         {de:"Zeit mit jdm verbringen", foreign:"to hang out with sb", icon:"🧑‍🤝‍🧑"},
@@ -6862,11 +6862,13 @@ function buildRoundCardsFromVocab(){
   for(const v of state.vocabPool){
     if(!v.active) continue;
 
-    // v.direction (falls gesetzt) geht vor state.direction -- so kann z.B.
-    // startDueReviewRound() pro Wort seine ursprüngliche Lernrichtung
-    // vorgeben, während normale Seiten-/Buchrunden (ohne v.direction)
-    // weiterhin einheitlich state.direction verwenden.
-    let directionForCard = v.direction || state.direction;
+    // onlyDirection (fest im Vokabeldatensatz, z.B. Grammatik-Erklärungen wie
+    // "Vergangenheitsform von isn't") geht vor ALLEM anderen -- diese Wörter
+    // sind nur in einer Richtung sinnvoll abfragbar (siehe findVocabEntryByDe).
+    // Danach v.direction (ursprüngliche Lernrichtung bei Wiederholungen, siehe
+    // startDueReviewRound), zuletzt state.direction.
+    const forcedDirection = (findVocabEntryByDe(v.de) || {}).onlyDirection;
+    let directionForCard = forcedDirection || v.direction || state.direction;
     if(directionForCard==="mixed"){
       directionForCard = (Math.random()<0.5) ? "deToEn" : "enToDe";
     }
@@ -7328,7 +7330,7 @@ function findVocabEntryByDe(deWord){
     const pages = allBooks[bookKey].pages || {};
     for(const pageId of Object.keys(pages)){
       const found = (pages[pageId]||[]).find(v=>v.de===deWord);
-      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId, lang:resolveSpeechLang(allBooks[bookKey].lang)};
+      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId, lang:resolveSpeechLang(allBooks[bookKey].lang), onlyDirection:found.onlyDirection||null};
     }
   }
   return null;
