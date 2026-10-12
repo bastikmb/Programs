@@ -5007,9 +5007,11 @@ function loadCustomBooks(){
     console.error("loadCustomBooks error", e);
     customBooks = {};
   }
+  invalidateVocabIndex();
 }
 
 function saveCustomBooks(){
+  invalidateVocabIndex();
   try { localStorage.setItem("vocabCustomBooks", JSON.stringify(customBooks)); }
   catch(e){ console.error("saveCustomBooks error", e); }
 }
@@ -5188,7 +5190,7 @@ let state = {
   // buildRoundCardsFromVocab() runs (start of the first round) -- listed
   // here too, with their real defaults, so this object actually documents
   // the full state shape instead of only the fields set before then.
-  requeuedKeys: {},             // which words (by de key) already got a within-round retry card, see maybeRequeueCard
+  requeuedKeys: {},             // which words (by vocabKey) already got a within-round retry card, see maybeRequeueCard
   roundStartTotalPoints: 0,     // prof.stats.totalPoints snapshot at round start, for live point-delta display
   roundLevelAtStart: 1,         // computeLevel() snapshot at round start, to detect a level-up mid-round
   roundCorrectCount: 0,         // correct answers so far this round
@@ -5464,7 +5466,8 @@ function createProfile(name){
         bonusCards:{redeemed:{}},
         roundsCompleted:0,
         totalCorrectAnswersEver:0,
-        wordSchedule:{}
+        wordSchedule:{},
+        vocabKeySchema:VOCAB_KEY_SCHEMA
       }
     };
     saveProfiles();
@@ -6724,6 +6727,7 @@ function startDueReviewRound(){
   const due = collectDueWords(prof);
   if(due.length===0) return;
   state.vocabPool = due.map(w=>({
+    key:w.key, onlyDirection:w.onlyDirection||null,
     de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId, lang:w.lang,
     direction:w.direction || null
   }));
@@ -6823,7 +6827,7 @@ function formatPageLabel(pageId){
 
 /* Percentage of this page's own vocabulary that has ever been answered
    correctly on the first try, separately for each learning direction
-   (profile.stats.correctByDirection, keyed by the German word) -- NOT
+   (profile.stats.correctByDirection, keyed by vocabKey()) -- NOT
    the score of whichever subset of words happened to be selected in the
    last round. Using the round's own subset as the denominator made
    picking e.g. just 1 of a page's 40 words and getting it right show
@@ -6839,7 +6843,7 @@ function computePageProgressByDirection(pageId){
   const pctFor = (counts)=>{
     let learned = 0;
     for(const w of words){
-      if(counts[w.de] > 0) learned++;
+      if(counts[vocabKey(book.lang, w.de, w.foreign)] > 0) learned++;
     }
     return Math.round(learned/words.length*100);
   };
@@ -6867,7 +6871,10 @@ function isPageSetWordProgressComplete(selectedPages){
   return selectedPages.every(pageId=>{
     const words = book.pages[pageId];
     if(!words || words.length===0) return false;
-    return words.every(w=>(byDir.deToEn[w.de]>0) || (byDir.enToDe[w.de]>0));
+    return words.every(w=>{
+      const key = vocabKey(book.lang, w.de, w.foreign);
+      return (byDir.deToEn[key]>0) || (byDir.enToDe[key]>0);
+    });
   });
 }
 
@@ -7154,10 +7161,10 @@ function buildRoundCardsFromVocab(){
 
     // onlyDirection (fest im Vokabeldatensatz, z.B. Grammatik-Erklärungen wie
     // "Vergangenheitsform von isn't") geht vor ALLEM anderen -- diese Wörter
-    // sind nur in einer Richtung sinnvoll abfragbar (siehe findVocabEntryByDe).
+    // sind nur in einer Richtung sinnvoll abfragbar.
     // Danach v.direction (ursprüngliche Lernrichtung bei Wiederholungen, siehe
     // startDueReviewRound), zuletzt state.direction.
-    const forcedDirection = (findVocabEntryByDe(v.de) || {}).onlyDirection;
+    const forcedDirection = v.onlyDirection || null;
     let directionForCard = forcedDirection || v.direction || state.direction;
     if(directionForCard==="mixed"){
       directionForCard = (Math.random()<0.5) ? "deToEn" : "enToDe";
@@ -7179,6 +7186,8 @@ function buildRoundCardsFromVocab(){
     }
 
     state.roundCards.push({
+      key:v.key, // vocabKey(), identity for all per-word stats
+      onlyDirection:v.onlyDirection||null,
       icon:v.icon,
       de:v.de,
       foreign:v.foreign,
@@ -7210,7 +7219,7 @@ function buildRoundCardsFromVocab(){
   state.roundIndex = 0;
   state.roundTotalPoints = 0;
   state.roundStartTime = Date.now();
-  state.requeuedKeys = {}; // which words (by de key) already got a within-round retry card, see maybeRequeueCard
+  state.requeuedKeys = {}; // which words (by vocabKey) already got a within-round retry card, see maybeRequeueCard
   state.currentCombo = 0;
   state.bestCombo = 0;
   state.roundComboBonus = 0;
@@ -7608,6 +7617,8 @@ function collectHardWords(){
     if(!card.done) continue;
     if(!card.firstTry){
       hard.push({
+        key:card.key,
+        onlyDirection:card.onlyDirection||null,
         prompt:card.prompt,
         answer:card.answer,
         icon:card.icon,
@@ -7622,23 +7633,136 @@ function collectHardWords(){
   return hard;
 }
 
-/* Looks up a word's CURRENT book/page vocab entry by its German text --
-   prof.stats.wordSchedule (see updateWordSchedule) only stores the word
-   key itself, not which book/page it came from, since a word's page can
-   be edited/moved over time and the book data stays the single source of
-   truth for de/foreign/icon/example/pageId. Scans built-in and custom
-   books; returns null if the word no longer exists anywhere (e.g. its
-   custom page was deleted) so collectDueWords() can just skip it. */
-function findVocabEntryByDe(deWord){
+/* Stable identity of ONE vocabulary item, used as the key for every
+   per-word statistic (wrongCounts, correctCounts, correctByDirection,
+   wordSchedule, pendingPageSetWords). Language + German + foreign text:
+   the same German word with a different translation ("groß" = big /
+   large / magnus) or in another language is a different item with its
+   own progress, while an identical pair repeated across books of the
+   same language ("sehen" = to see in Camden Town 5 and 6) is the same
+   knowledge and shares it. Before this, stats were keyed by the German
+   word alone, see migrateProfileToVocabKeys(). */
+function vocabKey(lang, de, foreign){
+  return `${lang}|${de}|${foreign}`;
+}
+
+/* key -> first matching entry across built-in and custom books, plus
+   de -> all entries (for the one-time migration). Rebuilt lazily after
+   customBooks changes (see saveCustomBooks/loadCustomBooks). */
+let vocabIndexCache = null;
+function invalidateVocabIndex(){ vocabIndexCache = null; }
+function getVocabIndex(){
+  if(vocabIndexCache) return vocabIndexCache;
+  const byKey = new Map(), byDe = new Map();
   const allBooks = {...BOOKS, ...customBooks};
-  for(const bookKey of Object.keys(allBooks)){
-    const pages = allBooks[bookKey].pages || {};
-    for(const pageId of Object.keys(pages)){
-      const found = (pages[pageId]||[]).find(v=>v.de===deWord);
-      if(found) return {de:found.de, foreign:found.foreign, icon:found.icon, example:found.example||null, pageId, lang:resolveSpeechLang(allBooks[bookKey].lang), onlyDirection:found.onlyDirection||null};
+  for(const [bookKey, book] of Object.entries(allBooks)){
+    for(const [pageId, words] of Object.entries(book.pages || {})){
+      for(const w of words || []){
+        const key = vocabKey(book.lang, w.de, w.foreign);
+        if(!byKey.has(key)){
+          byKey.set(key, {key, de:w.de, foreign:w.foreign, icon:w.icon, example:w.example||null, pageId,
+            lang:resolveSpeechLang(book.lang), onlyDirection:w.onlyDirection||null});
+        }
+        if(!byDe.has(w.de)) byDe.set(w.de, []);
+        byDe.get(w.de).push({key, bookKey, pageId, bookLang:book.lang});
+      }
     }
   }
-  return null;
+  vocabIndexCache = {byKey, byDe};
+  return vocabIndexCache;
+}
+
+/* Looks up a word's CURRENT vocab entry by its vocabKey() -- the stats
+   only store the key, the book data stays the single source of truth
+   for icon/example/pageId. Returns null if the word no longer exists
+   anywhere (e.g. its custom page was deleted). */
+function findVocabEntryByKey(key){
+  return getVocabIndex().byKey.get(key) || null;
+}
+
+/* Human-readable label for a stats key (problem-word list) -- falls back
+   to parsing the key itself if the word was deleted since. */
+function vocabKeyLabel(key){
+  const v = findVocabEntryByKey(key);
+  if(v) return `${v.de} → ${v.foreign}`;
+  const parts = key.split("|");
+  return parts.length>=3 ? `${parts[1]} → ${parts.slice(2).join("|")}` : key;
+}
+
+/* One-time migration of a profile's per-word stats from the old German-
+   word keys to vocabKey(). An old key is moved to every vocab item with
+   that German text, narrowed down to the books/languages this profile
+   actually played when that's possible; only words that truly can't be
+   told apart (same German word, several translations, all in books the
+   profile played) end up credited to each of them -- exactly what the
+   old shared key did anyway, so nothing visible is lost. Words that no
+   longer exist anywhere are dropped. The untouched old data is kept in
+   stats.legacyDeKeyedStats as a safety net. Returns true if it changed
+   anything. */
+const VOCAB_KEY_SCHEMA = 1;
+function migrateProfileToVocabKeys(prof){
+  const st = prof && prof.stats;
+  if(!st || (st.vocabKeySchema||0) >= VOCAB_KEY_SCHEMA) return false;
+  const {byDe} = getVocabIndex();
+  const playedBooks = new Set(Object.keys(st.booksPlayed||{}));
+  const playedLangs = new Set(Object.keys(st.languagesPlayed||{}));
+
+  const candidateKeys = (de, filter)=>{
+    let c = (byDe.get(de) || []).filter(filter || (()=>true));
+    const narrow = pred=>{ const n = c.filter(pred); if(n.length>0) c = n; };
+    if(new Set(c.map(x=>x.key)).size>1) narrow(x=>playedBooks.has(x.bookKey));
+    if(new Set(c.map(x=>x.key)).size>1) narrow(x=>playedLangs.has(x.bookLang));
+    return [...new Set(c.map(x=>x.key))];
+  };
+  const remap = (map)=>{
+    const out = {};
+    for(const [de, val] of Object.entries(map || {})){
+      for(const key of candidateKeys(de)){
+        out[key] = (val && typeof val==="object") ? {...val} : val;
+      }
+    }
+    return out;
+  };
+
+  st.legacyDeKeyedStats = JSON.parse(JSON.stringify({
+    wrongCounts: st.wrongCounts || {},
+    correctCounts: st.correctCounts || {},
+    correctByDirection: st.correctByDirection || null,
+    wordSchedule: st.wordSchedule || {},
+    pendingPageSetWords: st.pendingPageSetWords || {}
+  }));
+  st.wrongCounts = remap(st.wrongCounts);
+  st.correctCounts = remap(st.correctCounts);
+  if(st.correctByDirection){
+    st.correctByDirection = {
+      deToEn: remap(st.correctByDirection.deToEn),
+      enToDe: remap(st.correctByDirection.enToDe)
+    };
+  }
+  st.wordSchedule = remap(st.wordSchedule);
+  // pending words belong to one known book+page selection (the set key is
+  // "bookKey|page1,page2"), so they can be mapped precisely
+  const pendingOut = {};
+  for(const [setKey, words] of Object.entries(st.pendingPageSetWords || {})){
+    const [bookKey, pageList] = setKey.split("|");
+    const pages = new Set((pageList||"").split(","));
+    const mapped = {};
+    for(const de of Object.keys(words || {})){
+      for(const key of candidateKeys(de, x=>x.bookKey===bookKey && pages.has(x.pageId))) mapped[key] = true;
+    }
+    if(Object.keys(mapped).length>0) pendingOut[setKey] = mapped;
+  }
+  st.pendingPageSetWords = pendingOut;
+  st.vocabKeySchema = VOCAB_KEY_SCHEMA;
+  return true;
+}
+
+function migrateAllProfilesToVocabKeys(){
+  let changed = false;
+  for(const prof of Object.values(state.profiles)){
+    if(migrateProfileToVocabKeys(prof)) changed = true;
+  }
+  if(changed) saveProfiles();
 }
 
 /* Words whose Leitner-Box-Fälligkeit (see updateWordSchedule) heute oder
@@ -7651,7 +7775,7 @@ function collectDueWords(prof){
   for(const key of Object.keys(schedule)){
     const entry = schedule[key];
     if(entry && entry.dueDate && entry.dueDate<=today){
-      const vocab = findVocabEntryByDe(key);
+      const vocab = findVocabEntryByKey(key);
       if(vocab) due.push({...vocab, direction: entry.direction || null});
     }
   }
@@ -7671,7 +7795,7 @@ function isRoundFullyCorrect(originalCards, allRoundCards){
   if(originalCards.length===0) return false;
   return originalCards.every(oc=>{
     if(oc.resolvedCorrectly) return true;
-    const retry = allRoundCards.find(c=>c.isRequeue && c.de===oc.de);
+    const retry = allRoundCards.find(c=>c.isRequeue && c.key===oc.key);
     return !!(retry && retry.resolvedCorrectly);
   });
 }
@@ -7751,9 +7875,9 @@ function recordPendingBadWords(prof, originalCards, key){
   const pending = ensurePendingPageSetWords(prof);
   const badWords = {};
   for(const oc of originalCards){
-    const retry = state.roundCards.find(c=>c.isRequeue && c.de===oc.de);
+    const retry = state.roundCards.find(c=>c.isRequeue && c.key===oc.key);
     const resolved = oc.resolvedCorrectly || !!(retry && retry.resolvedCorrectly);
-    if(!resolved) badWords[oc.de] = true;
+    if(!resolved) badWords[oc.key] = true;
   }
   if(Object.keys(badWords).length>0) pending[key] = badWords;
   else delete pending[key];
@@ -7770,15 +7894,15 @@ function clearPendingBadWords(prof, originalCards, today){
   const newlyCompleted = [];
   const clearedWords = []; // distinkte Wörter, die diesmal aus mind. einem offenen Set entfernt wurden -- für "Nachhol-Profi"
   for(const oc of originalCards){
-    const retry = state.roundCards.find(c=>c.isRequeue && c.de===oc.de);
+    const retry = state.roundCards.find(c=>c.isRequeue && c.key===oc.key);
     const clearedNow = oc.resolvedCorrectly || !!(retry && retry.resolvedCorrectly);
     if(!clearedNow) continue;
     let wordWasPending = false;
     for(const key of Object.keys(pending)){
       const words = pending[key];
-      if(words && words[oc.de]){
+      if(words && words[oc.key]){
         wordWasPending = true;
-        delete words[oc.de];
+        delete words[oc.key];
         if(Object.keys(words).length===0){
           delete pending[key];
           if(!pageSets[key]){
@@ -7788,7 +7912,7 @@ function clearPendingBadWords(prof, originalCards, today){
         }
       }
     }
-    if(wordWasPending) clearedWords.push(oc.de);
+    if(wordWasPending) clearedWords.push(oc.key);
   }
   return {newlyCompleted, clearedWords};
 }
@@ -7807,8 +7931,8 @@ function updateWordCounters(prof, originalCards){
     // "Problemwörter" stat -- skipping or revealing without trying
     // still marks the card as !firstTry (for the round summary and page
     // progress), but shouldn't make a word look harder than it is.
-    // canonical key = the German word, stable no matter which direction was tested
-    const key = card.de;
+    // canonical key = vocabKey() of the item, stable no matter which direction was tested
+    const key = card.key;
     if(card.attemptedWrong){
       if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
       prof.stats.wrongCounts[key]+=1;
@@ -7854,7 +7978,7 @@ function isBookFullyMastered(prof, bookKey){
   const schedule = ensureWordSchedule(prof);
   for(const words of Object.values(book.pages)){
     for(const w of words){
-      const entry = schedule[w.de];
+      const entry = schedule[vocabKey(book.lang, w.de, w.foreign)];
       if(!entry || entry.box < LEITNER_MAX_BOX) return false;
     }
   }
@@ -7891,7 +8015,7 @@ function getAvailableLanguages(){
 function updateWordSchedule(prof, originalCards, today){
   const schedule = ensureWordSchedule(prof);
   for(const card of originalCards){
-    const key = card.de;
+    const key = card.key;
     const existing = schedule[key];
     // Einmal gesetzt, nie wieder überschrieben -- auch wenn das Wort
     // später (z.B. in einer "gemischt"-Seitenrunde) zufällig in der
@@ -8062,7 +8186,7 @@ function finalizeRoundAndUpdateProfile(){
     // a word that had already gone wrong 3+ times (before this round) and
     // got answered right on the first try this round counts as "mastered"
     const comebackHappened = originalCards.some(c=>
-      c.firstTry && c.done && (wrongCountsBefore[c.de]||0)>=3);
+      c.firstTry && c.done && (wrongCountsBefore[c.key]||0)>=3);
 
     // "Wochenendprofi": letzten gespielten Samstag/Sonntag separat merken --
     // das Abzeichen prüft dann (in buildAchievementCtx/ACHIEVEMENTS), ob der
@@ -8293,7 +8417,7 @@ function renderStatsScreen(){
       row.className="problem-row";
       const wSpan=document.createElement("div");
       wSpan.className="problem-word";
-      wSpan.textContent=word;
+      wSpan.textContent=vocabKeyLabel(word);
       const cSpan=document.createElement("div");
       cSpan.className="problem-count";
       cSpan.textContent=`Fehler: ${count}`;
@@ -9027,6 +9151,8 @@ function renderVocabPickScreen(){
     for(const v of arr){
       const key = `${pid}|${v.de}|${v.foreign}`;
       state.vocabPool.push({
+        key:vocabKey(currentBook.lang, v.de, v.foreign),
+        onlyDirection:v.onlyDirection||null,
         de:v.de,
         foreign:v.foreign,
         icon:v.icon,
@@ -9084,8 +9210,8 @@ function renderVocabPickScreen(){
       texts.appendChild(d);
       texts.appendChild(foreignRow);
 
-      const correctCount = correctCounts[voc.de] || 0;
-      const wrongCount = wrongCounts[voc.de] || 0;
+      const correctCount = correctCounts[voc.key] || 0;
+      const wrongCount = wrongCounts[voc.key] || 0;
       if(correctCount>0 || wrongCount>0){
         const histDiv=document.createElement("div");
         histDiv.className="vocab-history";
@@ -9452,14 +9578,14 @@ function showSummaryScreen(){
    via the original card. */
 function maybeRequeueCard(card){
   if(!card.attemptedWrong || card.isRequeue) return;
-  const key = card.de;
+  const key = card.key;
   if(state.requeuedKeys[key]) return;
   state.requeuedKeys[key] = true;
 
   const gap = 3 + Math.floor(Math.random()*4); // reappears 3-6 cards later
   const insertPos = Math.min(state.roundIndex + 1 + gap, state.roundCards.length);
   state.roundCards.splice(insertPos, 0, {
-    icon:card.icon, de:card.de, foreign:card.foreign, pageId:card.pageId,
+    key:card.key, icon:card.icon, de:card.de, foreign:card.foreign, pageId:card.pageId,
     example:card.example, direction:card.direction,
     prompt:card.prompt, answer:card.answer,
     speechLang:card.speechLang,
@@ -9992,6 +10118,7 @@ function setupEventListeners(){
           if(book) customBooks[key] = book;
         }
         saveCustomBooks();
+        migrateAllProfilesToVocabKeys(); // backups from before vocabKey() still use German-word keys
 
         renderProfilesScreen();
         alert("Daten erfolgreich importiert.");
@@ -10285,6 +10412,8 @@ function setupEventListeners(){
     // (using prompt/answer here would silently swap the two languages
     // whenever the previous round's direction was enToDe or mixed)
     state.vocabPool = hard.map(h=>({
+      key:h.key,
+      onlyDirection:h.onlyDirection,
       de:h.de,
       foreign:h.foreign,
       icon:h.icon,
@@ -10374,6 +10503,7 @@ function initHeroBanner(){
 function initApp(){
   loadProfiles();
   loadCustomBooks();
+  migrateAllProfilesToVocabKeys(); // needs both profiles and custom books loaded
   retrofitRetroactiveAchievements();
   let darkOn = false;
   try { darkOn = localStorage.getItem("vocabDarkMode")==="1"; } catch(e){ /* ignore */ }
