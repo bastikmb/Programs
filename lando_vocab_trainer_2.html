@@ -1440,6 +1440,18 @@ body.dark-theme .daily-goal-mini-banner {
   min-width:3.2rem;
   text-align:right;
 }
+.leaderboard-opt-label {
+  display:flex;
+  align-items:center;
+  gap:0.5rem;
+  font-weight:600;
+  cursor:pointer;
+}
+.leaderboard-opt-label input {
+  width:1.2rem;
+  height:1.2rem;
+  accent-color:var(--accent);
+}
 .leaderboard-row .breakdown {
   flex-basis:100%;
   font-size:0.72rem;
@@ -1966,6 +1978,14 @@ input:focus-visible {
       </details>
     </div>
 
+    <div id="leaderboardOptBlock" class="section-block" style="display:none;">
+      <div class="section-title">🏆 Online-Tabelle</div>
+      <label class="leaderboard-opt-label">
+        <input type="checkbox" id="chkLeaderboardOptIn" />
+        <span>In der Online-Tabelle anzeigen</span>
+      </label>
+      <div class="section-sub" style="margin-top:0.4rem;">Sichtbar für alle: dein Spitzname, Punkte, Trefferquote, Lernserie, Abzeichen und dein Team. Ausschalten löscht deinen Eintrag aus der Tabelle.</div>
+    </div>
     <div id="teamPickerBlock" class="section-block" style="display:none;">
       <details>
         <summary class="section-title" style="cursor:pointer;">⚽ Team wählen</summary>
@@ -2345,7 +2365,10 @@ input:focus-visible {
      match /databases/{database}/documents {
        match /leaderboard_v1/{docId} {
          allow read: if true;
-         allow delete: if false;
+         // own entries only (same uid prefix as for writing) -- used when a
+         // profile is deleted or opts out of the Tabelle
+         allow delete: if request.auth != null
+           && docId.matches('^' + request.auth.uid + '_.*$');
          allow create, update: if request.auth != null
            && docId.matches('^' + request.auth.uid + '_.*$')
            && request.resource.data.cloudId == docId
@@ -2362,7 +2385,7 @@ input:focus-visible {
            && request.resource.data.longestStreak is number
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
-           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 53
+           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 1000
            && request.resource.data.distinctPageSetsCompleted is number
            && request.resource.data.distinctPageSetsCompleted >= 0 && request.resource.data.distinctPageSetsCompleted <= 1000
            && (request.resource.data.team == null ||
@@ -2401,7 +2424,7 @@ function initFirebase(){
     fbDb = firebase.firestore();
     fbAuth = firebase.auth();
     fbAuth.signInAnonymously()
-      .then(()=>{ fbReady = true; refreshStartScreenConnectionWidgets(); })
+      .then(()=>{ fbReady = true; flushPendingCloudDeletes(); refreshStartScreenConnectionWidgets(); })
       .catch(e=>{ console.error("Firebase anon auth failed", e); fbReady=false; });
   } catch(e){ console.error("initFirebase error", e); fbReady=false; }
 }
@@ -6055,6 +6078,60 @@ function groupMembersByTeam(rows){
   return byTeam;
 }
 
+/* Removing a profile's entry from the public Tabelle -- on profile
+   deletion and on opt-out (prof.leaderboardOptOut, see the switch on the
+   profile screen). The doc id needs this browser's anonymous uid, which
+   is only known once signed in, so the id is built from the uid of the
+   CURRENT sign-in; if Firebase isn't reachable right now, the id is
+   remembered (localStorage) and the delete retried after the next
+   successful sign-in (flushPendingCloudDeletes). Only entries written from
+   this browser can be removed this way -- the security rules allow
+   deleting own-uid documents only. */
+const PENDING_CLOUD_DELETES_KEY = "vocabPendingCloudDeletes";
+
+function loadPendingCloudDeletes(){
+  try { return JSON.parse(localStorage.getItem(PENDING_CLOUD_DELETES_KEY)) || []; }
+  catch(e){ return []; }
+}
+function savePendingCloudDeletes(list){
+  try { localStorage.setItem(PENDING_CLOUD_DELETES_KEY, JSON.stringify(list)); } catch(e){ /* ignore */ }
+}
+
+function deleteCloudDoc(cloudId){
+  return fbDb.collection("leaderboard_v1").doc(fbAuth.currentUser.uid + "_" + cloudId).delete();
+}
+
+/* Queues the delete first and only un-queues it once Firestore confirmed
+   it, so closing the app mid-request can't lose it. */
+function removeProfileFromLeaderboard(prof){
+  if(!prof || !prof.cloudId) return; // never synced -> nothing in the cloud
+  const cloudId = prof.cloudId;
+  const pending = loadPendingCloudDeletes();
+  if(!pending.includes(cloudId)) savePendingCloudDeletes([...pending, cloudId]);
+  if(syncProfileToLeaderboardTimer){ // a queued upload must not recreate it
+    clearTimeout(syncProfileToLeaderboardTimer);
+    syncProfileToLeaderboardTimer = null;
+  }
+  flushPendingCloudDeletes();
+}
+
+function flushPendingCloudDeletes(){
+  if(!fbReady || !fbAuth || !fbAuth.currentUser) return;
+  for(const cloudId of loadPendingCloudDeletes()){
+    // opted back in in the meantime -> keep the entry
+    if(Object.values(state.profiles).some(p=>p.cloudId===cloudId && !p.leaderboardOptOut)){
+      savePendingCloudDeletes(loadPendingCloudDeletes().filter(id=>id!==cloudId));
+      continue;
+    }
+    deleteCloudDoc(cloudId)
+      .then(()=>{
+        savePendingCloudDeletes(loadPendingCloudDeletes().filter(id=>id!==cloudId));
+        invalidateLeaderboardCache();
+      })
+      .catch(e=>console.error("leaderboard delete failed (offline?)", e));
+  }
+}
+
 /* Fire-and-forget push of this profile's current cumulative stats to the
    shared leaderboard -- never blocks or interrupts the round-end UI, same
    try/catch-and-swallow philosophy as playSound(). No opt-in gate (the
@@ -6072,7 +6149,7 @@ let syncProfileToLeaderboardTimer = null;
    document with current totals (no delta, see doSyncProfileToLeaderboard),
    only the LAST call in a short burst actually needs to go out. */
 function syncProfileToLeaderboard(prof){
-  if(!prof || !fbReady || !fbAuth || !fbAuth.currentUser) return;
+  if(!prof || prof.leaderboardOptOut || !fbReady || !fbAuth || !fbAuth.currentUser) return;
   if(syncProfileToLeaderboardTimer) clearTimeout(syncProfileToLeaderboardTimer);
   syncProfileToLeaderboardTimer = setTimeout(()=>{
     syncProfileToLeaderboardTimer = null;
@@ -6082,12 +6159,17 @@ function syncProfileToLeaderboard(prof){
 
 function doSyncProfileToLeaderboard(prof){
   if(!prof || !fbReady || !fbAuth || !fbAuth.currentUser) return;
+  // re-checked here, not just when the (debounced) sync was requested: the
+  // profile may have opted out or been deleted in the meantime, and an
+  // upload now would put it right back into the public Tabelle
+  const profileName = Object.keys(state.profiles).find(n=>state.profiles[n]===prof);
+  if(!profileName || prof.leaderboardOptOut) return;
   try{
     const docId = getCloudDocId(prof);
     if(!docId) return;
     const data = {
       cloudId: docId,
-      nickname: (state.currentProfile||"").slice(0,24),
+      nickname: profileName.slice(0,24),
       totalPoints: prof.stats.totalPoints||0,
       roundsCompleted: prof.stats.roundsCompleted||0,
       bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
@@ -6102,6 +6184,7 @@ function doSyncProfileToLeaderboard(prof){
     fbDb.collection("leaderboard_v1").doc(docId).set(data)
       .then(()=>{
         syncLeaderboardFailureStreak = 0;
+        invalidateLeaderboardCache(); // own rank/score just changed
         if(!prof.cloudInfoSeen){
           prof.cloudInfoSeen = true;
           saveProfiles();
@@ -6129,7 +6212,7 @@ function showCloudInfoBanner(){
   if(!extraDiv) return;
   const banner = document.createElement("div");
   banner.className = "highlight-banner info";
-  banner.textContent = "ℹ️ Dein Spitzname und deine Punkte sind jetzt für deine Mitschüler in der Tabelle sichtbar.";
+  banner.textContent = "ℹ️ Dein Spitzname und deine Punkte sind jetzt für deine Mitschüler in der Tabelle sichtbar. Abschalten kannst du das jederzeit im Profil.";
   extraDiv.appendChild(banner);
 }
 
@@ -6346,7 +6429,7 @@ function renderDailyGoalWidget(){
    screen just to see where they stand. Fire-and-forget/async like the
    rest of the Firebase code -- renderStartScreen() itself returns
    immediately, this widget fills in once the (already existing)
-   fetchLeaderboard() call resolves. */
+   fetchLeaderboardRows() call resolves. */
 async function renderLeagueRankWidget(){
   const tile = document.getElementById("leagueRankTile");
   const prof = getCurrentProfileObj();
@@ -6362,6 +6445,11 @@ async function renderLeagueRankWidget(){
   };
   makeTileAccessible(tile, "Vokabel-Bundesligatabelle öffnen");
   const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
+  if(prof.leaderboardOptOut){
+    tile.innerHTML = `${head}<div class="stat-tile-sub">🙈 Nicht in der Tabelle</div>`;
+    tile.classList.add("show");
+    return;
+  }
   if(!fbReady){
     tile.innerHTML = `${head}<div class="stat-tile-sub">📡 Keine Verbindung</div>`;
     tile.classList.add("show");
@@ -6370,7 +6458,7 @@ async function renderLeagueRankWidget(){
   tile.innerHTML = `${head}<div class="stat-tile-value">⏳</div>`;
   tile.classList.add("show");
   try{
-    const rows = await fetchLeaderboard();
+    const rows = await fetchLeaderboardRows();
     // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle, sonst würde
     // der hier gezeigte Platz nicht zu dem passen, was renderLeaderboardRows
     // beim Öffnen der Tabelle tatsächlich anzeigt
@@ -6436,7 +6524,7 @@ async function renderTeamRankWidget(){
   }
   tile.innerHTML = nameBlock(`<span class="stat-tile-sub">⏳</span>`);
   try{
-    const rows = await fetchAllTeamMembers();
+    const rows = await fetchLeaderboardRows();
     const bonusedRows = applyDiligenceBonus(rows);
     const byTeam = groupMembersByTeam(bonusedRows);
     const teamEntries = Object.entries(byTeam)
@@ -6621,6 +6709,17 @@ function renderProfileCustomize(){
     });
     themeDiv.appendChild(btn);
   });
+}
+
+function renderLeaderboardOptIn(){
+  const block = document.getElementById("leaderboardOptBlock");
+  const prof = getCurrentProfileObj();
+  if(!prof){
+    block.style.display="none";
+    return;
+  }
+  block.style.display="block";
+  document.getElementById("chkLeaderboardOptIn").checked = !prof.leaderboardOptOut;
 }
 
 function renderTeamPicker(){
@@ -8562,7 +8661,7 @@ async function renderLeaderboardScreen(){
   statusEl.textContent = "⏳ Lade Tabelle...";
   statusEl.style.display="block";
   try{
-    const rows = await fetchLeaderboard();
+    const rows = await fetchLeaderboardRows();
     statusEl.style.display="none";
     renderLeaderboardRows(rows, prof);
   } catch(e){
@@ -8572,9 +8671,38 @@ async function renderLeaderboardScreen(){
   }
 }
 
-async function fetchLeaderboard(){
-  const snap = await fbDb.collection("leaderboard_v1").orderBy("leagueScore","desc").limit(50).get();
-  return snap.docs.map(d=>d.data());
+/* All leaderboard views (start-screen rank tiles, Bundesligatabelle,
+   Team-Tabelle) share ONE query and its result for a few minutes --
+   previously every start-screen visit ran two separate queries reading up
+   to 50 + 500 documents, which adds up fast against Firestore's read
+   quota. Top LEADERBOARD_FETCH_LIMIT by leagueScore is plenty for this
+   classroom-scale app; the individual table shows the first 50 of those.
+   Concurrent callers (both rank tiles render at once) share the same
+   in-flight request. Own successful syncs/deletes invalidate the cache so
+   the child's own new rank shows right away. */
+const LEADERBOARD_FETCH_LIMIT = 500;
+const LEADERBOARD_TABLE_SIZE = 50;
+const LEADERBOARD_CACHE_MS = 5*60*1000;
+let leaderboardCache = null; // {rows, fetchedAt}
+let leaderboardInFlight = null;
+
+function invalidateLeaderboardCache(){ leaderboardCache = null; }
+
+async function fetchLeaderboardRows(){
+  if(leaderboardCache && Date.now()-leaderboardCache.fetchedAt < LEADERBOARD_CACHE_MS){
+    return leaderboardCache.rows;
+  }
+  if(!leaderboardInFlight){
+    leaderboardInFlight = fbDb.collection("leaderboard_v1")
+      .orderBy("leagueScore","desc").limit(LEADERBOARD_FETCH_LIMIT).get()
+      .then(snap=>{
+        const rows = snap.docs.map(d=>d.data());
+        leaderboardCache = {rows, fetchedAt:Date.now()};
+        return rows;
+      })
+      .finally(()=>{ leaderboardInFlight = null; });
+  }
+  return leaderboardInFlight;
 }
 
 // Platz 1/2/3 nach roundsCompleted INNERHALB der aktuell geladenen Tabelle
@@ -8613,14 +8741,6 @@ function applyDiligenceBonus(rows){
     .sort((a,b)=>b.displayScore-a.displayScore);
 }
 
-/* Unlike fetchLeaderboard(), NOT limited to the top 50 by individual score
-   and NOT ordered -- a team aggregate needs every member, including ones
-   who'd never crack the individual top 50. 500 is comfortably above this
-   classroom-scale app's realistic user count. */
-async function fetchAllTeamMembers(){
-  const snap = await fbDb.collection("leaderboard_v1").limit(500).get();
-  return snap.docs.map(d=>d.data());
-}
 
 /* Builds one .leaderboard-row per entry: rank, nickname, big
    "Tabellenpunkte" value, and a small breakdown line so kids can see WHY
@@ -8640,8 +8760,9 @@ function renderLeaderboardRows(rows, prof){
 
   // Fleiß-Bonus verschiebt die Reihenfolge ggü. der reinen leagueScore --
   // siehe applyDiligenceBonus() für warum das nur hier auf Anzeigeebene
-  // passiert statt in der gespeicherten Punktzahl.
-  const bonusedRows = applyDiligenceBonus(rows);
+  // passiert statt in der gespeicherten Punktzahl. Bonus über ALLE
+  // geladenen Zeilen (wie die Rang-Kachel), angezeigt nur die Top 50.
+  const bonusedRows = applyDiligenceBonus(rows).slice(0, LEADERBOARD_TABLE_SIZE);
 
   const nameCounts = {};
   bonusedRows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
@@ -8682,10 +8803,10 @@ function renderLeaderboardRows(rows, prof){
 
 /* Eigener Team-Tabelle-Screen (getrennt von der individuellen
    Bundesligatabelle, siehe renderLeaderboardScreen()) -- gleiches
-   Lade-/Fehler-Muster, aber eigener Fetch über fetchAllTeamMembers()
-   (nicht das gedeckelte/sortierte fetchLeaderboard()), da ein
-   Team-Aggregat jedes Mitglied braucht, nicht nur die individuellen
-   Top 50. */
+   Lade-/Fehler-Muster und dieselben (gecachten) Zeilen aus
+   fetchLeaderboardRows() -- alle geladenen, nicht nur die in der
+   Einzeltabelle angezeigten Top 50, da ein Team-Aggregat jedes Mitglied
+   braucht. */
 async function renderTeamLeaderboardScreen(){
   const statusEl = document.getElementById("teamLeaderboardStatusNote");
   const bodyEl = document.getElementById("teamLeaderboardTableBody");
@@ -8700,7 +8821,7 @@ async function renderTeamLeaderboardScreen(){
   statusEl.textContent = "⏳ Lade Team-Tabelle...";
   statusEl.style.display="block";
   try{
-    const rows = await fetchAllTeamMembers();
+    const rows = await fetchLeaderboardRows();
     statusEl.style.display="none";
     renderTeamLeaderboardRows(applyDiligenceBonus(rows));
   } catch(e){
@@ -8807,6 +8928,7 @@ function renderTeamLeaderboardRows(rows){
 function renderProfilesScreen(){
   applyProfileTheme(); // so picking a new avatar/color reflects immediately, not just after returning to the start screen
   renderProfileCustomize();
+  renderLeaderboardOptIn();
   renderTeamPicker();
 
   const profDiv=document.getElementById("profileList");
@@ -8842,9 +8964,13 @@ function renderProfilesScreen(){
     delBtn.addEventListener("click",(e)=>{
       e.stopPropagation();
       showConfirmOverlay(
-        `Profil "${name}" wirklich löschen? Alle Punkte und Fortschritte gehen verloren.`,
+        `Profil "${name}" wirklich löschen? Alle Punkte und Fortschritte gehen verloren, auch der Eintrag in der Online-Tabelle.`,
         ()=>{
+          const deletedProf = state.profiles[name];
           delete state.profiles[name];
+          // after removing it from state.profiles -- flushPendingCloudDeletes()
+          // keeps entries of profiles that still exist and are opted in
+          removeProfileFromLeaderboard(deletedProf);
           if(state.currentProfile===name){
             state.currentProfile=null;
             saveCurrentProfile();
@@ -10195,6 +10321,20 @@ function setupEventListeners(){
   });
 
   document.getElementById("btnQuickStart").addEventListener("click", startQuickRound);
+
+  document.getElementById("chkLeaderboardOptIn").addEventListener("change", (e)=>{
+    const prof = getCurrentProfileObj();
+    if(!prof) return;
+    if(e.target.checked){
+      prof.leaderboardOptOut = false;
+      saveProfiles();
+      syncProfileToLeaderboard(prof); // back in with the current stats
+    } else {
+      prof.leaderboardOptOut = true;
+      saveProfiles();
+      removeProfileFromLeaderboard(prof);
+    }
+  });
 
   document.getElementById("btnExportData").addEventListener("click", ()=>{
     // include customBooks (eigene Bücher/Seiten/Vokabeln), not just profile stats --
