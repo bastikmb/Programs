@@ -950,6 +950,13 @@ body.dark-theme .answer-feedback.typo {
 .feedback-overlay-msg.far { color:var(--ink); }
 body.dark-theme .feedback-overlay-msg.good { color:#6ee7b7; }
 body.dark-theme .feedback-overlay-msg.far { color:var(--ink); }
+.feedback-overlay-answer {
+  font-size:1.25rem;
+  font-weight:700;
+  color:var(--accent);
+  margin:0.25rem 0 0.5rem;
+  word-break:break-word;
+}
 .feedback-overlay-example {
   font-size:1.05rem;
   font-style:italic;
@@ -1540,6 +1547,19 @@ body.dark-theme .daily-goal-mini-banner {
   transition:background var(--fast),box-shadow var(--fast),opacity var(--fast);
   box-shadow:0 10px 24px rgba(37,99,235,0.3);
 }
+/* visible keyboard focus -- .btn (and some inputs) set outline:none, so
+   without this keyboard users can't see where they are. :focus-visible
+   keeps it off for mouse/touch taps. */
+button:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible,
+input:focus-visible {
+  outline:3px solid var(--accent);
+  outline-offset:2px;
+}
+/* the full-screen "continue" overlay is focused programmatically -- an
+   outline around the whole viewport would just look broken */
+#feedbackOverlay:focus-visible { outline:none; }
 .btn:disabled {
   background:#9ca3af;
   box-shadow:none;
@@ -2187,6 +2207,7 @@ body.dark-theme .daily-goal-mini-banner {
 <div id="feedbackOverlay" class="feedback-overlay" style="display:none;" role="button" tabindex="0" aria-label="Weiter zur nächsten Aufgabe">
   <div class="feedback-overlay-inner">
     <div id="feedbackOverlayMsg" class="feedback-overlay-msg"></div>
+    <div id="feedbackOverlayAnswer" class="feedback-overlay-answer" style="display:none;"></div>
     <div id="feedbackOverlayExample" class="feedback-overlay-example" style="display:none;"></div>
     <button id="btnSpeakOverlay" class="speak-btn" type="button" title="Wort vorlesen" aria-label="Wort vorlesen" style="display:none;">🗣️</button>
     <div class="feedback-overlay-hint">👉 Antippen zum Weitermachen</div>
@@ -5484,6 +5505,29 @@ function sanitizeImportedProfile(raw){
   };
 }
 
+/* Same idea as sanitizeImportedProfile(), for the customBooks part of a
+   backup file: an imported book without a proper pages object (or with
+   non-string vocab fields) would crash every later render -- and since
+   it's persisted right away, on every app start from then on. Returns
+   null for anything unusable so the caller just skips it. */
+function sanitizeImportedCustomBook(raw){
+  if(typeof raw !== "object" || raw===null) return null;
+  if(typeof raw.lang !== "string" || typeof raw.name !== "string" || !raw.name.trim()) return null;
+  const pagesIn = (typeof raw.pages === "object" && raw.pages!==null) ? raw.pages : {};
+  const pages = {};
+  for(const [pageId, words] of Object.entries(pagesIn)){
+    if(RESERVED_PROFILE_NAMES.includes(pageId) || !Array.isArray(words)) continue;
+    pages[pageId] = words
+      .filter(w=>w && typeof w.de==="string" && typeof w.foreign==="string" && w.de.trim() && w.foreign.trim())
+      .map(w=>({
+        de:w.de, foreign:w.foreign,
+        icon: typeof w.icon==="string" ? w.icon : "📘",
+        ...(typeof w.example==="string" ? {example:w.example} : {})
+      }));
+  }
+  return { lang:raw.lang, name:raw.name.slice(0,60), pages, archived:!!raw.archived };
+}
+
 /* ===========================================================
    HELPERS
    =========================================================== */
@@ -7197,12 +7241,22 @@ function normalizeAnswer(str){
     // Latin macrons (long vowels) aren't on any keyboard, so they must not
     // be required to get an answer right -- strip them for comparison only,
     // the stored/displayed vocab keeps the macron for correct pronunciation.
-    .replace(/[āăâàáä]/g,"a")
+    // German umlauts ä/ö/ü are deliberately NOT folded here: "schon" vs
+    // "schön" or "Bar" vs "Bär" are different words (see normalizeForMatch
+    // for the accepted ae/oe/ue spelling instead).
+    .replace(/[āăâàá]/g,"a")
     .replace(/[ēĕêèéë]/g,"e")
     .replace(/[īĭîìíï]/g,"i")
-    .replace(/[ōŏôòóö]/g,"o")
-    .replace(/[ūŭûùúü]/g,"u")
+    .replace(/[ōŏôòó]/g,"o")
+    .replace(/[ūŭûùú]/g,"u")
     .replace(/[ȳŷỳýÿ]/g,"y");
+}
+
+/* Letter-by-letter comparison for the answer boxes -- same folding as
+   normalizeAnswer(), so a box isn't shown red for a letter the overall
+   check accepts (e.g. "a" typed for a Latin "ā"). */
+function sameLetter(a, b){
+  return normalizeAnswer(a)===normalizeAnswer(b);
 }
 
 /* Some vocab entries store alternative phrasings as "A / B" -- these must
@@ -7388,6 +7442,9 @@ const ABBREVIATIONS = [
 
 function normalizeForMatch(str){
   let s = normalizeAnswer(str);
+  // the usual keyboard-less spellings of German umlauts/ß count as equal
+  // ("schoen" = "schön", "strasse" = "Straße"), a bare base vowel does not
+  s = s.replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss");
   s = s.replace(/[\u2018\u2019\u02BC\u0060]/g,"'"); // unify curly/backtick apostrophes to a plain one
   for(const [pattern, expansion] of CONTRACTIONS){
     s = s.replace(pattern, expansion);
@@ -7456,7 +7513,7 @@ function markAnswerComparison(card, userAns){
       box.className="letter-box";
       if(uChar){
         box.textContent=uChar;
-        if(uChar.toLowerCase()===cChar.toLowerCase()){
+        if(sameLetter(uChar, cChar)){
           box.classList.add("letter-correct");
         } else {
           box.classList.add("letter-wrong");
@@ -7633,9 +7690,15 @@ function applyPageSetBonus(prof, originalCards, today, isFlawless){
   // Seiten-Set schon mal fehlerfrei war oder es eine Hard-Words-Runde war
   if(isFlawless) prof.stats.lastFlawlessRoundDate = today;
 
-  if(state.isHardWordsOnlyRound){
-    // Schwierige-Wörter-/Fälligkeits-Runden decken nie ein komplettes
-    // Seiten-Set ab, können aber einzelne zuvor offene Wörter nachholen.
+  // Wurden auf dem Wortauswahl-Screen Wörter abgewählt, deckt die Runde das
+  // Seiten-Set ebenfalls nicht komplett ab -- sonst ließe sich ein ganzes
+  // Set (samt Bonus) mit einem einzigen richtig beantworteten Wort
+  // "fehlerfrei" abschließen.
+  const coversFullSelection = state.vocabPool.length>0 && state.vocabPool.every(v=>v.active);
+  if(state.isHardWordsOnlyRound || !coversFullSelection){
+    // Schwierige-Wörter-/Fälligkeits-Runden (und Teilauswahlen) decken nie
+    // ein komplettes Seiten-Set ab, können aber einzelne zuvor offene
+    // Wörter nachholen.
     const {newlyCompleted, clearedWords} = clearPendingBadWords(prof, originalCards, today);
     if(newlyCompleted.length>0){
       pageSetBonusAwarded = {amount:0, isNewPageSet:true, catchUpCount:newlyCompleted.length, viaProgress:false};
@@ -7898,8 +7961,14 @@ function finalizeRoundAndUpdateProfile(){
   // was actually played, not the full selection, otherwise a round abandoned
   // after one word could register as e.g. a 20-word speed record.
   const playedCards = originalCards.filter(c=>c.done);
-  const roundWasFullyPlayed = playedCards.length===originalCards.length;
+  // A round with zero cards (e.g. "Nur schwierige Wörter" with no hard
+  // words) is not a played round -- otherwise every such click would bump
+  // roundsCompleted, which feeds the leaderboard's Fleißbonus.
+  const roundWasFullyPlayed = originalCards.length>0 && playedCards.length===originalCards.length;
   const totalCards = playedCards.length;
+  // Too-small rounds (a single picked word) must not farm perfect-round
+  // bonus/counters or the hint-free badge -- same floor as the records.
+  const roundIsBigEnough = originalCards.length>=MIN_WORDS_FOR_RECORD;
   const hardWords=collectHardWords();
 
   // calc first try % -- computed up front (not just at the end) since
@@ -7934,14 +8003,15 @@ function finalizeRoundAndUpdateProfile(){
       ? daysBetweenKeys(lastActiveDateBeforeRound, today) : null;
 
     const isFlawless = isRoundFullyCorrect(originalCards, state.roundCards);
-    if(isFlawless){
+    if(isFlawless && roundIsBigEnough){
       state.roundTotalPoints += PERFECT_ROUND_BONUS;
       perfectRoundBonusAwarded = true;
     }
     // Zählt nur bei tatsächlich komplett gespielten Runden -- ein
     // abgebrochener Versuch soll weder "Perfektionist" voranbringen noch
-    // eine laufende "Hattrick"-Serie kaputt machen.
-    if(roundWasFullyPlayed){
+    // eine laufende "Hattrick"-Serie kaputt machen. Zu kleine Runden
+    // zählen ebenfalls nicht (weder hoch noch zurücksetzen).
+    if(roundWasFullyPlayed && roundIsBigEnough){
       if(isFlawless){
         prof.stats.perfectRoundsCount = (prof.stats.perfectRoundsCount||0) + 1;
         prof.stats.consecutivePerfectRounds = (prof.stats.consecutivePerfectRounds||0) + 1;
@@ -8013,7 +8083,7 @@ function finalizeRoundAndUpdateProfile(){
       durationSec, dailyGoalJustMet, comebackHappened, gapDaysSinceLastActive,
       // "Dribbelkönig": komplette, tatsächlich gespielte Runde ganz ohne
       // Tipp/Lösung-zeigen.
-      hintFreeRound: roundWasFullyPlayed && !state.roundUsedHintOrReveal && originalCards.length>0,
+      hintFreeRound: roundWasFullyPlayed && roundIsBigEnough && !state.roundUsedHintOrReveal,
       // "Aufholjagd": mind. 3 Fehlversuche in der Runde, am Ende trotzdem
       // jedes Wort gemeistert (isFlawless oben bereits berechnet).
       hardComebackRound: originalCards.length>0 && isFlawless
@@ -8685,7 +8755,10 @@ function renderQuickStartBlock(){
     : last.direction==="deToEn" ? `Deutsch → ${getLangDisplayName(book.lang)}`
     : `${getLangDisplayName(book.lang)} → Deutsch`;
   const btn = document.getElementById("btnQuickStart");
-  btn.innerHTML = `<span style="font-size:1.3rem;">▶️</span><span><div class="bold">Weiter wie zuletzt</div><div class="muted" style="font-weight:400;">${book.name} – ${pageLabel} (${dirLabel})</div></span>`;
+  btn.innerHTML = `<span style="font-size:1.3rem;">▶️</span><span><div class="bold">Weiter wie zuletzt</div><div class="muted" style="font-weight:400;"></div></span>`;
+  // book.name can be user-typed (custom book) or come from an imported
+  // backup file -- set as text, never parsed as HTML
+  btn.querySelector(".muted").textContent = `${book.name} – ${pageLabel} (${dirLabel})`;
   block.style.display="block";
 }
 
@@ -9310,6 +9383,9 @@ function showSummaryScreen(){
     levelBanner.style.display="none";
   }
 
+  // nothing to practise -> don't offer a round that would start empty
+  document.getElementById("btnOnlyHard").style.display = hardWords.length>0 ? "" : "none";
+
   const hwDiv=document.getElementById("hardWordList");
   hwDiv.innerHTML="";
   if(hardWords.length===0){
@@ -9427,7 +9503,7 @@ function applyHint(){
       const key = `${wi}:${ci}`;
       if(card.hintedChars.has(key)) continue;
       const typedChar = iWord[ci] || "";
-      const alreadyCorrect = typedChar && typedChar.toLowerCase()===tWord[ci].toLowerCase();
+      const alreadyCorrect = typedChar && sameLetter(typedChar, tWord[ci]);
       if(!alreadyCorrect) candidates.push(key);
     }
   }
@@ -9485,7 +9561,7 @@ const KEYBOARD_NEIGHBORS = {
    ab 3 Zeichen Länge -- bei sehr kurzen Wörtern ist ein einzelner
    Buchstabenunterschied zu oft ein eigenständiges anderes Wort statt ein
    Vertipper. Arbeitet auf bereits normalizeForMatch()-normalisierten
-   Strings (Umlaute schon auf den Basisvokal gefaltet). */
+   Strings (Umlaute dort schon als ae/oe/ue ausgeschrieben). */
 function isAdjacentKeyTypo(input, target){
   if(input.length!==target.length || input.length<3) return false;
   let diffIdx=-1, diffCount=0;
@@ -9575,9 +9651,15 @@ function showExampleSentence(example){
    unproblematisch, hier IMMER card.foreign anzubieten statt nur den
    gerade sichtbaren Prompt (siehe btnSpeakPrompt in renderCurrentCard
    für den Fall VOR der Auflösung). */
-function showContinueOverlay(message, kind, example, onContinue, speakInfo){
+function showContinueOverlay(message, kind, example, onContinue, speakInfo, answerText){
   const overlay = document.getElementById("feedbackOverlay");
   const msgEl = document.getElementById("feedbackOverlayMsg");
+  // answerText optional: shown prominently (e.g. after "Lösung zeigen"),
+  // since the letter boxes behind the overlay are dimmed and, for longer
+  // answers, partly covered by it
+  const answerEl = document.getElementById("feedbackOverlayAnswer");
+  answerEl.textContent = answerText || "";
+  answerEl.style.display = answerText ? "block" : "none";
   const exampleEl = document.getElementById("feedbackOverlayExample");
   const speakBtn = document.getElementById("btnSpeakOverlay");
 
@@ -9644,6 +9726,10 @@ function checkAnswer(){
     // correct
     card.done=true;
     card.resolvedCorrectly=true;
+    if(card.typoPending){
+      card.typoPending = false;
+      state.roundTypoCorrectedCount++; // siehe "Grätsche"-Abzeichen
+    }
 
     // combo bonus for consecutive correct answers
     state.currentCombo++;
@@ -9719,7 +9805,10 @@ function checkAnswer(){
     // Punktabzug/Combo-Bruch/firstTry-Verlust -- das Kind muss selbst
     // richtig tippen, dieser eine Versuch zählt aber nicht als Fehler.
     if(isLikelyAdjacentKeyTypo(inputVal, correct)){
-      state.roundTypoCorrectedCount++; // siehe "Grätsche"-Abzeichen
+      // erst beim anschließend richtigen Nachtippen gezählt (siehe
+      // korrekter Zweig oben), höchstens einmal pro Karte -- sonst ließe
+      // sich "Grätsche" durch wiederholtes Falschtippen farmen
+      card.typoPending = true;
       markAnswerComparison(card, inputVal); // zeigt den einen abweichenden Buchstaben rot, Rest grün
       showAnswerFeedback(pickRandom(TYPO_MESSAGES), "typo");
       const inputEl = document.getElementById("answerInput");
@@ -9735,6 +9824,7 @@ function checkAnswer(){
 
     card.firstTry=false;
     card.attemptedWrong=true;
+    card.typoPending=false; // ein echter Fehler danach ist keine Tippfehler-Korrektur mehr
     if(card.score>0) card.score=card.score-1;
     document.getElementById("cardScore").textContent=String(card.score);
     markAnswerComparison(card, inputVal);
@@ -9799,7 +9889,7 @@ function revealSolution(){
     state.roundIndex++;
     setLearnControlsDisabled(false);
     renderCurrentCard();
-  }, {text:card.foreign, lang:card.speechLang});
+  }, {text:card.foreign, lang:card.speechLang}, `${card.prompt} → ${target}`);
 }
 
 /* ===========================================================
@@ -9895,7 +9985,11 @@ function setupEventListeners(){
         saveProfiles();
 
         for(const key of Object.keys(importedCustomBooks)){
-          customBooks[key] = importedCustomBooks[key];
+          // only custom_* keys (as created by generateBookKey) -- never
+          // overwrite a built-in book or hit a prototype property name
+          if(!key.startsWith("custom_")) continue;
+          const book = sanitizeImportedCustomBook(importedCustomBooks[key]);
+          if(book) customBooks[key] = book;
         }
         saveCustomBooks();
 
