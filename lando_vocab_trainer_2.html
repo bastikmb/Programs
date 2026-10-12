@@ -5259,7 +5259,12 @@ function retrofitRetroactiveAchievements(){
   let anyChanged = false;
   for(const prof of Object.values(state.profiles)){
     const unlocked = ensureAchievements(prof).unlocked;
-    const ctx = {streak: ensureStreakObj(prof)};
+    // Derselbe sichere ctx-Builder wie redeemBonusCard() -- liefert streak
+    // UND levelInfo (plus neutrale Defaults für alles Rundenbezogene). Ein
+    // reines {streak:...} hier reichte nicht mehr aus, sobald level_3/15/20
+    // (die ctx.levelInfo.level brauchen) zur Liste hinzukamen -- siehe
+    // Hotfix-Kommentar in CLAUDE-Plan.
+    const ctx = buildAchievementCtx(prof, {});
     for(const id of RETROFITTABLE_ACHIEVEMENT_IDS){
       if(unlocked[id]) continue;
       const def = ACHIEVEMENTS.find(a=>a.id===id);
