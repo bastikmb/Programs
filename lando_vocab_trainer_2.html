@@ -1279,6 +1279,62 @@ body.dark-theme .daily-goal-mini-banner {
   opacity:0.4;
   filter:grayscale(1);
 }
+/* Abzeichen-Familien: eine Kachel im Grid zeigt nur die höchste erreichte
+   Stufe (siehe buildFamilyBadgeEl), Klick öffnet showFamilyDetailOverlay()
+   mit allen Stufen -- Zeilen dort nutzen .family-tier-row statt der
+   gekachelten Grid-Optik. */
+.achievement-badge.family-badge {
+  cursor:pointer;
+  position:relative;
+}
+.family-tier-count {
+  position:absolute;
+  top:4px;
+  right:6px;
+  font-size:0.6rem;
+  font-weight:700;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--accent);
+  border-radius:999px;
+  padding:1px 6px;
+}
+.family-detail-box {
+  max-width:26rem;
+  width:100%;
+  max-height:80vh;
+  overflow-y:auto;
+}
+.family-detail-heading {
+  font-weight:800;
+  font-size:1.1rem;
+  margin-bottom:0.75rem;
+  text-align:center;
+}
+.family-tier-list {
+  display:flex;
+  flex-direction:column;
+  gap:0.5rem;
+  margin-bottom:1rem;
+}
+.achievement-badge.family-tier-row {
+  display:grid;
+  grid-template-columns:2.2rem 1fr;
+  text-align:left;
+  padding:0.6rem 0.7rem;
+  gap:0.1rem 0.6rem;
+}
+.family-tier-row .icon {
+  grid-row:1/4;
+  grid-column:1;
+  font-size:1.3rem;
+  align-self:center;
+}
+.family-tier-row .title,
+.family-tier-row .desc,
+.family-tier-row .progress {
+  grid-column:2;
+}
 /* leaderboard rows -- CSS variables throughout (like .achievement-badge),
    so dark mode adapts automatically without a separate override block */
 .leaderboard-table {
@@ -2193,7 +2249,7 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.longestStreak is number
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
-           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 33
+           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 53
            && request.resource.data.distinctPageSetsCompleted is number
            && request.resource.data.distinctPageSetsCompleted >= 0 && request.resource.data.distinctPageSetsCompleted <= 1000
            && (request.resource.data.team == null ||
@@ -5189,7 +5245,15 @@ function saveProfiles() {
    nicht an diesem Pfad). */
 const RETROFITTABLE_ACHIEVEMENT_IDS = [
   "teamplayer", "millionaire", "streak_100", "globetrotter",
-  "full_book_mastery", "ballon_dor"
+  "full_book_mastery", "ballon_dor",
+  // Nur Stufen auf Basis von Statistiken, die schon lange vor dieser
+  // Session getrackt wurden (streak, completedPageSets, totalPoints/Level)
+  // -- NICHT dabei: Stufen auf consecutivePerfectRounds/perfectRoundsCount/
+  // bonusCardsRedeemedCount/typoCorrectedCount, da diese Zähler selbst erst
+  // in dieser Session eingeführt wurden (kein historischer Rückstand,
+  // gleiche Begründung wie bei hattrick/weisse_weste/perfectionist oben).
+  "streak_150", "streak_200", "level_3", "level_15", "level_20",
+  "pages_3", "pages_25"
 ];
 function retrofitRetroactiveAchievements(){
   let anyChanged = false;
@@ -6794,11 +6858,13 @@ const ACHIEVEMENTS = [
   {id:"streak_30", icon:"🌟", title:"30-Tage-Serie", desc:"30 Tage in Folge gelernt",
     check:(p,ctx)=>ctx.streak.longest>=30,
     progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:30})},
-  {id:"perfect_round", icon:"✨", title:"Perfekte Runde", desc:"Alles beim ersten Versuch richtig",
-    check:(p,ctx)=>ctx.totalCards>=10 && ctx.firstTryPct===100,
-    // proxy: best first-try % reached so far (no running "how close was my
-    // last round" counter exists, this is the closest honest stand-in)
-    progress:p=>({current:(p.stats.records&&p.stats.records.bestFirstTryPct)||0, target:100})},
+  {id:"perfect_round", icon:"✨", title:"Perfekte Runde", desc:"Deine erste perfekte Runde geschafft",
+    // Gleiche Zählbasis wie "Mittelfeldstratege" (perfectRoundsCount), damit
+    // die Perfektion-Familie in sich konsistent ist -- siehe ACHIEVEMENT_FAMILIES.
+    // Bereits früher freigeschaltete Profile bleiben unangetastet (checkAchievements
+    // überspringt bereits freigeschaltete IDs, egal unter welcher alten Definition).
+    check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=1,
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:1})},
   {id:"level_5", icon:"🚀", title:"Level 5", desc:"Level 5 erreicht",
     check:(p,ctx)=>ctx.levelInfo.level>=5,
     progress:p=>({current:computeLevel(p.stats.totalPoints), target:5})},
@@ -6890,8 +6956,96 @@ const ACHIEVEMENTS = [
     check:(p,ctx)=>{
       const sat = p.stats.lastSaturdayPlayed, sun = p.stats.lastSundayPlayed;
       return !!(sat && sun && addDaysToDateKey(sat, 1)===sun);
-    }}
+    }},
+  // --- 20 neue Stufen für die Abzeichen-Familien (ACHIEVEMENT_FAMILIES
+  // unten) -- alle nutzen bereits bestehende Statistiken, keine davon
+  // braucht einen neuen Zähler. ---
+  {id:"streak_150", icon:"🏟️", title:"Dauerkarte", desc:"150 Tage in Folge gelernt",
+    check:(p,ctx)=>ctx.streak.longest>=150,
+    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:150})},
+  {id:"streak_200", icon:"🐐", title:"Vereinsikone", desc:"200 Tage in Folge gelernt",
+    check:(p,ctx)=>ctx.streak.longest>=200,
+    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:200})},
+  {id:"perfect_streak_2", icon:"🤝", title:"Anstoß", desc:"2 perfekte Runden direkt hintereinander",
+    check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=2,
+    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:2})},
+  {id:"perfect_streak_10", icon:"🥇", title:"Galaform", desc:"10 perfekte Runden direkt hintereinander",
+    check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=10,
+    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:10})},
+  {id:"perfect_streak_20", icon:"🐉", title:"Unaufhaltbar", desc:"20 perfekte Runden direkt hintereinander",
+    check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=20,
+    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:20})},
+  {id:"level_3", icon:"🌱", title:"Talent", desc:"Level 3 erreicht",
+    check:(p,ctx)=>ctx.levelInfo.level>=3,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:3})},
+  {id:"level_15", icon:"⭐", title:"Weltklasse", desc:"Level 15 erreicht",
+    check:(p,ctx)=>ctx.levelInfo.level>=15,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:15})},
+  {id:"level_20", icon:"👑", title:"Legendenstatus", desc:"Level 20 erreicht",
+    check:(p,ctx)=>ctx.levelInfo.level>=20,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:20})},
+  {id:"bonus_10", icon:"🎖️", title:"Vereinslegende", desc:"10 Bonuskarten insgesamt eingelöst",
+    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=10,
+    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:10})},
+  {id:"bonus_20", icon:"📿", title:"Rekordhalter", desc:"20 Bonuskarten insgesamt eingelöst",
+    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=20,
+    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:20})},
+  {id:"bonus_50", icon:"🏛️", title:"Hall of Fame", desc:"50 Bonuskarten insgesamt eingelöst",
+    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=50,
+    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:50})},
+  {id:"pages_3", icon:"🧢", title:"Startaufstellung", desc:"3 verschiedene Seiten fehlerfrei gelernt",
+    check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=3,
+    progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:3})},
+  {id:"pages_25", icon:"🧩", title:"Einsatzzeiten König", desc:"25 verschiedene Seiten fehlerfrei gelernt",
+    check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=25,
+    progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:25})},
+  {id:"typo_3", icon:"🩹", title:"Erste Hilfe", desc:"3 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=3,
+    progress:p=>({current:p.stats.typoCorrectedCount||0, target:3})},
+  {id:"typo_25", icon:"🧱", title:"Abwehrchef", desc:"25 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=25,
+    progress:p=>({current:p.stats.typoCorrectedCount||0, target:25})},
+  {id:"typo_50", icon:"🏰", title:"Abräumer", desc:"50 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=50,
+    progress:p=>({current:p.stats.typoCorrectedCount||0, target:50})},
+  {id:"typo_100", icon:"🦾", title:"Abwehrhühne", desc:"100 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=100,
+    progress:p=>({current:p.stats.typoCorrectedCount||0, target:100})},
+  {id:"perfect_5", icon:"🎯", title:"Das weiße Ballett", desc:"5 perfekte Runden insgesamt",
+    check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=5,
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:5})},
+  {id:"perfect_25", icon:"🧭", title:"Spielmacher", desc:"25 perfekte Runden insgesamt",
+    check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=25,
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:25})},
+  {id:"perfect_50", icon:"🌟", title:"Weltfußballer", desc:"50 perfekte Runden insgesamt",
+    check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=50,
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:50})}
 ];
+
+/* Fasst Abzeichen, die eine aufsteigende Stufenreihe auf derselben
+   Statistik bilden, zu "Familien" zusammen -- siehe renderAchievementsGrid()/
+   buildFamilyBadgeEl(): im Grid wird nur die höchste erreichte Stufe
+   gezeigt, Klick auf die Kachel öffnet showFamilyDetailOverlay() mit
+   allen Stufen. Jede Familie hat mindestens 5 tierIds, in aufsteigender
+   Zielreihenfolge. */
+const ACHIEVEMENT_FAMILIES = [
+  { id:"serientaeter", icon:"🔥", name:"Serientäter-Familie",
+    tierIds:["streak_7","streak_30","streak_100","streak_150","streak_200"] },
+  { id:"fehlerfrei", icon:"🧤", name:"Fehlerfrei-Familie",
+    tierIds:["perfect_streak_2","hattrick","weisse_weste","perfect_streak_10","perfect_streak_20"] },
+  { id:"level", icon:"🏆", name:"Level-Familie",
+    tierIds:["level_3","level_5","level_10","level_15","level_20"] },
+  { id:"bonuskarten", icon:"🎖️", name:"Bonuskarten-Familie",
+    tierIds:["elfmeterkoenig","pokaljaeger","bonus_10","bonus_20","bonus_50"] },
+  { id:"meisterschaft", icon:"🏅", name:"Vokabel-Meisterschaft",
+    tierIds:["pages_3","globetrotter","pages_25","full_book_mastery","ballon_dor"] },
+  { id:"tippfehler", icon:"🛡️", name:"Tippfehler-Familie",
+    tierIds:["typo_3","graetsche","typo_25","typo_50","typo_100"] },
+  { id:"perfektion", icon:"✨", name:"Perfektion-Familie",
+    tierIds:["perfect_round","perfect_5","perfectionist","perfect_25","perfect_50"] }
+];
+const ACHIEVEMENT_FAMILY_LOOKUP = {}; // achievementId -> family-Objekt
+ACHIEVEMENT_FAMILIES.forEach(fam=>{ fam.tierIds.forEach(id=>{ ACHIEVEMENT_FAMILY_LOOKUP[id]=fam; }); });
 
 /* checkAchievements() läuft nicht nur am Rundenende (finalizeRoundAndUpdateProfile,
    volle ctx mit echten Rundendaten), sondern z.B. auch beim Einlösen einer
@@ -7911,34 +8065,121 @@ function renderRecordsSection(prof){
   }
 }
 
+/* Baut EIN Abzeichen-Badge-Element (icon/title/desc/optional progress) --
+   herausgelöst aus renderAchievementsGrid(), damit buildFamilyBadgeEl()
+   und showFamilyDetailOverlay() dieselbe Darstellung wiederverwenden
+   können statt sie zu duplizieren. */
+function buildAchievementBadgeEl(def, isUnlocked, prof){
+  const badge=document.createElement("div");
+  badge.className = "achievement-badge" + (isUnlocked ? "" : " locked");
+  const icon=document.createElement("div"); icon.className="icon"; icon.textContent=def.icon;
+  const title=document.createElement("div"); title.className="title"; title.textContent=def.title;
+  const desc=document.createElement("div"); desc.className="desc"; desc.textContent=def.desc;
+  badge.appendChild(icon); badge.appendChild(title); badge.appendChild(desc);
+
+  // locked + has a meaningful running number -> show where you stand and
+  // how much is left, so a badge doesn't just sit there as a mystery
+  if(!isUnlocked && def.progress){
+    const p = def.progress(prof);
+    const current = Math.min(p.current, p.target);
+    const remaining = Math.max(0, p.target - p.current);
+    const prog=document.createElement("div");
+    prog.className="progress";
+    prog.textContent = `${current}/${p.target} · noch ${remaining}`;
+    badge.appendChild(prog);
+  }
+  return badge;
+}
+
+/* Zeigt im Grid nur die höchste bereits erreichte Stufe einer Familie
+   (oder Stufe 1 als aktuelles Ziel, falls noch nichts erreicht) -- der
+   Vorgänger verschwindet automatisch, sobald die nächste Stufe erreicht
+   ist. Klick/Enter/Space öffnet showFamilyDetailOverlay() mit allen
+   Stufen der Familie. */
+function buildFamilyBadgeEl(fam, prof, unlocked){
+  let highestIdx = -1;
+  fam.tierIds.forEach((id,i)=>{ if(unlocked[id]) highestIdx = i; });
+  const displayDef = ACHIEVEMENTS.find(a=>a.id===fam.tierIds[Math.max(highestIdx,0)]);
+  const badge = buildAchievementBadgeEl(displayDef, highestIdx>=0, prof);
+  badge.classList.add("family-badge");
+
+  const countChip=document.createElement("div");
+  countChip.className="family-tier-count";
+  countChip.textContent = `${Math.max(highestIdx+1,0)}/${fam.tierIds.length}`;
+  badge.appendChild(countChip);
+
+  badge.setAttribute("role","button");
+  badge.setAttribute("tabindex","0");
+  badge.setAttribute("aria-label", `${fam.name}, alle Stufen anzeigen`);
+  const open = ()=>showFamilyDetailOverlay(fam, prof);
+  badge.addEventListener("click", open);
+  badge.addEventListener("keydown",(e)=>{
+    if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }
+  });
+  return badge;
+}
+
+/* Vollständige Stufen-Übersicht einer Familie als Overlay -- gleiches
+   Muster wie showConfirmOverlay() (fixes, zentriertes Overlay,
+   Backdrop-Klick schließt), nur mit einer Liste von Abzeichen-Zeilen
+   statt einer Bestätigungsfrage. Erreichte Stufen normal, offene grau/
+   entsättigt (wiederverwendet .achievement-badge.locked). */
+function showFamilyDetailOverlay(fam, prof){
+  const unlocked = ensureAchievements(prof).unlocked;
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay family-detail-overlay";
+  const box = document.createElement("div");
+  box.className = "confirm-overlay-box family-detail-box";
+
+  const heading = document.createElement("div");
+  heading.className = "family-detail-heading";
+  heading.textContent = `${fam.icon} ${fam.name}`;
+  box.appendChild(heading);
+
+  const list = document.createElement("div");
+  list.className = "family-tier-list";
+  fam.tierIds.forEach(id=>{
+    const tierDef = ACHIEVEMENTS.find(a=>a.id===id);
+    const row = buildAchievementBadgeEl(tierDef, !!unlocked[id], prof);
+    row.classList.add("family-tier-row");
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "btn";
+  closeBtn.type = "button";
+  closeBtn.textContent = "Schließen";
+  box.appendChild(closeBtn);
+
+  function close(){ overlay.remove(); }
+  closeBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e)=>{ if(e.target===overlay) close(); });
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  closeBtn.focus();
+}
+
 /* Renders one tile per ACHIEVEMENTS definition, locked (greyed out) or
-   unlocked based on ensureAchievements(prof).unlocked. */
+   unlocked based on ensureAchievements(prof).unlocked -- Abzeichen, die
+   Teil einer ACHIEVEMENT_FAMILIES-Familie sind, werden zu EINER Kachel
+   zusammengefasst (siehe buildFamilyBadgeEl), alle anderen einzeln wie
+   bisher. */
 function renderAchievementsGrid(prof){
   const unlocked = ensureAchievements(prof).unlocked;
   const grid = document.getElementById("achievementsGrid");
   grid.innerHTML = "";
+  const renderedFamilies = new Set();
   for(const def of ACHIEVEMENTS){
-    const isUnlocked = !!unlocked[def.id];
-    const badge=document.createElement("div");
-    badge.className = "achievement-badge" + (isUnlocked ? "" : " locked");
-    const icon=document.createElement("div"); icon.className="icon"; icon.textContent=def.icon;
-    const title=document.createElement("div"); title.className="title"; title.textContent=def.title;
-    const desc=document.createElement("div"); desc.className="desc"; desc.textContent=def.desc;
-    badge.appendChild(icon); badge.appendChild(title); badge.appendChild(desc);
-
-    // locked + has a meaningful running number -> show where you stand and
-    // how much is left, so a badge doesn't just sit there as a mystery
-    if(!isUnlocked && def.progress){
-      const p = def.progress(prof);
-      const current = Math.min(p.current, p.target);
-      const remaining = Math.max(0, p.target - p.current);
-      const prog=document.createElement("div");
-      prog.className="progress";
-      prog.textContent = `${current}/${p.target} · noch ${remaining}`;
-      badge.appendChild(prog);
+    const fam = ACHIEVEMENT_FAMILY_LOOKUP[def.id];
+    if(fam){
+      if(renderedFamilies.has(fam.id)) continue;
+      renderedFamilies.add(fam.id);
+      grid.appendChild(buildFamilyBadgeEl(fam, prof, unlocked));
+      continue;
     }
-
-    grid.appendChild(badge);
+    grid.appendChild(buildAchievementBadgeEl(def, !!unlocked[def.id], prof));
   }
 }
 
