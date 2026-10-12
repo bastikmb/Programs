@@ -897,6 +897,10 @@ body.dark-theme .combo-indicator {
   background:#f3f4f6;
   color:var(--muted);
 }
+.answer-feedback.typo {
+  background:#dbeafe;
+  color:#1d4ed8;
+}
 body.dark-theme .answer-feedback.good {
   background:rgba(16,185,129,0.18);
   color:#6ee7b7;
@@ -908,6 +912,10 @@ body.dark-theme .answer-feedback.close {
 body.dark-theme .answer-feedback.far {
   background:var(--surface);
   color:var(--muted);
+}
+body.dark-theme .answer-feedback.typo {
+  background:rgba(59,130,246,0.18);
+  color:#93c5fd;
 }
 
 /* feedback overlay -- shown after a correct answer or "Lösung zeigen" instead
@@ -9106,6 +9114,50 @@ function setLearnControlsDisabled(disabled){
   document.getElementById("btnReveal").disabled = disabled;
 }
 
+// Tastatur-Nachbarschaft auf QWERTY-Basis -- "y"/"z" bekommen bewusst die
+// vereinigten Nachbarn BEIDER Layout-Positionen (QWERTY vs. QWERTZ tauschen
+// genau diese zwei Buchstaben, das tatsächliche virtuelle Tastatur-Layout
+// ist im Browser nicht auslesbar), siehe isAdjacentKeyTypo() unten.
+const KEYBOARD_NEIGHBORS = {
+  q:"wa", w:"qeas", e:"wrsd", r:"etdf", t:"ryfg",
+  y:"tughasx", u:"yihj", i:"uojk", o:"ipkl", p:"ol",
+  a:"qwsz", s:"weadzx", d:"ersfxc", f:"rtdgcv", g:"tyfhvb",
+  h:"yugjbn", j:"uihkmn", k:"iojlm", l:"opk",
+  z:"asxtugh", x:"zsdc", c:"xdfv", v:"cfgb", b:"vghn", n:"bhjm", m:"njk"
+};
+
+/* Erkennt einen "Nachbar-Tasten-Vertipper": gleiche Länge, exakt EIN
+   Buchstabe an EINER Position abweichend, und genau dieser Buchstabe
+   liegt auf einer Standard-Tastatur neben dem erwarteten. Bewusst nur
+   Einzel-Substitution (keine fehlenden/zusätzlichen Buchstaben) und erst
+   ab 3 Zeichen Länge -- bei sehr kurzen Wörtern ist ein einzelner
+   Buchstabenunterschied zu oft ein eigenständiges anderes Wort statt ein
+   Vertipper. Arbeitet auf bereits normalizeForMatch()-normalisierten
+   Strings (Umlaute schon auf den Basisvokal gefaltet). */
+function isAdjacentKeyTypo(input, target){
+  if(input.length!==target.length || input.length<3) return false;
+  let diffIdx=-1, diffCount=0;
+  for(let i=0;i<target.length;i++){
+    if(input[i]!==target[i]){
+      diffCount++;
+      if(diffCount>1) return false;
+      diffIdx=i;
+    }
+  }
+  if(diffCount!==1) return false;
+  const neighbors = KEYBOARD_NEIGHBORS[input[diffIdx]];
+  return !!neighbors && neighbors.includes(target[diffIdx]);
+}
+
+/* Wie answerMatches(), aber für Nachbar-Tasten-Vertipper -- prüft gegen
+   jede gültige Antwort-Alternative, true sobald eine passt. Nur ein
+   HINWEIS-Signal für checkAnswer() (siehe dort): macht die Antwort NICHT
+   automatisch richtig, das Kind muss selbst korrekt nachtippen. */
+function isLikelyAdjacentKeyTypo(inputVal, correctRaw){
+  const normInput = normalizeForMatch(inputVal);
+  return getAlternatives(correctRaw).some(alt => isAdjacentKeyTypo(normInput, normalizeForMatch(alt)));
+}
+
 /* Simple Levenshtein distance, used only to judge how close a wrong
    answer was, so we can show encouraging feedback instead of just red. */
 function levenshtein(a, b){
@@ -9129,6 +9181,10 @@ function levenshtein(a, b){
 const CLOSE_MESSAGES = ["Fast! 💪","Ganz knapp!","So nah dran! 👀","Kleiner Fehler, gleich nochmal!"];
 const FAR_MESSAGES = ["Kein Problem, nochmal! 👍","Schau dir die Lösung an","Nächster Versuch!","Kein Stress, weiter geht's!"];
 const CORRECT_MESSAGES = ["Super! ✅","Klasse! 🎉","Genau richtig!","Stark! 💪","Perfekt!"];
+// siehe isLikelyAdjacentKeyTypo() -- eigener, bewusst neutraler Hinweis
+// statt CLOSE_MESSAGES, da dieser Versuch (anders als "close") keinen
+// Punkt kostet und nicht als Fehler zählt.
+const TYPO_MESSAGES = ["Fast! Schau nochmal genau hin ⌨️","Kleiner Tippfehler, versuch's nochmal!","Ganz knapp daneben getippt – nochmal!"];
 
 function pickRandom(arr){
   return arr[Math.floor(Math.random()*arr.length)];
@@ -9307,6 +9363,18 @@ function checkAnswer(){
       renderCurrentCard();
     }, {text:card.foreign, lang:card.speechLang});
   } else {
+    // Nachbartasten-Tippfehler: Hinweis + eigener Korrekturversuch, OHNE
+    // Punktabzug/Combo-Bruch/firstTry-Verlust -- das Kind muss selbst
+    // richtig tippen, dieser eine Versuch zählt aber nicht als Fehler.
+    if(isLikelyAdjacentKeyTypo(inputVal, correct)){
+      markAnswerComparison(card, inputVal); // zeigt den einen abweichenden Buchstaben rot, Rest grün
+      showAnswerFeedback(pickRandom(TYPO_MESSAGES), "typo");
+      const inputEl = document.getElementById("answerInput");
+      inputEl.focus();
+      inputEl.select();
+      return; // bewusst VOR den Straf-Zeilen unten raus
+    }
+
     // wrong -> combo breaks
     state.currentCombo = 0;
     updateComboIndicator();
