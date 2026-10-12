@@ -908,6 +908,226 @@ body.dark-theme .bonus-progress-tile .stat-tile-bar-outer {
   background:rgba(255,255,255,0.12);
 }
 
+/* ---- Lernfortschritt-Screen (screen-progress) ---- */
+:root { --flame:#c2410c; --flame-text:#c2410c; --freeze-bg:#bae6fd; --freeze-text:#0c4a6e; }
+body.dark-theme { --flame:#c2410c; --flame-text:#fb923c; --freeze-bg:#075985; --freeze-text:#e0f2fe; }
+.progress-stat-row {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:var(--space-2);
+  margin-bottom:var(--space-3);
+}
+.progress-stat {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:var(--space-3) var(--space-2);
+  text-align:center;
+}
+.progress-stat-value {
+  font-family:var(--font-display);
+  font-size:var(--text-xl);
+  font-weight:800;
+  line-height:1.1;
+  color:var(--flame-text);
+}
+.progress-stat-label {
+  font-size:var(--text-xs);
+  font-weight:600;
+  color:var(--ink);
+}
+.progress-freeze-row {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:var(--space-2);
+  font-size:var(--text-sm);
+  color:var(--muted);
+  margin-bottom:var(--space-3);
+}
+.progress-freeze-icon { font-size:1.1rem; }
+.progress-freeze-icon.used { filter:grayscale(1); opacity:0.45; }
+.progress-help-btn {
+  width:1.6rem;
+  height:1.6rem;
+  border-radius:50%;
+  border:1.5px solid var(--muted);
+  background:none;
+  color:var(--muted);
+  font-weight:700;
+  cursor:pointer;
+  line-height:1;
+  padding:0;
+}
+.progress-freeze-help { margin:-0.25rem 0 var(--space-3); }
+.progress-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:var(--space-4) var(--space-3);
+  margin-bottom:var(--space-4);
+}
+.progress-card-title {
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:var(--text-md);
+  text-align:center;
+  margin-bottom:var(--space-3);
+}
+.progress-cal-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:var(--space-3);
+}
+.progress-cal-title {
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:var(--text-md);
+}
+.progress-cal-nav {
+  width:2.4rem;
+  height:2.4rem;
+  border:none;
+  background:none;
+  color:var(--ink);
+  font-size:1.6rem;
+  line-height:1;
+  cursor:pointer;
+  border-radius:50%;
+}
+.progress-cal-nav:disabled { opacity:0.25; cursor:default; }
+.progress-cal-grid {
+  display:grid;
+  grid-template-columns:repeat(7, minmax(0,1fr));
+  row-gap:0.45rem;
+  text-align:center;
+}
+.progress-cal-wd {
+  font-size:var(--text-xs);
+  font-weight:600;
+  color:var(--muted);
+  padding-bottom:0.2rem;
+}
+.progress-cal-day {
+  justify-self:center;
+  width:2.1rem;
+  height:2.1rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:var(--text-sm);
+  font-weight:700;
+  color:var(--ink);
+  border-radius:50%;
+}
+.progress-cal-day.future { color:var(--muted); opacity:0.5; }
+.progress-cal-day.today { box-shadow:inset 0 0 0 2px var(--accent); }
+/* flame = teardrop pointing up-right, number counter-rotated upright */
+.progress-cal-day.flame {
+  background:linear-gradient(200deg, #f97316 0%, var(--flame) 35%); /* number sits on the solid part: white 5.2:1 */
+  color:#fff;
+  border-radius:50% 0 50% 50%;
+  transform:rotate(-45deg);
+  box-shadow:0 2px 4px rgba(194,65,12,0.35);
+}
+.progress-cal-day.flame span { transform:rotate(45deg); }
+.progress-cal-day.flame.today { box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+.progress-cal-day.freeze {
+  background:var(--freeze-bg);
+  color:var(--freeze-text);
+}
+.day-chart {
+  position:relative;
+  display:flex;
+  align-items:flex-end;
+  gap:2px;
+  height:9.5rem; /* bars and goal line both scale to (height - 1.2rem label room) */
+  border-bottom:1px solid var(--border);
+}
+.day-chart-col {
+  flex:1 1 0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+  background:none;
+  border:none;
+  padding:0;
+  font:inherit;
+  color:inherit;
+  cursor:pointer;
+  min-width:0;
+}
+.day-chart-value {
+  font-size:var(--text-2xs);
+  font-weight:700;
+  color:var(--muted);
+  margin-bottom:2px;
+}
+.day-chart-bar {
+  width:62%;
+  max-width:2.2rem;
+  border-radius:4px 4px 0 0;
+  background:var(--accent);
+  opacity:0.45;
+  min-height:0;
+}
+.day-chart-bar.reached { opacity:1; }
+.day-chart-col.selected .day-chart-value { color:var(--ink); }
+.day-chart-goal {
+  position:absolute;
+  left:0;
+  right:0;
+  border-top:2px dashed var(--muted);
+  opacity:0.6;
+  pointer-events:none;
+}
+.day-chart-axis {
+  display:flex;
+  gap:2px;
+  margin-top:0.3rem;
+}
+.day-chart-axis span {
+  flex:1 1 0;
+  text-align:center;
+  font-size:var(--text-2xs);
+  color:var(--muted);
+}
+.day-chart-axis span.today { color:var(--ink); font-weight:700; }
+.progress-chart-detail {
+  min-height:1.2rem;
+  margin-top:var(--space-2);
+  text-align:center;
+  font-size:var(--text-sm);
+  font-weight:600;
+  color:var(--ink);
+}
+.progress-chart-legend {
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:var(--space-3);
+  margin-top:var(--space-2);
+  font-size:var(--text-xs);
+  color:var(--muted);
+}
+.progress-chart-legend > span { display:flex; align-items:center; gap:0.3rem; }
+.legend-swatch {
+  width:0.7rem;
+  height:0.7rem;
+  border-radius:2px;
+  background:var(--accent);
+  opacity:0.45;
+  display:inline-block;
+}
+.legend-swatch.reached { opacity:1; }
+.legend-line {
+  width:1rem;
+  border-top:2px dashed var(--muted);
+  display:inline-block;
+}
 /* bonus cards (unlocked at streak thresholds) */
 .bonus-cards-block { margin-bottom:1rem; }
 .bonus-card-list { display:flex; flex-direction:column; gap:0.6rem; }
@@ -2329,6 +2549,49 @@ input:focus-visible {
   </div>
 
   <!-- BONUS CARDS SCREEN (eigener Screen, öffnet beim Klick auf die Bonuskarten-Kachel auf der Startseite) -->
+  <div id="screen-progress" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>🔥 Lernfortschritt</span>
+    </h2>
+    <div class="section-sub" style="margin-bottom:1rem;">Eine Flamme gibt es für jeden Tag, an dem du dein Tagesziel (<span id="progGoalTarget">15</span> richtige Antworten) erreichst und mindestens eine Runde fehlerfrei schaffst.</div>
+    <div class="progress-stat-row">
+      <div class="progress-stat"><div id="progDayStreak" class="progress-stat-value">0</div><div class="progress-stat-label">Tages-Serie</div></div>
+      <div class="progress-stat"><div id="progWeekStreak" class="progress-stat-value">0</div><div class="progress-stat-label">Wochen-Serie</div></div>
+      <div class="progress-stat"><div id="progLongest" class="progress-stat-value">0</div><div class="progress-stat-label">Längste Serie</div></div>
+    </div>
+    <div class="progress-freeze-row">
+      <span>Jokertag:</span>
+      <span id="progFreezeIcon" class="progress-freeze-icon" aria-hidden="true">🧊</span>
+      <span id="progFreezeText"></span>
+      <button id="btnFreezeHelp" class="progress-help-btn" type="button" aria-expanded="false" aria-controls="progFreezeHelp" aria-label="Was ist ein Jokertag?">?</button>
+    </div>
+    <div id="progFreezeHelp" class="section-sub progress-freeze-help" hidden>Einmal pro Woche darf ein Tag ausfallen, ohne dass deine Serie reißt: Schaffst du am Tag danach wieder dein Ziel, wird der verpasste Tag mit einem Jokertag überbrückt (im Kalender blau).</div>
+
+    <div class="progress-card">
+      <div class="progress-cal-head">
+        <button id="btnCalPrev" class="progress-cal-nav" type="button" aria-label="Vorheriger Monat">‹</button>
+        <div id="progCalTitle" class="progress-cal-title"></div>
+        <button id="btnCalNext" class="progress-cal-nav" type="button" aria-label="Nächster Monat">›</button>
+      </div>
+      <div id="progCalendar" class="progress-cal-grid"></div>
+    </div>
+
+    <div class="progress-card">
+      <div class="progress-card-title">Richtige Antworten pro Tag</div>
+      <div id="progChart" class="day-chart"></div>
+      <div id="progChartDetail" class="progress-chart-detail" aria-live="polite"></div>
+      <div class="progress-chart-legend">
+        <span><span class="legend-swatch reached"></span>Ziel erreicht</span>
+        <span><span class="legend-swatch"></span>darunter</span>
+        <span><span class="legend-line"></span>Tagesziel</span>
+      </div>
+    </div>
+
+    <div class="btn-row btn-row-sticky">
+      <button id="btnProgressBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
   <div id="screen-bonus-cards" class="screen">
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🎁 Bonuskarten</span>
@@ -6458,6 +6721,9 @@ function renderDailyGoalWidget(){
     <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
   `;
   tile.classList.add("show");
+  tile.style.cursor = "pointer";
+  tile.onclick = openProgressScreen;
+  makeTileAccessible(tile, "Lernfortschritt öffnen");
 }
 
 /* Current rank in the cross-device Bundesligatabelle, shown right on the
@@ -6834,6 +7100,25 @@ function updateComboIndicator(){
     el.style.display="none";
   }
 }
+/* The stored streak.current only resets when the NEXT goal is reached
+   (updateStreak), so after a gap it still holds the old number. This is
+   the value that's actually still alive today: last flame today or
+   yesterday, or two days ago with the weekly Jokertag still available. */
+function effectiveStreak(streak, today){
+  if(!streak.lastActiveDate || !streak.current) return 0;
+  const gap = daysBetweenKeys(streak.lastActiveDate, today);
+  if(gap<=1) return streak.current;
+  if(gap===2 && canUseStreakFreeze(streak, today)) return streak.current;
+  return 0;
+}
+
+function openProgressScreen(){
+  state.backStackBeforeProgress = "screen-start";
+  state.progressMonth = null; // always open on the current month
+  switchScreen("screen-progress");
+  renderProgressScreen();
+}
+
 function renderStreakBadge(){
   const tile = document.getElementById("streakTile");
   const prof = getCurrentProfileObj();
@@ -6842,23 +7127,35 @@ function renderStreakBadge(){
     return;
   }
   const streak = ensureStreakObj(prof);
-  if(streak.current<=0){
-    tile.classList.remove("show", "at-risk");
+  tile.style.cursor = "pointer";
+  tile.onclick = openProgressScreen;
+  makeTileAccessible(tile, "Lernfortschritt öffnen");
+  const current = effectiveStreak(streak, todayKey());
+  if(current<=0){
+    // shown anyway (not hidden as before) -- it's the way into the
+    // Lernfortschritt screen
+    tile.classList.remove("at-risk");
+    tile.innerHTML = `
+      <div class="stat-tile-head"><span>🔥</span><span>Serie</span></div>
+      <div class="stat-tile-value">0</div>
+      <div class="stat-tile-sub">Tagesziel erreichen = erste Flamme</div>
+    `;
+    tile.classList.add("show");
     return;
   }
   const goalReachedToday = streak.lastActiveDate === todayKey();
   tile.classList.toggle("at-risk", !goalReachedToday);
   const sub = goalReachedToday
-    ? `${streak.current} Tag${streak.current===1?"":"e"} in Folge`
-    : `Heute noch lernen für ${streak.current} Tag${streak.current===1?"":"e"} am Stück! 🔥`;
+    ? `${current} Tag${current===1?"":"e"} in Folge`
+    : `Heute noch lernen für ${current} Tag${current===1?"":"e"} am Stück! 🔥`;
 
   // one flame per streak day, capped so the narrower tile doesn't overflow
   // -- the remaining days are shown as "+N" instead
   const MAX_FLAMES = 6;
-  const flameCount = Math.min(streak.current, MAX_FLAMES);
+  const flameCount = Math.min(current, MAX_FLAMES);
   let flamesHtml = "🔥".repeat(flameCount);
-  if(streak.current > MAX_FLAMES){
-    flamesHtml += `<span class="stat-tile-sub">+${streak.current-MAX_FLAMES}</span>`;
+  if(current > MAX_FLAMES){
+    flamesHtml += `<span class="stat-tile-sub">+${current-MAX_FLAMES}</span>`;
   }
 
   tile.innerHTML = `
@@ -7078,6 +7375,135 @@ function renderBonusCardsScreen(){
       });
     }, 1000);
   }
+}
+
+/* ===========================================================
+   LERNFORTSCHRITT-SCREEN (Serien, Kalender, Antworten pro Tag)
+   =========================================================== */
+
+const MONTH_NAMES_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const WEEKDAY_SHORT_DE = ["So","Mo","Di","Mi","Do","Fr","Sa"];
+const PROGRESS_CHART_DAYS = 9;
+
+function renderProgressScreen(){
+  const prof = getCurrentProfileObj();
+  if(!prof) return;
+  const today = todayKey();
+  const streak = ensureStreakObj(prof);
+  const needsSave = !prof.stats.dailyLogBackfilled;
+  const log = ensureDailyLog(prof);
+  if(needsSave) saveProfiles(); // first open: persist the reconstructed streak days
+
+  document.getElementById("progGoalTarget").textContent = String(DAILY_GOAL_TARGET);
+  document.getElementById("progDayStreak").textContent = String(effectiveStreak(streak, today));
+  document.getElementById("progWeekStreak").textContent = String(computeWeekStreak(log, today));
+  document.getElementById("progLongest").textContent = String(streak.longest || 0);
+
+  const freezeAvailable = canUseStreakFreeze(streak, today);
+  document.getElementById("progFreezeIcon").classList.toggle("used", !freezeAvailable);
+  let freezeText = "1 verfügbar";
+  if(!freezeAvailable){
+    const back = addDaysToDateKey(streak.lastFreezeUsedDate, STREAK_FREEZE_COOLDOWN_DAYS);
+    freezeText = `verbraucht, wieder ab ${back.slice(8,10)}.${back.slice(5,7)}.`;
+  }
+  document.getElementById("progFreezeText").textContent = freezeText;
+
+  renderProgressCalendar(log, today);
+  renderProgressChart(log, today, prof.stats.dailyLogSince || null);
+}
+
+function renderProgressCalendar(log, today){
+  const [ty, tm] = today.split("-").map(Number);
+  if(!state.progressMonth) state.progressMonth = {y:ty, m:tm};
+  const {y, m} = state.progressMonth;
+  document.getElementById("progCalTitle").textContent = `${MONTH_NAMES_DE[m-1]} ${y}`;
+  document.getElementById("btnCalNext").disabled = (y>ty) || (y===ty && m>=tm);
+
+  const grid = document.getElementById("progCalendar");
+  grid.innerHTML = "";
+  ["Mo","Di","Mi","Do","Fr","Sa","So"].forEach(wd=>{
+    const h = document.createElement("div");
+    h.className = "progress-cal-wd";
+    h.textContent = wd;
+    grid.appendChild(h);
+  });
+  const first = `${y}-${String(m).padStart(2,"0")}-01`;
+  const lead = (getWeekday(first)+6)%7; // Monday-first offset
+  for(let i=0;i<lead;i++) grid.appendChild(document.createElement("div"));
+  const daysInMonth = new Date(y, m, 0).getDate();
+  for(let d=1; d<=daysInMonth; d++){
+    const key = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const entry = log[key];
+    const cell = document.createElement("div");
+    cell.className = "progress-cal-day";
+    const num = document.createElement("span");
+    num.textContent = String(d);
+    cell.appendChild(num);
+    let label = `${d}. ${MONTH_NAMES_DE[m-1]}`;
+    if(entry && entry.flame){ cell.classList.add("flame"); label += ", Serien-Tag"; }
+    else if(entry && entry.freeze){ cell.classList.add("freeze"); label += ", Jokertag"; }
+    if(key===today) cell.classList.add("today");
+    if(key>today) cell.classList.add("future");
+    cell.setAttribute("aria-label", label);
+    grid.appendChild(cell);
+  }
+}
+
+function renderProgressChart(log, today, since){
+  const chart = document.getElementById("progChart");
+  const detail = document.getElementById("progChartDetail");
+  chart.innerHTML = "";
+  detail.textContent = "";
+  const days = [];
+  for(let i=PROGRESS_CHART_DAYS-1; i>=0; i--) days.push(addDaysToDateKey(today, -i));
+  // days before the log existed are unknown, not zero
+  const values = days.map(k=> (since && k<since) ? null : ((log[k] && log[k].correct) || 0));
+  const max = Math.max(DAILY_GOAL_TARGET, ...values.map(v=>v||0)) * 1.15;
+
+  const goal = document.createElement("div");
+  goal.className = "day-chart-goal";
+  // same scale as the bars: the top 1.2rem is room for the value labels
+  goal.style.bottom = `calc((100% - 1.2rem) * ${DAILY_GOAL_TARGET/max})`;
+  chart.appendChild(goal);
+
+  const axis = document.createElement("div");
+  axis.className = "day-chart-axis";
+  const describe = (k, v)=>{
+    const wd = WEEKDAY_SHORT_DE[getWeekday(k)];
+    const date = `${wd}, ${Number(k.slice(8,10))}. ${MONTH_NAMES_DE[Number(k.slice(5,7))-1]}`;
+    if(v===null) return `${date}: noch keine Aufzeichnung`;
+    return `${date}: ${v} richtige Antwort${v===1?"":"en"}${v>=DAILY_GOAL_TARGET ? " – Ziel erreicht 🎯" : ""}`;
+  };
+  days.forEach((k, i)=>{
+    const v = values[i];
+    const col = document.createElement("button");
+    col.type = "button";
+    col.className = "day-chart-col";
+    col.setAttribute("aria-label", describe(k, v));
+    col.title = describe(k, v);
+    const val = document.createElement("div");
+    val.className = "day-chart-value";
+    val.textContent = v===null ? "–" : String(v);
+    const bar = document.createElement("div");
+    bar.className = "day-chart-bar" + ((v||0)>=DAILY_GOAL_TARGET ? " reached" : "");
+    bar.style.height = `calc((100% - 1.2rem) * ${(v||0)/max})`;
+    col.appendChild(val);
+    col.appendChild(bar);
+    col.addEventListener("click", ()=>{
+      chart.querySelectorAll(".day-chart-col.selected").forEach(c=>c.classList.remove("selected"));
+      col.classList.add("selected");
+      detail.textContent = describe(k, v);
+    });
+    chart.appendChild(col);
+    const lab = document.createElement("span");
+    lab.textContent = String(Number(k.slice(8,10)));
+    if(k===today) lab.className = "today";
+    axis.appendChild(lab);
+  });
+  chart.after(axis);
+  // re-render must not stack axis rows
+  const axes = chart.parentElement.querySelectorAll(".day-chart-axis");
+  axes.forEach((a, idx)=>{ if(idx<axes.length-1) a.remove(); });
 }
 
 function formatPageLabel(pageId){
@@ -8326,6 +8752,12 @@ function evaluateDailyGoalAndStreak(prof, today){
     const result = updateStreak(prof);
     streakChanged = result.changed;
     streakFreezeUsed = result.freezeUsed;
+    if(result.changed){
+      const log = ensureDailyLog(prof);
+      dailyLogEntry(log, today).flame = true;
+      // the forgiven day is the one right before today (see updateStreak)
+      if(result.freezeUsed) dailyLogEntry(log, addDaysToDateKey(today, -1)).freeze = true;
+    }
     const longestAfterRound = ensureStreakObj(prof).longest;
     const thresholdsBefore = Math.floor(longestBeforeRound / BONUS_CARD_INTERVAL);
     const thresholdsAfter  = Math.floor(longestAfterRound  / BONUS_CARD_INTERVAL);
@@ -8334,6 +8766,80 @@ function evaluateDailyGoalAndStreak(prof, today){
     }
   }
   return {dailyGoalJustMet, streakChanged, streakFreezeUsed, newlyUnlockedBonusCards};
+}
+
+/* ===========================================================
+   TAGESPROTOKOLL (für den Lernfortschritt-Screen)
+   =========================================================== */
+
+/* prof.stats.dailyLog[dateKey] = {correct, flame, freeze}:
+   correct = richtige Antworten an dem Tag, flame = Serien-Tag (Tagesziel
+   + fehlerfreie Runde, siehe evaluateDailyGoalAndStreak), freeze = per
+   Jokertag überbrückter Tag. Vorher gab es keinen Verlauf pro Tag -- beim
+   ersten Zugriff wird deshalb die AKTUELLE Serie aus streak.current/
+   lastActiveDate/lastFreezeUsedDate rekonstruiert (frühere Serien und die
+   Antworten vergangener Tage sind nicht mehr bekannt, nur heute). */
+const DAILY_LOG_KEEP_DAYS = 730;
+
+function dailyLogEntry(log, dateKey){
+  if(!log[dateKey]) log[dateKey] = {correct:0, flame:false, freeze:false};
+  return log[dateKey];
+}
+
+function ensureDailyLog(prof){
+  const st = prof.stats;
+  if(!st.dailyLog) st.dailyLog = {};
+  if(!st.dailyLogBackfilled){
+    st.dailyLogBackfilled = true;
+    st.dailyLogSince = todayKey(); // answers per day are only known from here on
+    const streak = ensureStreakObj(prof);
+    const missedDay = streak.lastFreezeUsedDate ? addDaysToDateKey(streak.lastFreezeUsedDate, -1) : null;
+    let day = streak.lastActiveDate, remaining = streak.current || 0, guard = 0;
+    while(day && remaining>0 && guard++<4000){
+      if(day===missedDay){
+        dailyLogEntry(st.dailyLog, day).freeze = true;
+      } else {
+        dailyLogEntry(st.dailyLog, day).flame = true;
+        remaining--;
+      }
+      day = addDaysToDateKey(day, -1);
+    }
+    const goal = st.dailyGoal;
+    if(goal && goal.date===todayKey() && goal.correctToday>0){
+      dailyLogEntry(st.dailyLog, goal.date).correct = goal.correctToday;
+    }
+  }
+  return st.dailyLog;
+}
+
+/* Called once per finished round (finalizeRoundAndUpdateProfile). */
+function logRoundToDailyLog(prof, today, correctCount){
+  const log = ensureDailyLog(prof);
+  if(correctCount>0) dailyLogEntry(log, today).correct += correctCount;
+  // keep storage bounded -- two years of history is plenty for the calendar
+  const cutoff = addDaysToDateKey(today, -DAILY_LOG_KEEP_DAYS);
+  for(const k of Object.keys(log)) if(k < cutoff) delete log[k];
+}
+
+// Montag der Woche (ISO-Woche, wie im Kalender), als dateKey
+function weekStartKey(dateKey){
+  const wd = getWeekday(dateKey); // 0=So
+  return addDaysToDateKey(dateKey, -((wd+6)%7));
+}
+
+/* Wochen in Folge mit mindestens einem Serien-Tag. Die laufende Woche
+   zählt mit, sobald sie einen hat -- hat sie (noch) keinen, gilt die
+   Wochen-Serie als noch nicht gerissen und wird ab der Vorwoche gezählt. */
+function computeWeekStreak(log, today){
+  const weeks = new Set(Object.keys(log).filter(k=>log[k].flame).map(weekStartKey));
+  let week = weekStartKey(today);
+  if(!weeks.has(week)) week = addDaysToDateKey(week, -7);
+  let count = 0;
+  while(weeks.has(week) && count<1000){
+    count++;
+    week = addDaysToDateKey(week, -7);
+  }
+  return count;
 }
 
 const MAX_ROUND_DURATION_SEC = 7200; // 2h -- a round genuinely in progress never takes this long; a larger gap means the tab sat inactive/in the background (e.g. overnight) and shouldn't inflate totalTimeSec
@@ -8385,6 +8891,10 @@ function finalizeRoundAndUpdateProfile(){
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     const today = todayKey();
+    // backfill the day log from the PRE-round state (see ensureDailyLog),
+    // before this round's streak/goal updates -- otherwise today's
+    // answers would be counted twice on the first round after the update
+    ensureDailyLog(prof);
 
     // Vor evaluateDailyGoalAndStreak() (die lastActiveDate gleich auf heute
     // setzt) den bisherigen Stand sichern -- für "Wiedereinstieg" muss die
@@ -8449,6 +8959,7 @@ function finalizeRoundAndUpdateProfile(){
     if(roundWasFullyPlayed) prof.stats.roundsCompleted += 1;
     if(!prof.stats.totalCorrectAnswersEver) prof.stats.totalCorrectAnswersEver=0; // older profiles predate this field
     prof.stats.totalCorrectAnswersEver += state.roundCorrectCount;
+    logRoundToDailyLog(prof, today, state.roundCorrectCount);
 
     // a word that had already gone wrong 3+ times (before this round) and
     // got answered right on the first try this round counts as "mastered"
@@ -10806,6 +11317,26 @@ function setupEventListeners(){
     const target=state.backStackBeforeTeamLeaderboard || "screen-start";
     switchScreen(target);
     if(target==="screen-start") renderStartScreen();
+  });
+
+  document.getElementById("btnProgressBack").addEventListener("click", ()=>{
+    switchScreen(state.backStackBeforeProgress || "screen-start");
+    renderStartScreen();
+  });
+  const shiftProgressMonth = (delta)=>{
+    const pm = state.progressMonth;
+    const d = new Date(pm.y, pm.m-1+delta, 1);
+    state.progressMonth = {y:d.getFullYear(), m:d.getMonth()+1};
+    const prof = getCurrentProfileObj();
+    if(prof) renderProgressCalendar(ensureDailyLog(prof), todayKey());
+  };
+  document.getElementById("btnCalPrev").addEventListener("click", ()=>shiftProgressMonth(-1));
+  document.getElementById("btnCalNext").addEventListener("click", ()=>shiftProgressMonth(1));
+  document.getElementById("btnFreezeHelp").addEventListener("click", ()=>{
+    const help = document.getElementById("progFreezeHelp");
+    const btn = document.getElementById("btnFreezeHelp");
+    help.hidden = !help.hidden;
+    btn.setAttribute("aria-expanded", help.hidden ? "false" : "true");
   });
 
   document.getElementById("btnBonusCardsBack").addEventListener("click", ()=>{
