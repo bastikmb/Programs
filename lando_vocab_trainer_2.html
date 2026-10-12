@@ -2193,7 +2193,7 @@ body.dark-theme .daily-goal-mini-banner {
            && request.resource.data.longestStreak is number
            && request.resource.data.longestStreak >= 0 && request.resource.data.longestStreak <= 3650
            && request.resource.data.achievementsUnlocked is number
-           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 23
+           && request.resource.data.achievementsUnlocked >= 0 && request.resource.data.achievementsUnlocked <= 33
            && request.resource.data.distinctPageSetsCompleted is number
            && request.resource.data.distinctPageSetsCompleted >= 0 && request.resource.data.distinctPageSetsCompleted <= 1000
            && (request.resource.data.team == null ||
@@ -5117,6 +5117,8 @@ let state = {
   roundCorrectCount: 0,         // correct answers so far this round
   dailyGoalCountAtStart: 0,     // goal.correctToday snapshot at round start
   dailyGoalCelebratedThisRound: false, // true once the in-round daily-goal toast has fired, so it doesn't repeat
+  roundUsedHintOrReveal: false, // true as soon as applyHint()/revealSolution() is used this round, see "Dribbelkönig"
+  roundTypoCorrectedCount: 0,   // wie oft isLikelyAdjacentKeyTypo() diese Runde gegriffen hat, see "Grätsche"
 };
 
 /* Profile schema:
@@ -5520,6 +5522,11 @@ function addDaysToDateKey(dateKey, days){
   const m = String(d.getMonth()+1).padStart(2,"0");
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
+}
+
+// 0=Sonntag ... 6=Samstag (natives Date-Wochentags-Schema), siehe "Wochenendprofi"
+function getWeekday(dateKey){
+  return new Date(dateKey+"T00:00:00").getDay();
 }
 
 function ensureStreakObj(prof){
@@ -6493,6 +6500,15 @@ function redeemBonusCard(threshold){
     `Bonuskarte (${BONUS_CARD_REWARD_TITLE}, ${threshold} Flammen) jetzt als eingelöst markieren? Das kann danach nicht mehr zurückgenommen werden.`,
     ()=>{
       ensureBonusCards(prof).redeemed[threshold] = new Date().toISOString();
+      // "Elfmeterkönig"/"Pokaljäger": dauerhafter Zähler, unabhängig vom
+      // threshold. checkAchievements läuft hier außerhalb einer Runde --
+      // buildAchievementCtx() liefert dafür ein sicheres neutrales ctx
+      // (löst keine rundenbezogenen Abzeichen fälschlich aus, siehe dort).
+      // Neu freigeschaltete Abzeichen werden hier bewusst nur im
+      // Hintergrund vermerkt, ohne eigenes Banner -- sichtbar beim
+      // nächsten Blick auf den Abzeichen-Screen.
+      prof.stats.bonusCardsRedeemedCount = (prof.stats.bonusCardsRedeemedCount||0) + 1;
+      checkAchievements(prof, buildAchievementCtx(prof, {}));
       saveProfiles();
       renderBonusCardsScreen();
       renderBonusProgressTile(prof);
@@ -6838,8 +6854,71 @@ const ACHIEVEMENTS = [
   {id:"teamplayer", icon:"🤝", title:"Teamplayer", desc:"Einem Team beigetreten",
     check:(p,ctx)=>!!p.team},
   {id:"ballon_dor", icon:"🏅", title:"Ballon D'or", desc:"Jedes Wort in allen Büchern einer Sprache wirklich auswendig gelernt",
-    check:(p,ctx)=>getAvailableLanguages().some(l=>isLanguageFullyMastered(p, l))}
+    check:(p,ctx)=>getAvailableLanguages().some(l=>isLanguageFullyMastered(p, l))},
+  {id:"dribbelkoenig", icon:"🎯", title:"Dribbelkönig", desc:"Eine komplette Runde ohne Tipp oder \"Lösung zeigen\" gelöst",
+    check:(p,ctx)=>!!ctx.hintFreeRound},
+  {id:"weisse_weste", icon:"🧤", title:"Weiße Weste", desc:"5 perfekte Runden direkt hintereinander",
+    check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=5,
+    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:5})},
+  {id:"elfmeterkoenig", icon:"🥅", title:"Elfmeterkönig", desc:"Die erste Bonuskarte eingelöst",
+    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=1},
+  {id:"pokaljaeger", icon:"🏆", title:"Pokaljäger", desc:"5 Bonuskarten insgesamt eingelöst",
+    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=5,
+    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:5})},
+  {id:"flutlichtspiel", icon:"🌃", title:"Flutlichtspiel", desc:"Eine Runde nach 21 Uhr abends abgeschlossen",
+    check:(p,ctx)=>!!ctx.isNightRound},
+  {id:"libero", icon:"🔄", title:"Libero", desc:"In beiden Richtungen (Deutsch→Fremdsprache und umgekehrt) je mindestens 50 Wörter richtig beantwortet",
+    check:(p,ctx)=>{
+      const d = p.stats.correctByDirection || {};
+      const sum = obj => Object.values(obj||{}).reduce((s,n)=>s+n, 0);
+      return sum(d.deToEn)>=50 && sum(d.enToDe)>=50;
+    },
+    progress:p=>{
+      const d = p.stats.correctByDirection || {};
+      const sum = obj => Object.values(obj||{}).reduce((s,n)=>s+n, 0);
+      return {current:Math.min(sum(d.deToEn), sum(d.enToDe)), target:50};
+    }},
+  {id:"sturmlauf", icon:"⚡", title:"Sturmlauf", desc:"10 Antworten in Folge richtig (Combo) in einer einzigen Runde erreicht",
+    check:(p,ctx)=>((p.stats.records&&p.stats.records.highestCombo)||0)>=10,
+    progress:p=>({current:(p.stats.records&&p.stats.records.highestCombo)||0, target:10})},
+  {id:"graetsche", icon:"🛡️", title:"Grätsche", desc:"10-mal einen Nachbartasten-Tippfehler selbst erfolgreich korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=10,
+    progress:p=>({current:p.stats.typoCorrectedCount||0, target:10})},
+  {id:"aufholjagd", icon:"📈", title:"Aufholjagd", desc:"Eine Runde mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+    check:(p,ctx)=>!!ctx.hardComebackRound},
+  {id:"wochenendprofi", icon:"📅", title:"Wochenendprofi", desc:"An Samstag UND Sonntag desselben Wochenendes gelernt",
+    check:(p,ctx)=>{
+      const sat = p.stats.lastSaturdayPlayed, sun = p.stats.lastSundayPlayed;
+      return !!(sat && sun && addDaysToDateKey(sat, 1)===sun);
+    }}
 ];
+
+/* checkAchievements() läuft nicht nur am Rundenende (finalizeRoundAndUpdateProfile,
+   volle ctx mit echten Rundendaten), sondern z.B. auch beim Einlösen einer
+   Bonuskarte (redeemBonusCard) -- außerhalb einer Runde. Dieser Helper baut
+   in beiden Fällen dasselbe ctx-Shape: profilbezogene Felder (streak,
+   levelInfo) bekommen immer den echten aktuellen Wert, alle rundenbezogenen
+   Felder bekommen einen neutralen "nichts passiert"-Default (0/false/null),
+   der garantiert KEIN rundenbezogenes Abzeichen fälschlich auslöst (jedes
+   bestehende Abzeichen, das ctx.totalCards/ctx.durationSec/etc. prüft, hat
+   seine Schwelle so gesetzt, dass 0 bzw. false sie nie erreicht). Profilbasierte
+   Abzeichen (z.B. Punktemillionär, Hattrick) werden dadurch weiterhin korrekt
+   ausgewertet, egal von wo aus checkAchievements() aufgerufen wird. */
+function buildAchievementCtx(prof, overrides){
+  return Object.assign({
+    streak: ensureStreakObj(prof),
+    levelInfo: getLevelInfo(prof.stats.totalPoints),
+    totalCards: 0,
+    firstTryPct: 0,
+    durationSec: 0,
+    dailyGoalJustMet: false,
+    comebackHappened: false,
+    gapDaysSinceLastActive: null,
+    hintFreeRound: false,
+    hardComebackRound: false,
+    isNightRound: false
+  }, overrides || {});
+}
 
 /* Returns the newly-unlocked definitions (already-unlocked ones are
    skipped), and records the unlock date on the profile as a side effect. */
@@ -6932,6 +7011,8 @@ function buildRoundCardsFromVocab(){
   state.currentCombo = 0;
   state.bestCombo = 0;
   state.roundComboBonus = 0;
+  state.roundUsedHintOrReveal = false;
+  state.roundTypoCorrectedCount = 0;
 
   // Profile points/level are only saved to the profile when the round ends
   // (finalizeRoundAndUpdateProfile), so to show a level-up live, mid-round,
@@ -7754,10 +7835,34 @@ function finalizeRoundAndUpdateProfile(){
     const comebackHappened = originalCards.some(c=>
       c.firstTry && c.done && (wrongCountsBefore[c.de]||0)>=3);
 
-    const achievementCtx = {
-      streak: ensureStreakObj(prof), levelInfo, totalCards, firstTryPct,
-      durationSec, dailyGoalJustMet, comebackHappened, gapDaysSinceLastActive
-    };
+    // "Wochenendprofi": letzten gespielten Samstag/Sonntag separat merken --
+    // das Abzeichen prüft dann (in buildAchievementCtx/ACHIEVEMENTS), ob der
+    // gespeicherte Sonntag exakt ein Tag nach dem gespeicherten Samstag liegt,
+    // also beide zum selben Wochenende gehören.
+    const todayWeekday = getWeekday(today);
+    if(todayWeekday===6) prof.stats.lastSaturdayPlayed = today;
+    if(todayWeekday===0) prof.stats.lastSundayPlayed = today;
+
+    // "Grätsche": diese Runde selbst korrigierte Nachbartasten-Tippfehler
+    // dauerhaft aufsummieren (gleiches Muster wie catchUpWordsCount oben).
+    if(state.roundTypoCorrectedCount>0){
+      prof.stats.typoCorrectedCount = (prof.stats.typoCorrectedCount||0) + state.roundTypoCorrectedCount;
+    }
+
+    const achievementCtx = buildAchievementCtx(prof, {
+      levelInfo, totalCards, firstTryPct,
+      durationSec, dailyGoalJustMet, comebackHappened, gapDaysSinceLastActive,
+      // "Dribbelkönig": komplette, tatsächlich gespielte Runde ganz ohne
+      // Tipp/Lösung-zeigen.
+      hintFreeRound: roundWasFullyPlayed && !state.roundUsedHintOrReveal && originalCards.length>0,
+      // "Aufholjagd": mind. 3 Fehlversuche in der Runde, am Ende trotzdem
+      // jedes Wort gemeistert (isFlawless oben bereits berechnet).
+      hardComebackRound: originalCards.length>0 && isFlawless
+        && originalCards.filter(c=>c.attemptedWrong).length>=3,
+      // "Flutlichtspiel": Runde nach 21 Uhr abgeschlossen -- nur bei
+      // tatsächlich gespielten Karten, nicht bei einer leeren/abgebrochenen Runde.
+      isNightRound: totalCards>0 && new Date().getHours()>=21
+    });
     newlyUnlockedAchievements = checkAchievements(prof, achievementCtx);
 
     saveProfiles();
@@ -9049,6 +9154,7 @@ function maybeRequeueCard(card){
    expectedAnswerBoxes; the input field itself is left untouched, so the
    child still has to type the whole answer themselves. */
 function applyHint(){
+  state.roundUsedHintOrReveal = true; // siehe "Dribbelkönig"-Abzeichen
   const card = state.roundCards[state.roundIndex];
   const inputEl = document.getElementById("answerInput");
   const currentVal = inputEl.value;
@@ -9367,6 +9473,7 @@ function checkAnswer(){
     // Punktabzug/Combo-Bruch/firstTry-Verlust -- das Kind muss selbst
     // richtig tippen, dieser eine Versuch zählt aber nicht als Fehler.
     if(isLikelyAdjacentKeyTypo(inputVal, correct)){
+      state.roundTypoCorrectedCount++; // siehe "Grätsche"-Abzeichen
       markAnswerComparison(card, inputVal); // zeigt den einen abweichenden Buchstaben rot, Rest grün
       showAnswerFeedback(pickRandom(TYPO_MESSAGES), "typo");
       const inputEl = document.getElementById("answerInput");
@@ -9420,6 +9527,7 @@ function skipCurrentCard(){
 }
 
 function revealSolution(){
+  state.roundUsedHintOrReveal = true; // siehe "Dribbelkönig"-Abzeichen
   const card = state.roundCards[state.roundIndex];
   if(!card) return;
   const inputEl = document.getElementById("answerInput");
