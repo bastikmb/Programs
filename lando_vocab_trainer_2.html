@@ -6767,7 +6767,7 @@ const FAST_ROUND_SEC_PER_WORD = 5;
 const FAST_ROUND_MIN_FIRST_TRY_PCT = 70;
 
 const ACHIEVEMENTS = [
-  {id:"first_round", icon:"🥇", title:"Erste Runde", desc:"Deine erste Runde abgeschlossen",
+  {id:"first_round", icon:"🥇", title:"Newcomer", desc:"Deine erste Runde abgeschlossen",
     check:(p,ctx)=>p.stats.roundsCompleted===1},
   {id:"correct_100", icon:"💯", title:"100 Richtige", desc:"100 richtige Antworten insgesamt",
     check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=100,
@@ -6795,32 +6795,32 @@ const ACHIEVEMENTS = [
       && ctx.firstTryPct>=FAST_ROUND_MIN_FIRST_TRY_PCT},
   {id:"comeback_word", icon:"💪", title:"Comeback", desc:"Ein schwieriges Wort endlich gemeistert",
     check:(p,ctx)=>ctx.comebackHappened},
-  {id:"daily_goal_hit", icon:"🎯", title:"Tagesziel", desc:"Das Tagesziel erreicht",
+  {id:"daily_goal_hit", icon:"🎯", title:"Startelf Spieler", desc:"Das Tagesziel erreicht",
     check:(p,ctx)=>ctx.dailyGoalJustMet,
     progress:p=>({current:ensureDailyGoal(p).correctToday, target:DAILY_GOAL_TARGET})},
-  {id:"streak_100", icon:"🌙", title:"Serientäter", desc:"100 Tage in Folge gelernt",
+  {id:"streak_100", icon:"🌙", title:"Torschützenkönig", desc:"100 Tage in Folge gelernt",
     check:(p,ctx)=>ctx.streak.longest>=100,
     progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:100})},
-  {id:"marathon", icon:"🏔️", title:"Marathon", desc:"Eine einzelne Runde mit 50+ Wörtern abgeschlossen",
+  {id:"marathon", icon:"🏔️", title:"Laufwunder", desc:"Eine einzelne Runde mit 50+ Wörtern abgeschlossen",
     check:(p,ctx)=>ctx.totalCards>=50},
   {id:"millionaire", icon:"💰", title:"Punktemillionär", desc:"5.000 Gesamtpunkte erreicht",
     check:(p,ctx)=>(p.stats.totalPoints||0)>=5000,
     progress:p=>({current:p.stats.totalPoints||0, target:5000})},
-  {id:"perfectionist", icon:"👑", title:"Perfektionist", desc:"10 perfekte Runden insgesamt",
+  {id:"perfectionist", icon:"👑", title:"Mittelfeldstratege", desc:"10 perfekte Runden insgesamt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=10,
     progress:p=>({current:p.stats.perfectRoundsCount||0, target:10})},
   {id:"hattrick", icon:"🎩", title:"Hattrick", desc:"3 perfekte Runden direkt hintereinander",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=3,
     progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:3})},
-  {id:"full_book_mastery", icon:"🧠", title:"Vollbesetzt", desc:"Jedes Wort eines Buches wirklich auswendig gelernt",
+  {id:"full_book_mastery", icon:"🧠", title:"Stammspieler", desc:"Jedes Wort eines Buches wirklich auswendig gelernt",
     check:(p,ctx)=>Object.keys({...BOOKS, ...customBooks}).some(bk=>isBookFullyMastered(p, bk))},
   {id:"globetrotter", icon:"🌍", title:"Weltenbummler", desc:"10 verschiedene Seiten fehlerfrei gelernt",
     check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=10,
     progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:10})},
-  {id:"bookworm", icon:"📚", title:"Bücherwurm", desc:"In 3 verschiedenen Büchern gespielt",
+  {id:"bookworm", icon:"📚", title:"G.O.A.T.", desc:"In 3 verschiedenen Büchern gespielt",
     check:(p,ctx)=>Object.keys(p.stats.booksPlayed||{}).length>=3,
     progress:p=>({current:Object.keys(p.stats.booksPlayed||{}).length, target:3})},
-  {id:"polyglot", icon:"🗣️", title:"Polyglott", desc:"In jeder verfügbaren Sprache mindestens eine Runde gespielt",
+  {id:"polyglot", icon:"🗣️", title:"Allzweckwaffe", desc:"In jeder verfügbaren Sprache mindestens eine Runde gespielt",
     check:(p,ctx)=>{
       const langs = getAvailableLanguages();
       return langs.length>0 && langs.every(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]);
@@ -6830,7 +6830,7 @@ const ACHIEVEMENTS = [
       const done = langs.filter(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]).length;
       return {current:done, target:langs.length||1};
     }},
-  {id:"catchup_pro", icon:"🔁", title:"Nachhol-Profi", desc:"20 schwierige Wörter beim Üben später doch noch richtig hinbekommen",
+  {id:"catchup_pro", icon:"🔁", title:"Nachholspiel", desc:"20 schwierige Wörter beim Üben später doch noch richtig hinbekommen",
     check:(p,ctx)=>(p.stats.catchUpWordsCount||0)>=20,
     progress:p=>({current:p.stats.catchUpWordsCount||0, target:20})},
   {id:"comeback_pause", icon:"🌅", title:"Wiedereinstieg", desc:"Nach mindestens 7 Tagen Pause wieder gelernt",
