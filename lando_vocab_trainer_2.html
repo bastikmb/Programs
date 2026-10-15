@@ -2557,8 +2557,6 @@ input:focus-visible {
     <div class="section-title" style="margin-top:1rem;">🏆 Bestleistungen</div>
     <div class="stats-row" id="recordsRow"></div>
 
-    <div class="section-title" style="margin-top:1rem;">🏅 Abzeichen</div>
-    <div class="achievements-grid" id="achievementsGrid"></div>
 
     <div class="section-title" style="margin-top:1rem;">Top Problem-Wörter</div>
     <div class="problem-list" id="problemList"></div>
@@ -2598,6 +2596,17 @@ input:focus-visible {
   </div>
 
   <!-- BONUS CARDS SCREEN (eigener Screen, öffnet beim Klick auf die Bonuskarten-Kachel auf der Startseite) -->
+  <div id="screen-badges" class="screen">
+    <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+      <span>🏅 Abzeichen</span>
+    </h2>
+    <div id="badgesSummary" class="section-sub" style="margin-bottom:1rem;"></div>
+    <div class="achievements-grid" id="achievementsGrid"></div>
+    <div class="btn-row btn-row-sticky">
+      <button id="btnBadgesBack" class="btn-secondary btn">⬅ Zurück</button>
+    </div>
+  </div>
+
   <div id="screen-progress" class="screen">
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🔥 Lernfortschritt</span>
@@ -7277,9 +7286,19 @@ function findNextBadge(prof){
 
 function renderNextBadgeTile(prof){
   const tile = document.getElementById("nextBadgeTile");
-  const next = prof && findNextBadge(prof);
-  if(!next){
+  if(!prof){
     tile.classList.remove("show");
+    return;
+  }
+  const next = findNextBadge(prof);
+  if(!next){
+    // nothing with a progress bar left -- keep the way into the badges screen
+    tile.innerHTML = `<span class="next-badge-icon">🏅</span><div style="flex:1;min-width:0;"><div class="stat-tile-head">Abzeichen</div><div class="stat-tile-sub"></div></div>`;
+    tile.querySelector(".stat-tile-sub").textContent = `${countUnlockedAchievements(ensureAchievements(prof).unlocked)} von ${ACHIEVEMENTS.length} freigeschaltet`;
+    tile.classList.add("show");
+    tile.style.cursor = "pointer";
+    tile.onclick = openBadgesScreen;
+    makeTileAccessible(tile, "Alle Abzeichen öffnen");
     return;
   }
   const {def, pct, current, target} = next;
@@ -7295,12 +7314,8 @@ function renderNextBadgeTile(prof){
   tile.querySelector(".next-badge-title").textContent = `${def.title}: ${def.desc} (noch ${target-current})`;
   tile.classList.add("show");
   tile.style.cursor = "pointer";
-  tile.onclick = ()=>{
-    state.backStackBeforeStats = "screen-start";
-    switchScreen("screen-stats");
-    renderStatsScreen();
-  };
-  makeTileAccessible(tile, `Nächstes Abzeichen: ${def.title}, Statistik öffnen`);
+  tile.onclick = openBadgesScreen;
+  makeTileAccessible(tile, `Nächstes Abzeichen: ${def.title}, alle Abzeichen öffnen`);
 }
 
 function renderBonusProgressTile(prof){
@@ -9729,6 +9744,25 @@ function renderAchievementsGrid(prof){
   }
 }
 
+function renderBadgesScreen(){
+  const prof = getCurrentProfileObj();
+  const summary = document.getElementById("badgesSummary");
+  if(!prof){
+    summary.textContent = "";
+    document.getElementById("achievementsGrid").innerHTML = "";
+    return;
+  }
+  const unlocked = ensureAchievements(prof).unlocked;
+  summary.textContent = `${countUnlockedAchievements(unlocked)} von ${ACHIEVEMENTS.length} Abzeichen freigeschaltet – auf eine Kachel tippen zeigt alle Stufen.`;
+  renderAchievementsGrid(prof);
+}
+
+function openBadgesScreen(){
+  switchScreen("screen-badges");
+  renderBadgesScreen();
+  window.scrollTo(0, 0);
+}
+
 function renderStatsScreen(){
   const prof=getCurrentProfileObj();
   const labelEl = document.getElementById("statsProfileLabel");
@@ -9737,7 +9771,6 @@ function renderStatsScreen(){
     document.getElementById("statTotalPoints").textContent="0";
     document.getElementById("statTotalTime").textContent="0";
     document.getElementById("recordsRow").innerHTML="";
-    document.getElementById("achievementsGrid").innerHTML="";
     document.getElementById("problemList").innerHTML="<div style='padding:0.8rem;font-size:0.9rem;color:var(--muted);'>Keine Daten.</div>";
     return;
   }
@@ -9749,7 +9782,6 @@ function renderStatsScreen(){
   document.getElementById("statTotalTime").textContent = String(minTotal);
 
   renderRecordsSection(prof);
-  renderAchievementsGrid(prof);
 
   // sort wrongCounts desc
   const entries = Object.entries(prof.stats.wrongCounts||{});
@@ -10922,7 +10954,7 @@ function showSummaryScreen(){
     newlyUnlockedAchievements.slice(0, MAX_BADGE_BANNERS-1).forEach(ach=>{
       addHighlightBanner(extraDiv, "achievement", `${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`);
     });
-    addHighlightBanner(extraDiv, "achievement", `🏅 +${more} weitere Abzeichen – schau in der Statistik nach!`);
+    addHighlightBanner(extraDiv, "achievement", `🏅 +${more} weitere Abzeichen – schau unter „Nächstes Abzeichen“ auf der Startseite nach!`);
   } else newlyUnlockedAchievements.forEach(ach=>{
     addHighlightBanner(extraDiv, "achievement", `${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`);
   });
@@ -11899,6 +11931,10 @@ function setupEventListeners(){
   // "screen-start" -- so "screen-start" is the only branch that can
   // ever run. Kept as a fallback-checked `target` (not hardcoded)
   // so a future second entry point stays safe by construction.
+  document.getElementById("btnBadgesBack").addEventListener("click", ()=>{
+    goToScreen("screen-start", renderStartScreen);
+  });
+
   document.getElementById("btnStatsBack").addEventListener("click", ()=>{
     const target=state.backStackBeforeStats || "screen-start";
     switchScreen(target);
