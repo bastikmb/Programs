@@ -1135,6 +1135,37 @@ body.dark-theme { --flame:#c2410c; --flame-text:#fb923c; --freeze-bg:#075985; --
   border-top:2px dashed var(--muted);
   display:inline-block;
 }
+.progress-box-summary {
+  text-align:center;
+  font-size:var(--text-sm);
+  color:var(--muted);
+  margin:-0.25rem 0 var(--space-3);
+}
+.progress-box-summary strong { color:var(--ink); font-size:var(--text-md); }
+.box-rows { display:flex; flex-direction:column; gap:0.45rem; }
+.box-row {
+  display:grid;
+  grid-template-columns:4.6rem 1fr 2.2rem;
+  align-items:center;
+  gap:var(--space-2);
+  font-size:var(--text-xs);
+}
+.box-row-label { color:var(--ink); font-weight:600; line-height:1.2; }
+.box-row-label small { display:block; color:var(--muted); font-weight:500; }
+.box-row-track {
+  height:0.8rem;
+  background:var(--border);
+  border-radius:999px;
+  overflow:hidden;
+}
+.box-row-fill {
+  height:100%;
+  background:var(--accent);
+  border-radius:999px;
+  min-width:0;
+}
+.box-row-count { text-align:right; font-weight:700; color:var(--ink); font-size:var(--text-sm); }
+.box-row.top .box-row-label { color:var(--flame-text); }
 /* bonus cards (unlocked at streak thresholds) */
 .bonus-cards-block { margin-bottom:1rem; }
 .bonus-card-list { display:flex; flex-direction:column; gap:0.6rem; }
@@ -2479,6 +2510,8 @@ input:focus-visible {
         <div><span class="muted">Bester Combo:</span> <span id="sumBestCombo" class="bold">–</span></div>
         <div><span class="muted">Combo-Bonus:</span> <span id="sumComboBonus" class="bold">+0</span></div>
         <div><span class="muted">Perfekte Runde:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
+        <div><span class="muted">Wiederholungs-Bonus:</span> <span id="sumReviewBonus" class="bold">+0</span></div>
+        <div><span class="muted">Sicher gelernt (Fach 6):</span> <span id="sumMasteredBonus" class="bold">+0</span></div>
       </div>
     </div>
 
@@ -2592,6 +2625,14 @@ input:focus-visible {
         <span><span class="legend-swatch"></span>darunter</span>
         <span><span class="legend-line"></span>Tagesziel</span>
       </div>
+    </div>
+
+    <div class="progress-card">
+      <div class="progress-card-title">Wiederholungs-Fächer</div>
+      <div id="progBoxSummary" class="progress-box-summary"></div>
+      <div id="progBoxes" class="box-rows"></div>
+      <div class="section-sub" style="margin-top:var(--space-3);">Auf Anhieb richtig = ein Fach weiter, falsch = zurück in Fach 1. Jedes Wort, das in Fach 6 ankommt, bringt +5 Punkte.</div>
+      <button id="btnProgressReview" class="btn" type="button" style="width:100%;margin-top:var(--space-3);display:none;"></button>
     </div>
 
     <div class="btn-row btn-row-sticky">
@@ -6233,6 +6274,11 @@ function ensurePendingPageSetWords(prof){
   return prof.stats.pendingPageSetWords;
 }
 
+// Wiederholungs-Bonus: +50 % der Rundenpunkte, wenn eine Wiederholungsrunde
+// ALLE heute fälligen Wörter erledigt hat (Gegenstück zum Seiten-Bonus)
+const REVIEW_BONUS_RATIO = 0.5;
+// je Wort, das (wieder) ins höchste Leitner-Fach aufrückt = "sicher gelernt"
+const MASTERED_WORD_BONUS = 5;
 const PAGESET_BONUS_RATIO = 0.5; // +50% der in der Runde erzielten Punkte
 const PERFECT_ROUND_BONUS = 5; // bei JEDER Runde ohne Skip/Aufdecken, nicht nur bei neuen Seiten-Sets
 
@@ -7260,7 +7306,7 @@ function renderDueReviewTile(prof){
     tile.innerHTML = `
       <span style="font-size:1.2rem;">📅</span>
       <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head">${due.length} Wort${due.length===1?"":"e"} heute fällig</div>
+        <div class="stat-tile-head">${due.length} ${due.length===1?"Wort":"Wörter"} heute fällig</div>
         <div class="stat-tile-sub">Antippen zum Üben</div>
       </div>
     `;
@@ -7306,6 +7352,7 @@ function startDueReviewRound(){
   }));
   state.direction = "mixed";
   state.isHardWordsOnlyRound = true; // deckt nie eine volle Seiten-Auswahl ab -- kein Seiten-Set-Bonus, siehe isRoundFullyCorrect()
+  state.isDueReviewRound = true; // für Wiederholungs-Bonus und "Doublesieger", siehe finalizeRoundAndUpdateProfile
   switchScreen("screen-learn");
   buildRoundCardsFromVocab();
   renderCurrentCard();
@@ -7419,6 +7466,57 @@ function renderProgressScreen(){
 
   renderProgressCalendar(log, today);
   renderProgressChart(log, today, prof.stats.dailyLogSince || null);
+  renderProgressBoxes(prof);
+}
+
+/* Wie viele (noch existierende) Wörter in welchem Leitner-Fach liegen --
+   macht den Wiederholungsplan sichtbar, siehe updateWordSchedule. */
+const BOX_INTERVAL_LABELS = ["morgen","in 2 Tagen","in 4 Tagen","in 1 Woche","in 2 Wochen","in 30 Tagen"];
+function renderProgressBoxes(prof){
+  const counts = new Array(LEITNER_MAX_BOX).fill(0);
+  for(const [key, entry] of Object.entries(ensureWordSchedule(prof))){
+    if(!entry || !entry.box || !findVocabEntryByKey(key)) continue; // deleted words don't count
+    counts[Math.min(entry.box, LEITNER_MAX_BOX)-1]++;
+  }
+  const total = counts.reduce((a,b)=>a+b, 0);
+  const max = Math.max(1, ...counts);
+  const summary = document.getElementById("progBoxSummary");
+  summary.innerHTML = "";
+  if(total===0){
+    summary.textContent = "Noch keine Wörter im Wiederholungsplan – spiel eine Runde!";
+  } else {
+    const strong = document.createElement("strong");
+    strong.textContent = String(counts[LEITNER_MAX_BOX-1]);
+    summary.append(strong, ` von ${total} geübten Wörtern sicher gelernt`);
+  }
+  const rows = document.getElementById("progBoxes");
+  rows.innerHTML = "";
+  counts.forEach((n, i)=>{
+    const row = document.createElement("div");
+    row.className = "box-row" + (i===LEITNER_MAX_BOX-1 ? " top" : "");
+    row.setAttribute("aria-label", `Fach ${i+1}: ${n} Wörter, wieder fällig ${BOX_INTERVAL_LABELS[i]}`);
+    const label = document.createElement("div");
+    label.className = "box-row-label";
+    label.textContent = i===LEITNER_MAX_BOX-1 ? `Fach ${i+1} 🎓` : `Fach ${i+1}`;
+    const sub = document.createElement("small");
+    sub.textContent = BOX_INTERVAL_LABELS[i];
+    label.appendChild(sub);
+    const track = document.createElement("div");
+    track.className = "box-row-track";
+    const fill = document.createElement("div");
+    fill.className = "box-row-fill";
+    fill.style.width = `${n/max*100}%`;
+    track.appendChild(fill);
+    const count = document.createElement("div");
+    count.className = "box-row-count";
+    count.textContent = String(n);
+    row.append(label, track, count);
+    rows.appendChild(row);
+  });
+  const due = collectDueWords(prof).length;
+  const btn = document.getElementById("btnProgressReview");
+  btn.style.display = due>0 ? "" : "none";
+  btn.textContent = `📅 ${due} fällige${due===1?"s Wort":" Wörter"} jetzt wiederholen`;
 }
 
 function renderProgressCalendar(log, today){
@@ -7782,7 +7880,23 @@ const ACHIEVEMENTS = [
     progress:p=>({current:p.stats.perfectRoundsCount||0, target:50})},
   {id:"perfect_50", icon:"🌟", title:"Weltfußballer", desc:"100 perfekte Runden insgesamt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=100,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:100})}
+    progress:p=>({current:p.stats.perfectRoundsCount||0, target:100})},
+  // "Doublesieger"-Familie: erledigte Wiederholungsrunden (Kachel "heute fällig")
+  {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Wiederholungsrunden abgeschlossen",
+    check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=5,
+    progress:p=>({current:p.stats.reviewRoundsCount||0, target:5})},
+  {id:"review_25", icon:"🏆", title:"Doublesieger", desc:"25 Wiederholungsrunden abgeschlossen",
+    check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=25,
+    progress:p=>({current:p.stats.reviewRoundsCount||0, target:25})},
+  {id:"review_50", icon:"🥇", title:"Triplesieger", desc:"50 Wiederholungsrunden abgeschlossen",
+    check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=50,
+    progress:p=>({current:p.stats.reviewRoundsCount||0, target:50})},
+  {id:"review_100", icon:"🛡️", title:"Serienmeister", desc:"100 Wiederholungsrunden abgeschlossen",
+    check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=100,
+    progress:p=>({current:p.stats.reviewRoundsCount||0, target:100})},
+  {id:"review_250", icon:"⭐", title:"Rekordmeister", desc:"250 Wiederholungsrunden abgeschlossen",
+    check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=250,
+    progress:p=>({current:p.stats.reviewRoundsCount||0, target:250})}
 ];
 
 /* Fasst Abzeichen, die eine aufsteigende Stufenreihe auf derselben
@@ -7804,6 +7918,8 @@ const ACHIEVEMENT_FAMILIES = [
     tierIds:["pages_3","globetrotter","pages_25","full_book_mastery","ballon_dor"] },
   { id:"tippfehler", icon:"🛡️", name:"Tippfehler-Familie",
     tierIds:["typo_3","graetsche","typo_25","typo_50","typo_100"] },
+  { id:"doublesieger", icon:"🏆", name:"Doublesieger-Familie",
+    tierIds:["review_5","review_25","review_50","review_100","review_250"] },
   { id:"perfektion", icon:"✨", name:"Perfektion-Familie",
     tierIds:["perfect_round","perfect_5","perfectionist","perfect_25","perfect_50"] }
 ];
@@ -8790,6 +8906,7 @@ function getAvailableLanguages(){
    siehe dortiger Kommentar. */
 function updateWordSchedule(prof, originalCards, today){
   const schedule = ensureWordSchedule(prof);
+  let newlyMastered = 0;
   for(const card of originalCards){
     const key = card.key;
     const existing = schedule[key];
@@ -8807,8 +8924,10 @@ function updateWordSchedule(prof, originalCards, today){
       const prevBox = (existing && existing.box) || 0;
       const box = Math.min(prevBox+1, LEITNER_MAX_BOX);
       schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1]), direction:originalDirection};
+      if(box===LEITNER_MAX_BOX && prevBox<LEITNER_MAX_BOX) newlyMastered++;
     }
   }
+  return newlyMastered; // words that just moved INTO the top box, see MASTERED_WORD_BONUS
 }
 
 /* Part of finalizeRoundAndUpdateProfile(): advances the daily-goal counter
@@ -8971,6 +9090,7 @@ function finalizeRoundAndUpdateProfile(){
   let newlyUnlockedBonusCards=[];
   let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0, viaProgress:false};
   let perfectRoundBonusAwarded = false;
+  let reviewBonus = 0, masteredBonus = 0, masteredWordsCount = 0;
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     const today = todayKey();
@@ -9014,7 +9134,25 @@ function finalizeRoundAndUpdateProfile(){
     leveledUp = levelInfo.level > levelBefore;
 
     const wrongCountsBefore = updateWordCounters(prof, originalCards);
-    updateWordSchedule(prof, originalCards, today);
+    const newlyMastered = updateWordSchedule(prof, originalCards, today);
+
+    // Boni, die erst NACH der Einsortierung feststehen: Fach-6-Bonus und
+    // Wiederholungs-Bonus (alle heute fälligen Wörter erledigt -- übersprungene
+    // oder aufgedeckte bleiben fällig und verhindern ihn)
+    masteredWordsCount = newlyMastered;
+    masteredBonus = newlyMastered * MASTERED_WORD_BONUS;
+    if(state.isDueReviewRound && roundWasFullyPlayed && collectDueWords(prof).length===0){
+      reviewBonus = Math.round(state.roundTotalPoints * REVIEW_BONUS_RATIO);
+    }
+    if(state.isDueReviewRound && roundWasFullyPlayed){
+      prof.stats.reviewRoundsCount = (prof.stats.reviewRoundsCount||0) + 1; // "Doublesieger"
+    }
+    if(masteredBonus + reviewBonus > 0){
+      state.roundTotalPoints += masteredBonus + reviewBonus;
+      prof.stats.totalPoints += masteredBonus + reviewBonus;
+      levelInfo = getLevelInfo(prof.stats.totalPoints);
+      leveledUp = levelInfo.level > levelBefore;
+    }
 
     // Page progress (computePageProgressByDirection) is derived live from
     // correctByDirection above, so there's nothing further to persist here.
@@ -9104,7 +9242,10 @@ function finalizeRoundAndUpdateProfile(){
     newlyUnlockedAchievements,
     newlyUnlockedBonusCards,
     pageSetBonusAwarded,
-    perfectRoundBonusAwarded
+    perfectRoundBonusAwarded,
+    reviewBonus,
+    masteredBonus,
+    masteredWordsCount
   };
 }
 
@@ -9802,6 +9943,7 @@ function startQuickRound(){
   state.selectedPages = validPages;
   state.direction = last.direction;
   state.isHardWordsOnlyRound = false;
+  state.isDueReviewRound = false;
   renderVocabPickScreen();
   switchScreen("screen-learn");
   buildRoundCardsFromVocab();
@@ -9955,7 +10097,7 @@ function renderPagesList(){
       const wc=(pgObj[pid]||[]).length;
       const wcDiv=document.createElement("div");
       wcDiv.className="page-progress";
-      wcDiv.textContent=`${wc} Wort${wc===1?"":"e"}`;
+      wcDiv.textContent=`${wc} ${wc===1?"Wort":"Wörter"}`;
       main.appendChild(wcDiv);
 
       const rightWrap=document.createElement("div");
@@ -10378,7 +10520,7 @@ function showConfirmOverlay(message, onConfirm, opts){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded, perfectRoundBonusAwarded} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded, perfectRoundBonusAwarded, reviewBonus, masteredBonus, masteredWordsCount} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   // Details-Bereich bei jedem neuen Rundenergebnis wieder einklappen, statt
@@ -10403,6 +10545,8 @@ function showSummaryScreen(){
   document.getElementById("sumBestCombo").textContent = state.bestCombo>=2 ? `${state.bestCombo}er 🔥` : "–";
   document.getElementById("sumComboBonus").textContent = `+${state.roundComboBonus}`;
   document.getElementById("sumPerfectBonus").textContent = perfectRoundBonusAwarded ? `+${PERFECT_ROUND_BONUS}` : "+0";
+  document.getElementById("sumReviewBonus").textContent = `+${reviewBonus}`;
+  document.getElementById("sumMasteredBonus").textContent = masteredWordsCount>0 ? `+${masteredBonus} (${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"})` : "+0";
 
   const levelBanner = document.getElementById("levelUpBanner");
   if(leveledUp && levelInfo){
@@ -10449,6 +10593,12 @@ function showSummaryScreen(){
   } else if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.viaProgress){
     addHighlightBanner(extraDiv, "pageset", `🗺️ Seiten-Set abgeschlossen -- alle Wörter schon vorher gelernt!`);
   }
+  if(reviewBonus>0){
+    addHighlightBanner(extraDiv, "pageset", `📅 Alle fälligen Wörter wiederholt! +${reviewBonus} Wiederholungs-Bonus`);
+  }
+  if(masteredWordsCount>0){
+    addHighlightBanner(extraDiv, "record", `🎓 ${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"} jetzt sicher gelernt (Fach 6)! +${masteredBonus} Punkte`);
+  }
   if(dailyGoalJustMet){
     // shown again here for visibility (the child may have dismissed the
     // mid-round toast too quickly to read it) -- no sound replay, that
@@ -10460,7 +10610,7 @@ function showSummaryScreen(){
   // things happen in the same round -- achievement/record beats a plain
   // level-up (level-up already played live in checkAnswer() the moment it
   // happened, this is just a reminder chime for whichever is most noteworthy)
-  if(newlyUnlockedAchievements.length>0 || newRecords.length>0 || newlyUnlockedBonusCards.length>0 || pageSetBonusAwarded.isNewPageSet) playSound("achievement");
+  if(newlyUnlockedAchievements.length>0 || newRecords.length>0 || newlyUnlockedBonusCards.length>0 || pageSetBonusAwarded.isNewPageSet || reviewBonus>0 || masteredWordsCount>0) playSound("achievement");
   else if(leveledUp) playSound("levelup");
 
   switchScreen("screen-summary");
@@ -11271,6 +11421,7 @@ function setupEventListeners(){
     }
     // start round
     state.isHardWordsOnlyRound = false;
+    state.isDueReviewRound = false;
     goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
@@ -11340,6 +11491,9 @@ function setupEventListeners(){
     // Replay the exact same word selection + direction as the round that
     // just finished. state.vocabPool still holds it untouched -- only
     // btnOnlyHard below overwrites it.
+    // a replay of a review round is no review anymore -- its words were
+    // just rescheduled, none of them is due today
+    state.isDueReviewRound = false;
     goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
@@ -11362,6 +11516,7 @@ function setupEventListeners(){
     }));
     // We'll reuse current state.direction (unchanged)
     state.isHardWordsOnlyRound = true; // never covers the full page selection -- excluded from the page-set bonus, see isRoundFullyCorrect()
+    state.isDueReviewRound = false;
     goToScreen("screen-learn", ()=>{ buildRoundCardsFromVocab(); renderCurrentCard(); });
   });
 
@@ -11427,6 +11582,7 @@ function setupEventListeners(){
     if(prof) renderProgressCalendar(ensureDailyLog(prof), todayKey());
   };
   document.getElementById("btnCalPrev").addEventListener("click", ()=>shiftProgressMonth(-1));
+  document.getElementById("btnProgressReview").addEventListener("click", startDueReviewRound);
   document.getElementById("btnCalNext").addEventListener("click", ()=>shiftProgressMonth(1));
   document.getElementById("btnFreezeHelp").addEventListener("click", ()=>{
     const help = document.getElementById("progFreezeHelp");
