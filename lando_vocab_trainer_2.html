@@ -2239,6 +2239,16 @@ body.dark-theme .leaderboard-row .score { color:var(--board-value); text-shadow:
 body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   box-shadow:0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+/* Saison-Tabelle */
+.leaderboard-row.inactive { opacity:0.7; }
+.leaderboard-row .lb-hint {
+  flex-basis:100%;
+  font-size:var(--text-xs);
+  font-weight:700;
+  color:var(--heading);
+}
+.leaderboard-row .team-goal-bar { flex-basis:100%; margin-top:0; }
+.lb-explain summary { cursor:pointer; font-weight:700; color:var(--heading); margin-bottom:0.3rem; }
 /* Level-Übersicht */
 .level-list { display:flex; flex-direction:column; gap:0.45rem; }
 .level-row {
@@ -2508,6 +2518,8 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
         <summary class="section-title" style="cursor:pointer;">⚽ Team wählen</summary>
         <div style="margin-top:0.75rem;">
           <div class="section-sub" style="margin-bottom:0.5rem;">1. Bundesliga</div>
+          <div class="section-sub" style="margin-bottom:0.5rem;">Ein Vereinswechsel ist höchstens alle 30 Tage möglich.</div>
+          <div id="teamChangeNote" class="answer-feedback close" style="display:none;margin-bottom:0.5rem;"></div>
           <div id="teamPickerLeague1" class="flex-row-wrap" style="margin-bottom:0.75rem;"></div>
           <div class="section-sub" style="margin-bottom:0.5rem;">2. Bundesliga</div>
           <div id="teamPickerLeague2" class="flex-row-wrap"></div>
@@ -2796,7 +2808,16 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       <small class="screen-sub">Die Vokabel-Liga online</small>
     </h2>
     <div id="leaderboardProfileLabel" class="section-sub" style="margin-bottom:0.5rem;"></div>
-    <div class="section-sub" style="margin-bottom:1rem;">Tabellenpunkte = 40% Punkte pro Runde im Schnitt + 40% Treffergenauigkeit + 20% deine Lernserie, plus Bonus für Abzeichen, Bestleistungen und verschiedene gemeisterte Seiten-Sets.</div>
+    <details class="section-sub lb-explain" style="margin-bottom:1rem;">
+      <summary>Wie werden die Punkte berechnet?</summary>
+      Gezählt werden nur die letzten 28 Tage (max. 1000 Punkte):<br>
+      ⚽ Fleiß bis 300 – richtige Antworten (voll ab 700)<br>
+      🎯 Genauigkeit bis 250 – Erstversuch-Quote deiner letzten 10 Runden<br>
+      🔥 Konstanz bis 200 – Tage mit geschafftem Tagesziel (voll ab 20)<br>
+      📦 Gelernt bis 150 – Wörter, die in Fach 6 angekommen sind (voll ab 40)<br>
+      🏅 Abzeichen bis 100 – neue Abzeichen in 28 Tagen und deine ganze Sammlung<br>
+      🤝 +10, wenn dein Team diese Woche sein Wochenziel schafft. 💤 = seit 14 Tagen nicht gespielt.
+    </details>
     <div id="leaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="leaderboardTableBody"></div>
 
@@ -2811,7 +2832,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       <span>🏆 Team-Tabelle</span>
       <small class="screen-sub">Welcher Verein lernt am besten?</small>
     </h2>
-    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Median der Tabellenpunkte aller Mitglieder dieses Teams. Auf ein Team tippen zeigt die Mitglieder.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Teampunkte = Durchschnitt der Saisonpunkte aller aktiven Mitglieder (in den letzten 14 Tagen gespielt). Kleine Teams werden mit dem Liga-Schnitt ausgeglichen. Wochenziel: 150 Tore (richtige Antworten) pro aktivem Mitglied, Mo–So. Auf ein Team tippen zeigt die Mitglieder.</div>
     <div id="teamLeaderboardStatusNote" class="answer-feedback close" style="display:none;margin-bottom:1rem;"></div>
     <div class="leaderboard-table" id="teamLeaderboardTableBody"></div>
 
@@ -6672,35 +6693,140 @@ function computeLeagueScore(stats){
   return base + achievementBonus + recordBonus + explorerBonus;
 }
 
-function median(values){
-  if(values.length===0) return 0;
-  const sorted = [...values].sort((a,b)=>a-b);
-  const mid = Math.floor(sorted.length/2);
-  return sorted.length%2!==0 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+/* ===========================================================
+   SAISON-WERTUNG (Bundesligatabelle + Team-Tabelle)
+   Gezählt werden nur die letzten 28 Tage -- man kann auf- und absteigen,
+   Pausen kosten langsam Punkte, Neulinge zählen ab der ersten Runde voll.
+   Jedes Gerät lädt seine Tageswerte hoch (sDays usw., siehe
+   buildSeasonPayload) und JEDER Betrachter rechnet die Punkte für SEIN
+   heutiges Datum selbst aus (computeSeasonFromRow) -- so verfällt auch
+   der Eintrag eines Kindes, das die App gar nicht mehr öffnet.
+   =========================================================== */
+const SEASON_VERSION = 1;
+const SEASON_DAYS = 28;
+const SEASON_ACTIVE_DAYS = 14;      // "aktiv" für die Team-Wertung
+const SEASON_RECENT_ROUNDS = 10;    // Genauigkeit = Schnitt der letzten Runden
+const SEASON_FULL = {correct:700, flameDays:20, mastered:40, newBadges:6};
+const SEASON_MAX = {fleiss:300, genau:250, konstanz:200, gelernt:150, abzSeason:60, abzTotal:40};
+const TEAM_WEEK_GOAL_PER_MEMBER = 150; // Tore (= richtige Antworten) pro aktivem Mitglied und Woche
+const TEAM_GOAL_BONUS = 10;            // für jedes aktive Mitglied, wenn das Team sein Wochenziel schafft
+const TEAM_SHRINK_K = 2;               // so viele "Liga-Durchschnittsspieler" zählen in jedem Team mit
+const TEAM_CHANGE_COOLDOWN_DAYS = 30;
+
+/* Erstversuch-Quote jeder vollständig gespielten Runde (ab 5 Wörtern) --
+   Grundlage für den Genauigkeits-Anteil (Durchschnitt statt Bestwert). */
+function recordRecentFirstTry(prof, pct, totalCards){
+  if(totalCards<5) return;
+  const arr = Array.isArray(prof.stats.recentFirstTry) ? prof.stats.recentFirstTry : [];
+  arr.push(Math.max(0, Math.min(100, Math.round(pct))));
+  prof.stats.recentFirstTry = arr.slice(-SEASON_RECENT_ROUNDS);
 }
 
-/* Team-vs-Team aggregate for the team leaderboard -- MEDIAN, not AVERAGE,
-   of member leagueScores: mirrors computeLeagueScore()'s own per-round
-   (not per-total) normalization philosophy one layer up, so a 1-member
-   "team" can compete on equal footing with a 5-member one instead of
-   always losing to whichever team has the most members. Median instead
-   of mean so a single very weak or very strong outlier member can't pull
-   the whole team's score with them -- the team is judged by its typical
-   member, not its average. */
-function computeTeamScore(memberRows){
-  if(memberRows.length===0) return {score:0, memberCount:0, avgFirstTryPct:0, avgStreak:0};
-  // bevorzugt displayScore (leagueScore + Fleißbonus, siehe
-  // applyDiligenceBonus) -- Fallback auf leagueScore, falls die Rows
-  // den Bonus (noch) nicht durchlaufen haben
-  const scoreOf = r => (r.displayScore!=null ? r.displayScore : r.leagueScore) || 0;
-  const sum = key => memberRows.reduce((s,r)=>s+(r[key]||0),0);
-  const memberCount = memberRows.length;
-  return {
-    score: Math.round(median(memberRows.map(scoreOf))),
-    memberCount,
-    avgFirstTryPct: Math.round(sum("bestFirstTryPct")/memberCount),
-    avgStreak: Math.round(sum("longestStreak")/memberCount)
+/* Was ein Gerät für die Saison-Wertung hochlädt: nur Tageswerte der
+   letzten 28 Tage (richtige Antworten, Serien-Tag, Fach-6-Wörter),
+   Freischalt-Daten neuer Abzeichen und die aktuelle Genauigkeit. */
+function buildSeasonPayload(prof, today){
+  const log = ensureDailyLog(prof);
+  const from = addDaysToDateKey(today, -(SEASON_DAYS-1));
+  const sDays = {};
+  let lastActiveDay = null;
+  for(const k of Object.keys(log)){
+    const e = log[k];
+    if((e.correct||0)>0 && (!lastActiveDay || k>lastActiveDay)) lastActiveDay = k;
+    if(k<from || k>today) continue;
+    if((e.correct||0)>0 || e.flame || (e.mastered||0)>0) sDays[k] = [e.correct||0, e.flame?1:0, e.mastered||0];
+  }
+  const streak = ensureStreakObj(prof);
+  if(streak.lastActiveDate && (!lastActiveDay || streak.lastActiveDate>lastActiveDay)) lastActiveDay = streak.lastActiveDate;
+  const unlocked = ensureAchievements(prof).unlocked || {};
+  const sBadgeDays = ACHIEVEMENTS
+    .map(a=>unlocked[a.id])
+    .filter(d=>typeof d==="string" && d>=from && d<=today)
+    .slice(0, 200);
+  const recent = Array.isArray(prof.stats.recentFirstTry) ? prof.stats.recentFirstTry : [];
+  // noch keine Runde seit dem Update gespielt: Bestwert etwas abgeschlagen
+  // als Schätzung, bis echte Runden-Werte vorliegen
+  const best = (prof.stats.records && prof.stats.records.bestFirstTryPct) || 0;
+  const sAcc = recent.length ? Math.round(recent.reduce((a,b)=>a+b,0)/recent.length) : Math.round(best*0.9);
+  return {sDays, sBadgeDays, sAcc, lastActiveDay: lastActiveDay || "", seasonVersion: SEASON_VERSION};
+}
+
+/* Saisonpunkte eines Tabelleneintrags, aus Sicht des heutigen Tages. */
+function computeSeasonFromRow(row, today){
+  const from = addDaysToDateKey(today, -(SEASON_DAYS-1));
+  const weekFrom = weekStartKey(today);
+  let correct = 0, flameDays = 0, mastered = 0, weekGoals = 0;
+  for(const [k, v] of Object.entries(row.sDays || {})){
+    if(k<from || k>today || !Array.isArray(v)) continue;
+    correct += Number(v[0])||0;
+    if(v[1]) flameDays++;
+    mastered += Number(v[2])||0;
+    if(k>=weekFrom) weekGoals += Number(v[0])||0;
+  }
+  const active = !!row.lastActiveDay && row.lastActiveDay >= addDaysToDateKey(today, -(SEASON_ACTIVE_DAYS-1));
+  const playedInSeason = correct>0 || flameDays>0;
+  const newBadges = (row.sBadgeDays || []).filter(d=>d>=from && d<=today).length;
+  const totalBadges = Math.min(ACHIEVEMENTS.length, row.achievementsUnlocked||0);
+  const parts = {
+    fleiss: Math.round(SEASON_MAX.fleiss * Math.min(1, Math.sqrt(correct/SEASON_FULL.correct))),
+    genau: playedInSeason ? Math.round(SEASON_MAX.genau * Math.max(0, Math.min(100, Number(row.sAcc)||0)) / 100) : 0,
+    konstanz: Math.round(SEASON_MAX.konstanz * Math.min(1, flameDays/SEASON_FULL.flameDays)),
+    gelernt: Math.round(SEASON_MAX.gelernt * Math.min(1, mastered/SEASON_FULL.mastered)),
+    abzeichen: Math.min(SEASON_MAX.abzSeason, Math.round(newBadges*SEASON_MAX.abzSeason/SEASON_FULL.newBadges))
+      + Math.round(SEASON_MAX.abzTotal * Math.sqrt(totalBadges/ACHIEVEMENTS.length))
   };
+  const score = parts.fleiss + parts.genau + parts.konstanz + parts.gelernt + parts.abzeichen;
+  return {...parts, teamBonus:0, score, correct, flameDays, mastered, newBadges, weekGoals, active};
+}
+
+/* Einzel- und Team-Tabelle aus denselben geladenen Zeilen. Team-Punkte =
+   Durchschnitt der AKTIVEN Mitglieder plus TEAM_SHRINK_K gedachte
+   Liga-Durchschnittsspieler: jeder Punkt jedes Kindes bewegt den
+   Teamwert (beim früheren Median zählte nur das mittlere Kind), und ein
+   einzelnes starkes Kind ist nicht automatisch ein Spitzenteam. */
+function computeSeasonStandings(rows, today){
+  const players = rows
+    .filter(r=>r.seasonVersion===SEASON_VERSION)
+    .map(r=>({...r, season: computeSeasonFromRow(r, today)}));
+  const activeScores = players.filter(p=>p.season.active).map(p=>p.season.score);
+  const leagueAvg = activeScores.length ? activeScores.reduce((a,b)=>a+b,0)/activeScores.length : 0;
+  const teams = Object.entries(groupMembersByTeam(players))
+    .map(([teamId, members])=>{
+      const active = members.filter(m=>m.season.active);
+      const goal = TEAM_WEEK_GOAL_PER_MEMBER * Math.max(1, active.length);
+      const goals = members.reduce((sum,m)=>sum+m.season.weekGoals, 0);
+      const reached = active.length>0 && goals>=goal;
+      if(reached) active.forEach(m=>{ m.season.teamBonus = TEAM_GOAL_BONUS; m.season.score += TEAM_GOAL_BONUS; });
+      return {teamId, team:getTeamById(teamId), members, active, goal, goals, reached};
+    })
+    .filter(t=>t.team);
+  teams.forEach(t=>{
+    const sum = t.active.reduce((a,m)=>a+m.season.score, 0);
+    t.score = t.active.length ? Math.round((sum + TEAM_SHRINK_K*leagueAvg)/(t.active.length + TEAM_SHRINK_K)) : 0;
+  });
+  teams.sort((a,b)=>b.score-a.score || b.goals-a.goals);
+  players.forEach(p=>{ p.displayScore = p.season.score; });
+  players.sort((a,b)=>b.displayScore-a.displayScore || b.season.correct-a.season.correct);
+  return {players, teams, leagueAvg};
+}
+
+/* Kurzer Tipp für den eigenen Eintrag: der Anteil mit dem meisten
+   ungenutzten Potenzial. */
+const SEASON_TIPS = {
+  fleiss:"mehr richtige Antworten sammeln",
+  genau:"beim ersten Versuch genauer tippen",
+  konstanz:"an mehr Tagen das Tagesziel schaffen",
+  gelernt:"fällige Wiederholungen machen",
+  abzeichen:"neue Abzeichen holen"
+};
+function seasonTip(season){
+  const max = {fleiss:SEASON_MAX.fleiss, genau:SEASON_MAX.genau, konstanz:SEASON_MAX.konstanz, gelernt:SEASON_MAX.gelernt, abzeichen:SEASON_MAX.abzSeason+SEASON_MAX.abzTotal};
+  let best = "fleiss", gap = -1;
+  for(const k of Object.keys(max)){
+    const g = max[k] - season[k];
+    if(g>gap){ gap = g; best = k; }
+  }
+  return SEASON_TIPS[best];
 }
 
 function groupMembersByTeam(rows){
@@ -6815,7 +6941,16 @@ function doSyncProfileToLeaderboard(prof){
     };
     data.leagueScore = computeLeagueScore(prof.stats);
     data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-    fbDb.collection("leaderboard_v1").doc(docId).set(data)
+    const legacyData = {...data};
+    Object.assign(data, buildSeasonPayload(prof, todayKey()));
+    const ref = fbDb.collection("leaderboard_v1").doc(docId);
+    // Firestore-Regeln noch ohne die Saison-Felder: ohne sie erneut
+    // schreiben, damit ältere Geräte weiter die bisherige Tabelle sehen
+    ref.set(data)
+      .catch(e=>{
+        if(e && e.code==="permission-denied") return ref.set(legacyData);
+        throw e;
+      })
       .then(()=>{
         syncLeaderboardFailureStreak = 0;
         invalidateLeaderboardCache(); // own rank/score just changed
@@ -7152,10 +7287,9 @@ async function renderLeagueRankWidget(){
   show("⏳", "Bundesliga");
   try{
     const rows = await fetchLeaderboardRows();
-    // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle
-    const bonusedRows = applyDiligenceBonus(rows);
-    const idx = bonusedRows.findIndex(r=>isOwnLeaderboardRow(r, prof));
-    if(idx>=0) show(`Platz ${idx+1}`, "Bundesliga"); else show("–", "noch nicht gelistet");
+    const {players} = computeSeasonStandings(rows, todayKey());
+    const idx = players.findIndex(r=>isOwnLeaderboardRow(r, prof));
+    if(idx>=0) show(`Platz ${idx+1}`, `${players[idx].displayScore} Punkte`); else show("–", "noch nicht gelistet");
   } catch(e){
     console.error("renderLeagueRankWidget error", e);
     show("–", "offline 📡");
@@ -7165,8 +7299,8 @@ async function renderLeagueRankWidget(){
 /* Current rank in the Team-Tabelle for the profile's chosen team (see
    TEAM_LIST/prof.team) -- mirrors renderLeagueRankWidget()'s async/
    fire-and-forget pattern and reuses the same aggregation helpers the
-   team-leaderboard screen itself uses (groupMembersByTeam,
-   computeTeamScore), so the rank shown here always matches that screen.
+   team-leaderboard screen itself uses (computeSeasonStandings), so the
+   rank shown here always matches that screen.
    Shown as its own wide tile (badge + name + rank needs more room than
    the compact stat tiles), with a dashed "pick a team" prompt when the
    profile hasn't chosen one yet. */
@@ -7203,12 +7337,9 @@ async function renderTeamRankWidget(){
   show("⏳");
   try{
     const rows = await fetchLeaderboardRows();
-    const byTeam = groupMembersByTeam(applyDiligenceBonus(rows));
-    const teamEntries = Object.entries(byTeam)
-      .map(([teamId, members])=>({teamId, agg:computeTeamScore(members)}))
-      .sort((a,b)=>b.agg.score-a.agg.score);
-    const idx = teamEntries.findIndex(e=>e.teamId===prof.team);
-    show(idx>=0 ? `Team-Platz ${idx+1}` : "noch nicht gelistet");
+    const {teams} = computeSeasonStandings(rows, todayKey());
+    const idx = teams.findIndex(e=>e.teamId===prof.team);
+    show(idx>=0 ? `Platz ${idx+1} · ${teams[idx].goals}/${teams[idx].goal} ⚽` : "noch nicht gelistet");
   } catch(e){
     console.error("renderTeamRankWidget error", e);
     show("offline 📡");
@@ -7444,7 +7575,19 @@ function renderTeamPicker(){
       btn.setAttribute("aria-pressed", isActive ? "true":"false");
       if(isActive) btn.classList.add("active");
       btn.addEventListener("click",()=>{
+        if(team.id===prof.team) return;
+        // Vereinstreue: ein Wechsel (nicht die erste Wahl) höchstens alle 30 Tage
+        if(prof.team && prof.teamChangedAt){
+          const nextAllowed = addDaysToDateKey(prof.teamChangedAt, TEAM_CHANGE_COOLDOWN_DAYS);
+          if(todayKey() < nextAllowed){
+            const note = document.getElementById("teamChangeNote");
+            note.textContent = `🔒 Ein Vereinswechsel ist erst ab ${nextAllowed.split("-").reverse().join(".")} wieder möglich.`;
+            note.style.display = "block";
+            return;
+          }
+        }
         prof.team = team.id;
+        prof.teamChangedAt = todayKey();
         saveProfiles();
         renderProfilesScreen();
         syncProfileToLeaderboard(prof);
@@ -9737,6 +9880,11 @@ function finalizeRoundAndUpdateProfile(){
     if(!prof.stats.totalCorrectAnswersEver) prof.stats.totalCorrectAnswersEver=0; // older profiles predate this field
     prof.stats.totalCorrectAnswersEver += state.roundCorrectCount;
     logRoundToDailyLog(prof, today, state.roundCorrectCount);
+    if(newlyMastered>0){
+      const dayEntry = dailyLogEntry(ensureDailyLog(prof), today);
+      dayEntry.mastered = (dayEntry.mastered||0) + newlyMastered;
+    }
+    if(roundWasFullyPlayed) recordRecentFirstTry(prof, firstTryPct, totalCards);
 
     // a word that had already gone wrong 3+ times (before this round) and
     // got answered right on the first try this round counts as "mastered"
@@ -10092,8 +10240,11 @@ async function fetchLeaderboardRows(){
     return leaderboardCache.rows;
   }
   if(!leaderboardInFlight){
+    // nur Einträge mit Saison-Werten -- ältere App-Versionen laden noch
+    // die alte Wertung hoch, die nicht vergleichbar ist; sie erscheinen,
+    // sobald das Gerät die neue Version einmal geöffnet hat
     leaderboardInFlight = fbDb.collection("leaderboard_v1")
-      .orderBy("leagueScore","desc").limit(LEADERBOARD_FETCH_LIMIT).get()
+      .where("seasonVersion","==",SEASON_VERSION).limit(LEADERBOARD_FETCH_LIMIT).get()
       .then(snap=>{
         const rows = dedupeLeaderboardRows(snap.docs.map(d=>d.data()));
         leaderboardCache = {rows, fetchedAt:Date.now()};
@@ -10129,41 +10280,6 @@ function dedupeLeaderboardRows(rows){
   return rows.filter(r=>best.get(leaderboardProfileKey(r.cloudId))===r);
 }
 
-// Platz 1/2/3 nach roundsCompleted INNERHALB der aktuell geladenen Tabelle
-// bekommen diesen Bonus, alle anderen nichts -- bewusst nur 3 Plätze, damit
-// nicht "wer oft genug spielt" irgendwann den Bonus erreicht, sondern nur
-// die tatsächlich Fleißigsten im Vergleich zu allen anderen gerade
-// angezeigten Kindern.
-const DILIGENCE_BONUS_BY_RANK = [100, 50, 10];
-
-/* Fleiß-Bonus für Vielspieler -- bewusst NICHT Teil von computeLeagueScore()
-   und NICHT in die gespeicherte/synchronisierte leagueScore eingerechnet,
-   sonst würde die Punktzahl eines Kindes davon abhängen, welche anderen
-   Kinder gerade zufällig mit in der Tabelle stehen bzw. wann wer zuletzt
-   synct hat -- ein unlösbares Henne-Ei-Problem beim Schreiben (ein Client
-   kennt beim eigenen Sync nicht die aktuellen Werte aller anderen).
-   Stattdessen rein auf Anzeigeebene: aus den bereits geladenen Zeilen wird
-   ermittelt, wer die meisten Runden abgeschlossen hat, und NUR für die
-   Anzeige/Sortierung der Tabelle ein Bonus aufaddiert. Der rohe
-   leagueScore-Kern (Qualität: Punkte/Runde, Trefferquote, Serie) bleibt
-   dadurch komplett unangetastet -- der Fleiß-Bonus kann ihn nur um max.
-   +100 nach oben verschieben, nicht verwässern. */
-function applyDiligenceBonus(rows){
-  const byRounds = [...rows].sort((a,b)=>(b.roundsCompleted||0)-(a.roundsCompleted||0));
-  const bonusByCloudId = {};
-  for(let i=0; i<DILIGENCE_BONUS_BY_RANK.length && i<byRounds.length; i++){
-    if((byRounds[i].roundsCompleted||0)>0){
-      bonusByCloudId[byRounds[i].cloudId] = DILIGENCE_BONUS_BY_RANK[i];
-    }
-  }
-  return rows
-    .map(r=>({
-      ...r,
-      diligenceBonus: bonusByCloudId[r.cloudId]||0,
-      displayScore: (r.leagueScore||0) + (bonusByCloudId[r.cloudId]||0)
-    }))
-    .sort((a,b)=>b.displayScore-a.displayScore);
-}
 
 
 /* Builds one .leaderboard-row per entry: rank, nickname, big
@@ -10177,24 +10293,19 @@ function renderLeaderboardRows(rows, prof){
   const bodyEl = document.getElementById("leaderboardTableBody");
   bodyEl.innerHTML = "";
 
-  if(rows.length===0){
-    bodyEl.innerHTML = "<div class='answer-feedback close'>Noch niemand in der Tabelle 👀</div>";
+  const {players} = computeSeasonStandings(rows, todayKey());
+  if(players.length===0){
+    bodyEl.innerHTML = "<div class='answer-feedback close'>Noch niemand in der Saison-Tabelle 👀</div>";
     return;
   }
-
-  // Fleiß-Bonus verschiebt die Reihenfolge ggü. der reinen leagueScore --
-  // siehe applyDiligenceBonus() für warum das nur hier auf Anzeigeebene
-  // passiert statt in der gespeicherten Punktzahl. Bonus über ALLE
-  // geladenen Zeilen (wie die Rang-Kachel), angezeigt nur die Top 50.
-  const bonusedRows = applyDiligenceBonus(rows).slice(0, LEADERBOARD_TABLE_SIZE);
-
+  const shown = players.slice(0, LEADERBOARD_TABLE_SIZE);
   const nameCounts = {};
-  bonusedRows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
+  shown.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
 
-
-  bonusedRows.forEach((r, idx)=>{
+  shown.forEach((r, idx)=>{
+    const own = isOwnLeaderboardRow(r, prof);
     const row=document.createElement("div");
-    row.className = "leaderboard-row" + (isOwnLeaderboardRow(r, prof) ? " own" : "");
+    row.className = "leaderboard-row" + (own ? " own" : "") + (r.season.active ? "" : " inactive");
 
     const rank=document.createElement("div");
     rank.className="rank";
@@ -10203,23 +10314,33 @@ function renderLeaderboardRows(rows, prof){
     const name=document.createElement("div");
     name.className="nickname";
     const dupSuffix = nameCounts[r.nickname]>1 ? ` (#${String(r.cloudId).slice(-4)})` : "";
-    name.textContent = (r.nickname||"?") + dupSuffix;
+    name.textContent = (r.nickname||"?") + dupSuffix + (r.season.active ? "" : " 💤");
 
     const score=document.createElement("div");
     score.className="score";
     score.textContent = String(r.displayScore);
 
-    const roundsCompleted = Math.max(1, r.roundsCompleted||0);
-    const avgPts = Math.round((r.totalPoints||0)/roundsCompleted);
+    const sn = r.season;
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
-    const diligenceNote = r.diligenceBonus>0 ? ` · 🏃 Fleißbonus +${r.diligenceBonus}` : "";
-    breakdown.textContent = `Ø ${avgPts} Pkt/Runde · ${r.bestFirstTryPct||0}% Trefferquote · ${r.longestStreak||0} Tage Serie · 🏅 ${r.achievementsUnlocked||0} Abzeichen · 🗺️ ${r.distinctPageSetsCompleted||0} Seiten-Sets${diligenceNote}`;
+    breakdown.textContent = `⚽ Fleiß ${sn.fleiss} · 🎯 Genauigkeit ${sn.genau} · 🔥 Konstanz ${sn.konstanz} · 📦 Gelernt ${sn.gelernt} · 🏅 Abzeichen ${sn.abzeichen}`
+      + (sn.teamBonus ? ` · 🤝 Teamziel +${sn.teamBonus}` : "");
 
     row.appendChild(rank);
     row.appendChild(name);
     row.appendChild(score);
     row.appendChild(breakdown);
+    if(own){
+      const hint=document.createElement("div");
+      hint.className="lb-hint";
+      if(idx===0){
+        hint.textContent = "🥇 Du führst die Tabelle an – weiter so!";
+      } else {
+        const diff = players[idx-1].displayScore - r.displayScore + 1;
+        hint.textContent = `👉 Noch ${diff} ${diff===1?"Punkt":"Punkte"} bis Platz ${idx} – z. B. ${seasonTip(sn)}.`;
+      }
+      row.appendChild(hint);
+    }
     bodyEl.appendChild(row);
   });
 }
@@ -10246,7 +10367,7 @@ async function renderTeamLeaderboardScreen(){
   try{
     const rows = await fetchLeaderboardRows();
     statusEl.style.display="none";
-    renderTeamLeaderboardRows(applyDiligenceBonus(rows));
+    renderTeamLeaderboardRows(rows);
   } catch(e){
     console.error("renderTeamLeaderboardScreen error", e);
     statusEl.textContent = "📡 Keine Verbindung";
@@ -10262,20 +10383,17 @@ function renderTeamLeaderboardRows(rows){
   const bodyEl = document.getElementById("teamLeaderboardTableBody");
   bodyEl.innerHTML = "";
 
-  const byTeam = groupMembersByTeam(rows);
-  const teamEntries = Object.entries(byTeam)
-    .map(([teamId, members])=>({teamId, team:getTeamById(teamId), members, agg:computeTeamScore(members)}))
-    .filter(e=>e.team) // drop any unknown/stale team id defensively
-    .sort((a,b)=>b.agg.score-a.agg.score);
+  const prof = getCurrentProfileObj();
+  const {teams} = computeSeasonStandings(rows, todayKey());
 
-  if(teamEntries.length===0){
+  if(teams.length===0){
     bodyEl.innerHTML = "<div class='answer-feedback close'>Noch kein Team in der Tabelle 👀</div>";
     return;
   }
 
-  teamEntries.forEach((entry, idx)=>{
+  teams.forEach((entry, idx)=>{
     const row=document.createElement("div");
-    row.className="leaderboard-row team-row";
+    row.className="leaderboard-row team-row" + (prof && prof.team===entry.teamId ? " own" : "");
 
     const rank=document.createElement("div");
     rank.className="rank";
@@ -10293,39 +10411,39 @@ function renderTeamLeaderboardRows(rows){
 
     const score=document.createElement("div");
     score.className="score";
-    score.textContent=String(entry.agg.score);
+    score.textContent=String(entry.score);
 
     const breakdown=document.createElement("div");
     breakdown.className="breakdown";
-    breakdown.textContent = `${entry.agg.memberCount} Mitglied${entry.agg.memberCount===1?"":"er"} · Ø ${entry.agg.avgFirstTryPct}% Trefferquote · Ø ${entry.agg.avgStreak} Tage Serie · 👉 Mitglieder antippen`;
+    breakdown.textContent = `${entry.active.length} von ${entry.members.length} aktiv · Wochenziel ${entry.goals}/${entry.goal} Tore${entry.reached ? " ✅ +"+TEAM_GOAL_BONUS+" für alle" : ""} · 👉 Mitglieder antippen`;
+
+    const goalBar=document.createElement("div");
+    goalBar.className="stat-tile-bar-outer team-goal-bar";
+    goalBar.innerHTML = `<div class="stat-tile-bar-inner" style="width:${Math.min(100, Math.round(entry.goals/entry.goal*100))}%;background:var(--accent);"></div>`;
 
     row.appendChild(rank);
     row.appendChild(badge);
     row.appendChild(name);
     row.appendChild(score);
     row.appendChild(breakdown);
+    row.appendChild(goalBar);
     bodyEl.appendChild(row);
 
     const membersDiv=document.createElement("div");
     membersDiv.className="team-members-list";
     membersDiv.style.display="none";
-    [...entry.members].sort((a,b)=>(b.displayScore||0)-(a.displayScore||0)).forEach(m=>{
+    [...entry.members].sort((a,b)=>b.season.score-a.season.score).forEach(m=>{
       const line=document.createElement("div");
       line.className="team-member-row";
-      const diligenceNote = m.diligenceBonus>0 ? ` (🏃 +${m.diligenceBonus})` : "";
-      line.textContent = `${m.nickname||"?"} — ${m.displayScore||0} Pkt${diligenceNote}`;
+      line.textContent = `${m.nickname||"?"} — ${m.season.score} Pkt · ${m.season.weekGoals} Tore diese Woche · ${m.season.active ? "aktiv ⚽" : "pausiert 💤"}`;
       membersDiv.appendChild(line);
     });
     bodyEl.appendChild(membersDiv);
 
-    // keyboard/screen-reader support for expanding the member list --
-    // same role/tabindex/keydown shape as makeTileAccessible(), spelled
-    // out here since this is a plain row, not one of the "stat tile"
-    // elements that helper targets
     row.setAttribute("role", "button");
     row.setAttribute("tabindex", "0");
     row.setAttribute("aria-expanded", "false");
-    row.setAttribute("aria-label", `${entry.team.name}, Mitglieder anzeigen`);
+    row.setAttribute("aria-label", `${entry.team.name}, Platz ${idx+1}, ${entry.score} Punkte, Mitglieder anzeigen`);
     const toggleMembers = ()=>{
       const nowOpen = membersDiv.style.display==="none";
       membersDiv.style.display = nowOpen ? "block" : "none";
@@ -12315,7 +12433,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-15.2";
+const APP_BUILD = "2026-10-15.3";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
