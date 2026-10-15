@@ -3038,7 +3038,18 @@ function initFirebase(){
     fbDb = firebase.firestore();
     fbAuth = firebase.auth();
     fbAuth.signInAnonymously()
-      .then(()=>{ fbReady = true; flushPendingCloudDeletes(); refreshStartScreenConnectionWidgets(); })
+      .then(()=>{
+        fbReady = true;
+        flushPendingCloudDeletes();
+        // Eintrag gleich beim Start aktualisieren, nicht erst nach der
+        // nächsten Runde: nach einer Neuinstallation (z.B. Homescreen-App
+        // neu hinzugefügt) gibt es eine neue anonyme uid und damit eine
+        // neue Dokument-id -- ohne diesen Sync stünde das Kind bis zur
+        // nächsten Runde als "noch nicht gelistet" auf der Startseite.
+        const prof = getCurrentProfileObj();
+        if(prof && (prof.stats.roundsCompleted||0) > 0) syncProfileToLeaderboard(prof);
+        refreshStartScreenConnectionWidgets();
+      })
       .catch(e=>{ console.error("Firebase anon auth failed", e); fbReady=false; });
   } catch(e){ console.error("initFirebase error", e); fbReady=false; }
 }
@@ -6792,6 +6803,7 @@ function doSyncProfileToLeaderboard(prof){
       .then(()=>{
         syncLeaderboardFailureStreak = 0;
         invalidateLeaderboardCache(); // own rank/score just changed
+        refreshStartScreenConnectionWidgets();
         if(!prof.cloudInfoSeen){
           prof.cloudInfoSeen = true;
           saveProfiles();
@@ -10068,13 +10080,42 @@ async function fetchLeaderboardRows(){
     leaderboardInFlight = fbDb.collection("leaderboard_v1")
       .orderBy("leagueScore","desc").limit(LEADERBOARD_FETCH_LIMIT).get()
       .then(snap=>{
-        const rows = snap.docs.map(d=>d.data());
+        const rows = dedupeLeaderboardRows(snap.docs.map(d=>d.data()));
         leaderboardCache = {rows, fetchedAt:Date.now()};
         return rows;
       })
       .finally(()=>{ leaderboardInFlight = null; });
   }
   return leaderboardInFlight;
+}
+
+/* Ein Profil kann nach einer Neuinstallation (neue anonyme uid, Daten per
+   Sicherung wiederhergestellt) zweimal in der Tabelle stehen: der alte
+   Eintrag gehört der alten uid und lässt sich von der neuen aus nicht
+   löschen (Firestore-Regeln: nur eigene uid). Die Dokument-id ist
+   "<uid>_<profil-cloudId>" -- gleiche profil-cloudId = gleiches Kind, es
+   zählt nur der zuletzt aktualisierte Eintrag. */
+function leaderboardRowTime(r){
+  const t = r.updatedAt;
+  if(t && typeof t.toMillis==="function") return t.toMillis();
+  return typeof t==="number" ? t : 0;
+}
+function dedupeLeaderboardRows(rows){
+  const best = new Map();
+  rows.forEach(r=>{
+    const id = String(r.cloudId||"");
+    const key = id.includes("_") ? id.slice(id.indexOf("_")+1) : id;
+    const prev = best.get(key);
+    if(!prev
+      || leaderboardRowTime(r) > leaderboardRowTime(prev)
+      || (leaderboardRowTime(r)===leaderboardRowTime(prev) && (r.roundsCompleted||0) > (prev.roundsCompleted||0))){
+      best.set(key, r);
+    }
+  });
+  return rows.filter(r=>{
+    const id = String(r.cloudId||"");
+    return best.get(id.includes("_") ? id.slice(id.indexOf("_")+1) : id) === r;
+  });
 }
 
 // Platz 1/2/3 nach roundsCompleted INNERHALB der aktuell geladenen Tabelle
