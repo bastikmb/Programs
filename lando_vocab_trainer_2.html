@@ -275,86 +275,6 @@ h2, .start-greeting-text, .stat-tile-value,
   filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));
 }
 
-/* welcome-screen hero banner -- built entirely from the language icons
-   already embedded for the selector buttons (see LANG_ICON_IMG), so it
-   adds no further image weight to the file */
-.hero-banner {
-  position:relative;
-  background:linear-gradient(135deg, var(--accent-strong), #8b5cf6 72%, var(--brand-teal));
-  border-radius:var(--radius);
-  padding:1.4rem 1.25rem 1.6rem;
-  margin-bottom:1rem;
-  text-align:center;
-  overflow:hidden;
-  box-shadow:var(--card-shadow);
-}
-.hero-banner .hero-title {
-  font-family:var(--font-display);
-  font-size:1.6rem;
-  font-weight:800;
-  color:#fff;
-  text-shadow:0 2px 6px rgba(0,0,0,0.2);
-}
-.hero-banner .hero-subtitle {
-  font-size:var(--text-sm);
-  color:rgba(255,255,255,0.9);
-  margin-top:0.2rem;
-  margin-bottom:1.1rem;
-}
-/* compact variant for the start screen -- same banner, smaller so it
-   doesn't crowd out the stat tiles below it */
-.hero-banner.compact {
-  padding:1rem 1.1rem 1.1rem;
-}
-.hero-banner.compact .hero-title {
-  font-size:1.2rem;
-}
-.hero-banner.compact .hero-subtitle {
-  font-size:0.76rem;
-  margin-bottom:0.7rem;
-}
-.hero-banner.compact .hero-icon-tile {
-  width:2.3rem;
-  height:2.3rem;
-  border-radius:var(--radius-xs);
-}
-.hero-icon-row {
-  display:flex;
-  justify-content:center;
-  gap:0.6rem;
-}
-.hero-icon-tile {
-  background:#fff;
-  border-radius:var(--radius-xs);
-  width:3.2rem;
-  height:3.2rem;
-  flex-shrink:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow:0 6px 14px rgba(0,0,0,0.25);
-}
-.hero-icon-tile img {
-  width:75%;
-  height:75%;
-  object-fit:contain;
-}
-.hero-icon-tile:nth-child(1){ transform:rotate(-7deg); }
-.hero-icon-tile:nth-child(2){ transform:rotate(5deg); }
-.hero-icon-tile:nth-child(3){ transform:rotate(-4deg); }
-.hero-icon-tile:nth-child(4){ transform:rotate(7deg); }
-.hero-sparkle {
-  position:absolute;
-  font-size:1.1rem;
-  opacity:0.85;
-  animation:heroSparkle var(--ambient) ease-in-out infinite;
-}
-.hero-sparkle.s1{ top:0.7rem; left:1rem; animation-delay:0s; }
-@keyframes heroSparkle {
-  0%,100% { transform:scale(0.85) rotate(0deg); opacity:0.6; }
-  50% { transform:scale(1.15) rotate(15deg); opacity:1; }
-}
-
 /* book pages list */
 .page-row {
   display:flex;
@@ -667,35 +587,30 @@ body.dark-theme .hist-badge.wrong {
   gap:0.4rem;
   min-width:0;
 }
-.greeting-sparkle {
-  display:inline-block;
-  flex:none;
-  font-size:1rem;
-  color:var(--brand-teal);
-  animation:heroSparkle var(--ambient) ease-in-out infinite;
-}
 .start-greeting-text {
   font-size:1.25rem;
   font-weight:800;
   font-family:var(--font-display);
   color:var(--ink);
+  flex:1;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
-/* theme/sound toggles, stacked along the right edge of the start
-   screen's hero -- clear of the centered title and icon row */
-.hero-settings {
-  position:absolute;
-  top:0.5rem;
-  right:0.5rem;
+/* theme/sound toggles in the start screen's greeting row */
+.start-greeting-actions {
   display:flex;
-  flex-direction:column;
-  gap:0.3rem;
+  align-items:center;
+  gap:0.35rem;
+  flex-shrink:0;
 }
 .icon-toggle-btn {
   width:2rem;
   height:2rem;
   border-radius:50%;
-  border:1px solid rgba(255,255,255,0.45);
-  background:rgba(255,255,255,0.2);
+  border:1px solid var(--border);
+  background:var(--card);
   font-size:1rem;
   line-height:1;
   cursor:pointer;
@@ -1166,6 +1081,132 @@ body.dark-theme { --flame:#c2410c; --flame-text:#fb923c; --freeze-bg:#075985; --
 }
 .box-row-count { text-align:right; font-weight:700; color:var(--ink); font-size:var(--text-sm); }
 .box-row.top .box-row-label { color:var(--flame-text); }
+/* ---- Startseite: Anzeigetafel (Variante C) ---- */
+.pitch {
+  position:relative;
+  border-radius:var(--radius);
+  padding:0.75rem;
+  margin-bottom:var(--space-3);
+  color:#fff;
+  background:repeating-linear-gradient(90deg, #1f7a3e 0 2.1rem, #23884a 2.1rem 4.2rem);
+  overflow:hidden;
+}
+.pitch::before {
+  content:"";
+  position:absolute;
+  inset:0.5rem;
+  border:2px solid rgba(255,255,255,0.35);
+  border-radius:var(--radius-sm);
+  pointer-events:none;
+}
+.pitch::after {
+  content:"";
+  position:absolute;
+  left:50%;
+  top:0.5rem;
+  bottom:0.5rem;
+  border-left:2px solid rgba(255,255,255,0.35);
+  pointer-events:none;
+}
+.pitch-grid {
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:0.5rem;
+}
+.sb-cell, .sb-team {
+  position:relative;
+  z-index:1;
+  font:inherit;
+  color:#fff;
+  text-align:left;
+  background:rgba(0,0,0,0.3);
+  border:none;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  min-width:0;
+}
+.sb-cell { padding:0.5rem 0.65rem; display:flex; flex-direction:column; }
+.sb-cell:active, .sb-team:active { background:rgba(0,0,0,0.42); }
+.sb-label {
+  font-size:var(--text-2xs);
+  font-weight:700;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  opacity:0.9;
+}
+.sb-value {
+  font-family:var(--font-display);
+  font-weight:800;
+  font-size:1.45rem;
+  line-height:1.1;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.sb-sub {
+  font-size:var(--text-xs);
+  opacity:0.92;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.sb-cell.warn .sb-sub::before {
+  content:"";
+  display:inline-block;
+  width:0.5rem;
+  height:0.5rem;
+  border-radius:50%;
+  background:#fb923c;
+  margin-right:0.3rem;
+  animation:streakPulse var(--ambient) ease-in-out infinite;
+}
+.sb-team {
+  width:100%;
+  margin-top:0.5rem;
+  display:flex;
+  align-items:center;
+  gap:0.55rem;
+  padding:0.45rem 0.65rem;
+  font-size:var(--text-sm);
+}
+.sb-team .sb-team-badge {
+  width:1.9rem;
+  height:1.9rem;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  font-weight:900;
+  font-size:0.6rem;
+  flex-shrink:0;
+}
+.sb-team .sb-team-name { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sb-chev { font-weight:800; opacity:0.85; }
+.sb-list { display:flex; flex-direction:column; gap:0.45rem; }
+.sb-item {
+  display:flex;
+  align-items:center;
+  gap:0.65rem;
+  width:100%;
+  font:inherit;
+  color:var(--ink);
+  text-align:left;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:0.6rem 0.7rem;
+  cursor:pointer;
+}
+.sb-item:disabled { cursor:default; color:var(--muted); background:var(--surface); }
+.sb-item.hot { background:var(--accent-bg); border-color:var(--accent); }
+.sb-item .sb-icon { font-size:1.3rem; width:1.7rem; text-align:center; flex-shrink:0; }
+.sb-item .sb-text { flex:1; min-width:0; }
+.sb-item .sb-title { font-weight:700; font-size:var(--text-sm); }
+.sb-item .sb-desc { font-size:var(--text-xs); color:var(--muted); }
+.sb-item .sb-chev { color:var(--muted); }
+.sb-item .stat-tile-bar-outer { margin-top:0.3rem; }
 /* "Nächstes Abzeichen" teaser on the start screen */
 .next-badge-tile {
   flex-direction:row;
@@ -2188,44 +2229,34 @@ input:focus-visible {
 
   <!-- START SCREEN -->
   <div id="screen-start" class="screen">
-    <div class="hero-banner compact">
-      <span class="hero-sparkle s1">✨</span>
-      <div class="hero-settings">
+    <div class="start-greeting-row">
+      <div id="welcomeHeading" class="start-greeting-text">👋 Willkommen</div>
+      <div class="start-greeting-actions">
         <button id="btnToggleTheme" class="icon-toggle-btn" type="button" aria-label="Dunkles Design einschalten" title="Hell/Dunkel">🌙</button>
         <button id="btnToggleSound" class="icon-toggle-btn" type="button" aria-label="Ton ausschalten" title="Ton an/aus">🔊</button>
-      </div>
-      <div class="hero-title">📖 Vokabeltrainer</div>
-      <div class="hero-subtitle">Spielend Sprachen lernen</div>
-      <div class="hero-icon-row">
-        <div class="hero-icon-tile"><img id="heroIconDe" alt="" /></div>
-        <div class="hero-icon-tile"><img id="heroIconEn" alt="" /></div>
-        <div class="hero-icon-tile"><img id="heroIconFr" alt="" /></div>
-        <div class="hero-icon-tile"><img id="heroIconLa" alt="" /></div>
+        <button id="btnGoToProfiles" class="start-profile-btn"></button>
       </div>
     </div>
 
-    <div class="start-greeting-row">
-      <div class="start-greeting-text-group">
-        <span class="greeting-sparkle" aria-hidden="true">✨</span>
-        <div id="welcomeHeading" class="start-greeting-text">👋 Willkommen</div>
+    <!-- Anzeigetafel: Kennzahlen im Stadion-Look (Fußball-Thema wie Abzeichen/Teams) -->
+    <div id="scoreboard" class="pitch">
+      <div class="pitch-grid">
+        <button id="streakTile" class="sb-cell" type="button"></button>
+        <button id="dailyGoalTile" class="sb-cell" type="button"></button>
+        <button id="levelTile" class="sb-cell" type="button"></button>
+        <button id="leagueRankTile" class="sb-cell" type="button"></button>
       </div>
-      <button id="btnGoToProfiles" class="start-profile-btn"></button>
+      <button id="teamRankTile" class="sb-team" type="button"></button>
     </div>
 
-    <div class="start-stat-grid">
-      <div id="streakTile" class="stat-tile"></div>
-      <div id="levelTile" class="stat-tile"></div>
-      <div id="dailyGoalTile" class="stat-tile"></div>
-      <div id="leagueRankTile" class="stat-tile"></div>
-      <div id="teamRankTile" class="stat-tile stat-tile-wide team-tile-row"></div>
+    <div class="sb-list">
+      <button id="dueReviewTile" class="sb-item" type="button"></button>
+      <button id="nextBadgeTile" class="sb-item" type="button"></button>
+      <button id="bonusProgressTile" class="sb-item" type="button"></button>
     </div>
-
-    <div id="nextBadgeTile" class="stat-tile next-badge-tile"></div>
-    <div id="bonusProgressTile" class="stat-tile bonus-progress-tile"></div>
-    <div id="dueReviewTile" class="stat-tile bonus-progress-tile"></div>
 
     <div class="btn-row btn-row-sticky">
-      <button id="btnStartToLanguage" class="btn" disabled>📚 Lernen starten</button>
+      <button id="btnStartToLanguage" class="btn" disabled>⚽ Anpfiff!</button>
       <button id="btnQuickStart" class="btn btn-quickstart" style="display:none;"></button>
     </div>
   </div>
@@ -6739,28 +6770,49 @@ function makeTileAccessible(tile, label, addChevron=true){
   };
 }
 
+/* Anzeigetafel-Zelle bzw. Listenzeile der Startseite befüllen -- alle
+   Texte per textContent (Profil-/Teamnamen sind Freitext). */
+function setScoreCell(el, {label, value, sub, onClick, aria, warn}){
+  el.innerHTML = `<span class="sb-label"></span><span class="sb-value"></span><span class="sb-sub"></span>`;
+  el.querySelector(".sb-label").textContent = label;
+  el.querySelector(".sb-value").textContent = value;
+  el.querySelector(".sb-sub").textContent = sub || "";
+  el.classList.toggle("warn", !!warn);
+  el.onclick = onClick || null;
+  el.setAttribute("aria-label", aria || `${label}: ${value}${sub ? ", "+sub : ""}`);
+}
+function setListItem(el, {icon, title, desc, onClick, aria, hot, pct}){
+  el.innerHTML = `<span class="sb-icon" aria-hidden="true"></span><span class="sb-text"><span class="sb-title"></span><span class="sb-desc" style="display:block"></span></span>`
+    + (onClick ? `<span class="sb-chev" aria-hidden="true">›</span>` : "");
+  el.querySelector(".sb-icon").textContent = icon;
+  el.querySelector(".sb-title").textContent = title;
+  el.querySelector(".sb-desc").textContent = desc || "";
+  if(pct!=null){
+    const bar = document.createElement("div");
+    bar.className = "stat-tile-bar-outer";
+    bar.innerHTML = `<div class="stat-tile-bar-inner" style="width:${Math.round(pct)}%;background:var(--accent);"></div>`;
+    el.querySelector(".sb-text").appendChild(bar);
+  }
+  el.classList.toggle("hot", !!hot);
+  el.disabled = !onClick;
+  el.onclick = onClick || null;
+  el.setAttribute("aria-label", aria || `${title}${desc ? ", "+desc : ""}`);
+}
+
 function renderLevelBadge(){
   const tile = document.getElementById("levelTile");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
+  if(!prof) return;
   const info = getLevelInfo(prof.stats.totalPoints);
-  tile.innerHTML = `
-    <div class="stat-tile-head"><span>⭐</span><span>Level</span></div>
-    <div class="stat-tile-value">${info.level} · ${info.title}</div>
-    <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${info.pct}%;background:var(--accent);"></div></div>
-    <div class="stat-tile-sub">${info.pointsToNext>0 ? `noch ${info.pointsToNext} Pkt. bis Lvl ${info.level+1}` : "Maximalstufe erreicht"}</div>
-  `;
-  tile.classList.add("show");
-  tile.style.cursor = "pointer";
-  tile.onclick = ()=>{
-    state.backStackBeforeStats = "screen-start";
-    switchScreen("screen-stats");
-    renderStatsScreen();
-  };
-  makeTileAccessible(tile, "Statistik öffnen");
+  setScoreCell(tile, {
+    label:"Level", value:`⭐ ${info.level}`, sub:info.title,
+    aria:`Level ${info.level}, ${info.title}, noch ${info.pointsToNext} Punkte bis Level ${info.level+1}. Statistik öffnen`,
+    onClick:()=>{
+      state.backStackBeforeStats = "screen-start";
+      switchScreen("screen-stats");
+      renderStatsScreen();
+    }
+  });
 }
 
 /* Daily-goal tile on the start screen's stat grid. ensureDailyGoal()
@@ -6769,22 +6821,16 @@ function renderLevelBadge(){
 function renderDailyGoalWidget(){
   const tile = document.getElementById("dailyGoalTile");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
+  if(!prof) return;
   const goal = ensureDailyGoal(prof);
-  const count = Math.min(goal.correctToday, DAILY_GOAL_TARGET);
-  const pct = Math.round(count/DAILY_GOAL_TARGET*100);
-  tile.innerHTML = `
-    <div class="stat-tile-head"><span>🎯</span><span>Tagesziel</span></div>
-    <div class="stat-tile-value">${goal.correctToday}${goal.correctToday>=DAILY_GOAL_TARGET ? " 🎯" : ""} / ${DAILY_GOAL_TARGET}</div>
-    <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
-  `;
-  tile.classList.add("show");
-  tile.style.cursor = "pointer";
-  tile.onclick = openProgressScreen;
-  makeTileAccessible(tile, "Lernfortschritt öffnen");
+  const left = DAILY_GOAL_TARGET - goal.correctToday;
+  // Spielstand-Optik "18:25" -- richtige Antworten sind hier die "Tore"
+  setScoreCell(tile, {
+    label:"Tagesziel", value:`${goal.correctToday}:${DAILY_GOAL_TARGET}`,
+    sub: left>0 ? `noch ${left} ${left===1?"Tor":"Tore"}` : "geschafft! 🎯",
+    aria:`Tagesziel: ${goal.correctToday} von ${DAILY_GOAL_TARGET} richtigen Antworten. Lernfortschritt öffnen`,
+    onClick:openProgressScreen
+  });
 }
 
 /* Current rank in the cross-device Bundesligatabelle, shown right on the
@@ -6796,44 +6842,27 @@ function renderDailyGoalWidget(){
 async function renderLeagueRankWidget(){
   const tile = document.getElementById("leagueRankTile");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
-  tile.style.cursor = "pointer";
-  tile.onclick = ()=>{
+  if(!prof) return;
+  const open = ()=>{
     state.backStackBeforeLeaderboard = "screen-start";
     switchScreen("screen-leaderboard");
     renderLeaderboardScreen();
   };
-  makeTileAccessible(tile, "Vokabel-Bundesligatabelle öffnen");
-  const head = `<div class="stat-tile-head"><span>🏆</span><span>Tabelle</span></div>`;
-  if(prof.leaderboardOptOut){
-    tile.innerHTML = `${head}<div class="stat-tile-sub">🙈 Nicht in der Tabelle</div>`;
-    tile.classList.add("show");
-    return;
-  }
-  if(!fbReady){
-    tile.innerHTML = `${head}<div class="stat-tile-sub">📡 Keine Verbindung</div>`;
-    tile.classList.add("show");
-    return;
-  }
-  tile.innerHTML = `${head}<div class="stat-tile-value">⏳</div>`;
-  tile.classList.add("show");
+  const show = (value, sub)=>setScoreCell(tile, {label:"Tabelle", value, sub, onClick:open,
+    aria:`Tabelle: ${value}${sub ? ", "+sub : ""}. Bundesligatabelle öffnen`});
+  if(prof.leaderboardOptOut){ show("–", "nicht dabei 🙈"); return; }
+  if(!fbReady){ show("–", "offline 📡"); return; }
+  show("⏳", "Bundesliga");
   try{
     const rows = await fetchLeaderboardRows();
-    // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle, sonst würde
-    // der hier gezeigte Platz nicht zu dem passen, was renderLeaderboardRows
-    // beim Öffnen der Tabelle tatsächlich anzeigt
+    // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle
     const bonusedRows = applyDiligenceBonus(rows);
     const ownDocId = getCloudDocId(prof);
     const idx = bonusedRows.findIndex(r=>r.cloudId===ownDocId);
-    tile.innerHTML = idx>=0
-      ? `${head}<div class="stat-tile-value">Platz ${idx+1}</div>`
-      : `${head}<div class="stat-tile-sub">noch nicht gelistet</div>`;
+    if(idx>=0) show(`Platz ${idx+1}`, "Bundesliga"); else show("–", "noch nicht gelistet");
   } catch(e){
     console.error("renderLeagueRankWidget error", e);
-    tile.innerHTML = `${head}<div class="stat-tile-sub">📡 Keine Verbindung</div>`;
+    show("–", "offline 📡");
   }
 }
 
@@ -6848,58 +6877,45 @@ async function renderLeagueRankWidget(){
 async function renderTeamRankWidget(){
   const tile = document.getElementById("teamRankTile");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
-  if(!prof.team){
-    tile.classList.add("show", "no-team");
-    tile.innerHTML = `
-      <span style="font-size:1.2rem;opacity:0.6;">⚽</span>
-      <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head">Noch kein Team gewählt</div>
-        <div class="stat-tile-sub">Für die Team-Tabelle im Profil auswählen</div>
-      </div>
-      <span style="font-size:0.78rem;font-weight:800;color:var(--accent);white-space:nowrap;">Wählen →</span>
-    `;
-    tile.onclick = ()=>{
+  if(!prof) return;
+  const team = prof.team ? getTeamById(prof.team) : null;
+  const render = (badgeText, badgeBg, name, rank, onClick, aria)=>{
+    tile.innerHTML = `<span class="sb-team-badge"></span><span class="sb-team-name"></span><span class="sb-team-rank"></span><span class="sb-chev" aria-hidden="true">›</span>`;
+    const badge = tile.querySelector(".sb-team-badge");
+    badge.textContent = badgeText;
+    badge.style.background = badgeBg;
+    badge.style.color = badgeBg==="transparent" ? "#fff" : readableTextOn(badgeBg);
+    tile.querySelector(".sb-team-name").textContent = name;
+    tile.querySelector(".sb-team-rank").textContent = rank;
+    tile.onclick = onClick;
+    tile.setAttribute("aria-label", aria);
+  };
+  if(!team){
+    render("⚽", "transparent", "Team wählen", "", ()=>{
       switchScreen("screen-profiles");
       renderProfilesScreen();
-    };
-    makeTileAccessible(tile, "Team auswählen", false);
+    }, "Noch kein Team gewählt. Team auswählen");
     return;
   }
-  tile.classList.add("show");
-  tile.classList.remove("no-team");
-  tile.onclick = ()=>{
+  const openTeams = ()=>{
     state.backStackBeforeTeamLeaderboard = "screen-start";
     switchScreen("screen-team-leaderboard");
     renderTeamLeaderboardScreen();
   };
-  makeTileAccessible(tile, "Team-Tabelle öffnen");
-  const team = getTeamById(prof.team);
-  if(!team) { tile.classList.remove("show"); return; } // defensive: team id no longer in TEAM_LIST
-  const badge = `<span class="team-tile-badge" style="background:${team.colorPrimary};color:${readableTextOn(team.colorPrimary)};">${team.shortCode}</span>`;
-  const nameBlock = (sub)=>`${badge}<div style="flex:1;min-width:0;"><div class="stat-tile-head">Team</div><div class="stat-tile-value" style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${team.name}</div></div>${sub}`;
-  if(!fbReady){
-    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">📡 Keine Verbindung</span>`);
-    return;
-  }
-  tile.innerHTML = nameBlock(`<span class="stat-tile-sub">⏳</span>`);
+  const show = rank=>render(team.shortCode, team.colorPrimary, team.name, rank, openTeams, `Team ${team.name}: ${rank}. Team-Tabelle öffnen`);
+  if(!fbReady){ show("offline 📡"); return; }
+  show("⏳");
   try{
     const rows = await fetchLeaderboardRows();
-    const bonusedRows = applyDiligenceBonus(rows);
-    const byTeam = groupMembersByTeam(bonusedRows);
+    const byTeam = groupMembersByTeam(applyDiligenceBonus(rows));
     const teamEntries = Object.entries(byTeam)
       .map(([teamId, members])=>({teamId, agg:computeTeamScore(members)}))
       .sort((a,b)=>b.agg.score-a.agg.score);
     const idx = teamEntries.findIndex(e=>e.teamId===prof.team);
-    tile.innerHTML = nameBlock(idx>=0
-      ? `<span class="team-tile-rank">Platz ${idx+1}</span>`
-      : `<span class="stat-tile-sub">noch nicht gelistet</span>`);
+    show(idx>=0 ? `Team-Platz ${idx+1}` : "noch nicht gelistet");
   } catch(e){
     console.error("renderTeamRankWidget error", e);
-    tile.innerHTML = nameBlock(`<span class="stat-tile-sub">📡 Keine Verbindung</span>`);
+    show("offline 📡");
   }
 }
 
@@ -7183,48 +7199,20 @@ function openProgressScreen(){
 function renderStreakBadge(){
   const tile = document.getElementById("streakTile");
   const prof = getCurrentProfileObj();
-  if(!prof){
-    tile.classList.remove("show", "at-risk");
-    return;
-  }
+  if(!prof) return;
   const streak = ensureStreakObj(prof);
-  tile.style.cursor = "pointer";
-  tile.onclick = openProgressScreen;
-  makeTileAccessible(tile, "Lernfortschritt öffnen");
   const current = effectiveStreak(streak, todayKey());
-  if(current<=0){
-    // shown anyway (not hidden as before) -- it's the way into the
-    // Lernfortschritt screen
-    tile.classList.remove("at-risk");
-    tile.innerHTML = `
-      <div class="stat-tile-head"><span>🔥</span><span>Serie</span></div>
-      <div class="stat-tile-value">0</div>
-      <div class="stat-tile-sub">Tagesziel erreichen = erste Flamme</div>
-    `;
-    tile.classList.add("show");
-    return;
-  }
-  const goalReachedToday = streak.lastActiveDate === todayKey();
-  tile.classList.toggle("at-risk", !goalReachedToday);
-  const sub = goalReachedToday
-    ? `${current} Tag${current===1?"":"e"} in Folge`
-    : `Heute noch lernen für ${current} Tag${current===1?"":"e"} am Stück! 🔥`;
-
-  // one flame per streak day, capped so the narrower tile doesn't overflow
-  // -- the remaining days are shown as "+N" instead
-  const MAX_FLAMES = 6;
-  const flameCount = Math.min(current, MAX_FLAMES);
-  let flamesHtml = "🔥".repeat(flameCount);
-  if(current > MAX_FLAMES){
-    flamesHtml += `<span class="stat-tile-sub">+${current-MAX_FLAMES}</span>`;
-  }
-
-  tile.innerHTML = `
-    <div class="stat-tile-head"><span>🔥</span><span>Serie</span></div>
-    <div class="stat-tile-flames">${flamesHtml}</div>
-    <div class="stat-tile-sub">${sub}</div>
-  `;
-  tile.classList.add("show");
+  const doneToday = streak.lastActiveDate === todayKey();
+  let sub;
+  if(current<=0) sub = "Ziel = 1. Flamme";
+  else if(doneToday) sub = "heute geschafft ✓";
+  else sub = "heute offen";
+  setScoreCell(tile, {
+    label:"Serie", value:`🔥 ${current}`, sub,
+    warn: current>0 && !doneToday, // Serie reißt heute, wenn nichts passiert
+    aria:`Serie: ${current} ${current===1?"Tag":"Tage"}, ${sub}. Lernfortschritt öffnen`,
+    onClick:openProgressScreen
+  });
 }
 
 function formatGermanDateTime(d){
@@ -7286,71 +7274,38 @@ function findNextBadge(prof){
 
 function renderNextBadgeTile(prof){
   const tile = document.getElementById("nextBadgeTile");
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
+  if(!prof) return;
   const next = findNextBadge(prof);
   if(!next){
     // nothing with a progress bar left -- keep the way into the badges screen
-    tile.innerHTML = `<span class="next-badge-icon">🏅</span><div style="flex:1;min-width:0;"><div class="stat-tile-head">Abzeichen</div><div class="stat-tile-sub"></div></div>`;
-    tile.querySelector(".stat-tile-sub").textContent = `${countUnlockedAchievements(ensureAchievements(prof).unlocked)} von ${ACHIEVEMENTS.length} freigeschaltet`;
-    tile.classList.add("show");
-    tile.style.cursor = "pointer";
-    tile.onclick = openBadgesScreen;
-    makeTileAccessible(tile, "Alle Abzeichen öffnen");
+    setListItem(tile, {icon:"🏅", title:"Abzeichen",
+      desc:`${countUnlockedAchievements(ensureAchievements(prof).unlocked)} von ${ACHIEVEMENTS.length} freigeschaltet`,
+      onClick:openBadgesScreen});
     return;
   }
   const {def, pct, current, target} = next;
-  tile.innerHTML = `
-    <span class="next-badge-icon"></span>
-    <div style="flex:1;min-width:0;">
-      <div class="stat-tile-head">Nächstes Abzeichen</div>
-      <div class="stat-tile-sub next-badge-title"></div>
-      <div class="stat-tile-bar-outer" style="margin-top:0.3rem;"><div class="stat-tile-bar-inner" style="width:${Math.round(pct*100)}%;background:var(--accent);"></div></div>
-    </div>
-  `;
-  tile.querySelector(".next-badge-icon").textContent = def.icon;
-  tile.querySelector(".next-badge-title").textContent = `${def.title}: ${def.desc} (noch ${target-current})`;
-  tile.classList.add("show");
-  tile.style.cursor = "pointer";
-  tile.onclick = openBadgesScreen;
-  makeTileAccessible(tile, `Nächstes Abzeichen: ${def.title}, alle Abzeichen öffnen`);
+  setListItem(tile, {icon:def.icon, title:`Nächstes Abzeichen: ${def.title}`,
+    desc:`${def.desc} (noch ${target-current})`, pct:pct*100, onClick:openBadgesScreen,
+    aria:`Nächstes Abzeichen: ${def.title}, ${def.desc}, noch ${target-current}. Alle Abzeichen öffnen`});
 }
 
 function renderBonusProgressTile(prof){
   const tile = document.getElementById("bonusProgressTile");
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
-  const {available} = getBonusCardThresholds(prof);
-  if(available.length>0){
-    tile.innerHTML = `
-      <span style="font-size:1.2rem;">🎁</span>
-      <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head">${available.length} Bonuskarte${available.length===1?"":"n"} verfügbar!</div>
-        <div class="stat-tile-sub">Antippen zum Einlösen</div>
-      </div>
-    `;
-  } else {
-    const {remaining, pct} = getNextBonusCardProgress(prof);
-    tile.innerHTML = `
-      <span style="font-size:1.2rem;">🎁</span>
-      <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head" style="margin-bottom:0.3rem;">Nächste Bonuskarte: noch ${remaining} Flamme${remaining===1?"":"n"}</div>
-        <div class="stat-tile-bar-outer"><div class="stat-tile-bar-inner" style="width:${pct}%;background:var(--accent);"></div></div>
-      </div>
-    `;
-  }
-  tile.classList.add("show");
-  tile.style.cursor = "pointer";
-  tile.onclick = ()=>{
+  if(!prof) return;
+  const open = ()=>{
     state.backStackBeforeBonusCards = "screen-start";
     switchScreen("screen-bonus-cards");
     renderBonusCardsScreen();
   };
-  makeTileAccessible(tile, "Bonuskarten öffnen");
+  const {available} = getBonusCardThresholds(prof);
+  if(available.length>0){
+    setListItem(tile, {icon:"🎁", title:`${available.length} Bonuskarte${available.length===1?"":"n"} verfügbar!`,
+      desc:"Antippen zum Einlösen", hot:true, onClick:open});
+  } else {
+    const {remaining, pct} = getNextBonusCardProgress(prof);
+    setListItem(tile, {icon:"🎁", title:`Bonuskarte in ${remaining} ${remaining===1?"Tag":"Tagen"}`,
+      desc:"Serie weiter halten", pct, onClick:open});
+  }
 }
 
 /* Always-visible teaser tile for the day-based Leitner review queue (see
@@ -7361,40 +7316,15 @@ function renderBonusProgressTile(prof){
    normale Seiten-/Wortauswahl zu gehen (siehe startDueReviewRound). */
 function renderDueReviewTile(prof){
   const tile = document.getElementById("dueReviewTile");
-  if(!prof){
-    tile.classList.remove("show");
-    return;
-  }
+  if(!prof) return;
   const due = collectDueWords(prof);
   if(due.length>0){
-    tile.innerHTML = `
-      <span style="font-size:1.2rem;">📅</span>
-      <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head">${due.length} ${due.length===1?"Wort":"Wörter"} heute fällig</div>
-        <div class="stat-tile-sub">Antippen zum Üben</div>
-      </div>
-    `;
-    tile.classList.remove("is-empty");
-    tile.style.cursor = "pointer";
-    tile.onclick = startDueReviewRound;
-    makeTileAccessible(tile, "Fällige Wiederholungen üben");
+    setListItem(tile, {icon:"📅", title:`Training: ${due.length} ${due.length===1?"Wort":"Wörter"} fällig`,
+      desc:"Alle schaffen = +50 % Bonus", hot:true, onClick:startDueReviewRound,
+      aria:`${due.length} Wörter zum Wiederholen fällig. Training starten`});
   } else {
-    tile.innerHTML = `
-      <span style="font-size:1.2rem;">📅</span>
-      <div style="flex:1;min-width:0;">
-        <div class="stat-tile-head">Keine Wiederholungen fällig</div>
-      </div>
-    `;
-    tile.classList.add("is-empty"); // neutral look -- nothing to tap here
-    tile.style.cursor = "default";
-    tile.onclick = null;
-    tile.onkeydown = null;
-    tile.classList.remove("stat-tile-clickable");
-    tile.removeAttribute("role");
-    tile.removeAttribute("tabindex");
-    tile.removeAttribute("aria-label");
+    setListItem(tile, {icon:"📅", title:"Kein Training fällig", desc:"Wiederholungen kommen von selbst wieder"});
   }
-  tile.classList.add("show");
 }
 
 /* Startet eine Runde direkt aus den fälligen Wiederholungen (siehe
@@ -10183,19 +10113,21 @@ function renderStartScreen(){
     goToProfilesBtn.textContent = "";
     const avatarSpan = document.createElement("span");
     avatarSpan.className = "avatar-circle";
-    avatarSpan.textContent = avatar;
+    avatarSpan.textContent = avatar || "👤";
     const arrowSpan = document.createElement("span");
     arrowSpan.style.color = "var(--muted)";
     arrowSpan.style.fontWeight = "600";
     arrowSpan.textContent = "▾";
+    // nur Avatar + Pfeil -- der Name steht schon in der Begrüßung daneben
     goToProfilesBtn.appendChild(avatarSpan);
-    goToProfilesBtn.appendChild(document.createTextNode(state.currentProfile + " "));
     goToProfilesBtn.appendChild(arrowSpan);
+    goToProfilesBtn.setAttribute("aria-label", `Profil ${state.currentProfile} – wechseln oder anpassen`);
   } else {
     welcomeEl.textContent = "👋 Willkommen";
     // "Profil erstellen" wäre irreführend, wenn schon Profile existieren --
     // dann will man meistens eins davon AUSWÄHLEN, nicht ein neues anlegen.
     // Nur wenn wirklich noch gar keins existiert, ist "erstellen" korrekt.
+    goToProfilesBtn.removeAttribute("aria-label");
     goToProfilesBtn.innerHTML = Object.keys(state.profiles).length>0
       ? "👤 Profil wählen"
       : "➕ Profil erstellen";
@@ -10281,7 +10213,8 @@ function renderQuickStartBlock(){
     // no previous round to resume -> starting a new one is THE action
     btn.style.display="none";
     newRoundBtn.className = "btn";
-    newRoundBtn.textContent = "📚 Lernen starten";
+    newRoundBtn.textContent = "⚽ Anpfiff!";
+    newRoundBtn.removeAttribute("aria-label");
     return;
   }
   const pageLabel = validPages.length===1
@@ -10290,7 +10223,7 @@ function renderQuickStartBlock(){
   const dirLabel = last.direction==="mixed" ? "gemischt"
     : last.direction==="deToEn" ? `Deutsch → ${getLangDisplayName(book.lang)}`
     : `${getLangDisplayName(book.lang)} → Deutsch`;
-  btn.innerHTML = `<span class="bold">▶️ Weiterlernen</span><span class="qs-sub"></span>`;
+  btn.innerHTML = `<span class="bold">▶️ Anpfiff!</span><span class="qs-sub"></span>`;
   // book.name can be user-typed (custom book) or come from an imported
   // backup file -- set as text, never parsed as HTML
   btn.querySelector(".qs-sub").textContent = `${pageLabel} · ${dirLabel}`;
@@ -10298,7 +10231,8 @@ function renderQuickStartBlock(){
   btn.style.display="";
   // resuming is the primary action, a new selection the secondary one
   newRoundBtn.className = "btn-secondary btn";
-  newRoundBtn.textContent = "📚 Neue Runde";
+  newRoundBtn.textContent = "📚 Neu";
+  newRoundBtn.setAttribute("aria-label", "Neue Runde: Sprache und Seiten wählen");
 }
 
 function startQuickRound(){
@@ -11998,11 +11932,6 @@ function applyDarkMode(on){
 }
 
 function initHeroBanner(){
-  document.getElementById("heroIconDe").src = LANG_ICON_IMG.de;
-  document.getElementById("heroIconEn").src = LANG_ICON_IMG.en;
-  document.getElementById("heroIconFr").src = LANG_ICON_IMG.fr;
-  document.getElementById("heroIconLa").src = LANG_ICON_IMG.la;
-
   // SVG <image> needs href set this way (xlink:href too, for older
   // engines) -- a plain .src assignment like on <img> has no effect here
   const splashLogo = document.getElementById("splashLogo");
