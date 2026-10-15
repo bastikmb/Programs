@@ -5129,7 +5129,7 @@ const BOOKS = {
     cover: BOOK_COVERS.pontes,
     pages: {
       "Pontes-002": [
-        {de:"Sei gegrüßt!", foreign:"Salvē!", icon:"👋"},
+        {de:"Sei gegrüßt! (zu einer Person)", foreign:"Salvē!", icon:"👋"},
         {de:"der Vater", foreign:"pater", icon:"👨"},
         {de:"die Mutter", foreign:"māter", icon:"👩"},
         {de:"der Sohn", foreign:"filius", icon:"👦"},
@@ -5194,7 +5194,7 @@ const BOOKS = {
         {de:"nicht dürfen", foreign:"nōn dēbēre", icon:"🚫"},
         {de:"bis jetzt, noch", foreign:"adhūc", icon:"⏳"},
         {de:"dort", foreign:"illīc", icon:"📌"},
-        {de:"die Kinder", foreign:"līberī", icon:"🧒"},
+        {de:"die Kinder", foreign:"līberī", icon:"🧒", example:"līberī = die Kinder (einer Familie); puerī = Jungen"},
         {de:"der Mann", foreign:"vir", icon:"👨"},
         {de:"das Atrium", foreign:"ātrium", icon:"🏛️"},
         {de:"die Ruhe, die Freizeit", foreign:"ōtium", icon:"🛋️"},
@@ -5202,7 +5202,7 @@ const BOOKS = {
         {de:"das Peristyl", foreign:"peristylium", icon:"🏛️"},
         {de:"die Pflicht", foreign:"officium", icon:"📋"},
         {de:"erfüllen", foreign:"explēre", icon:"✔️"},
-        {de:"Seid gegrüßt!", foreign:"Salvēte!", icon:"👋"},
+        {de:"Seid gegrüßt! (zu mehreren)", foreign:"Salvēte!", icon:"👋"},
         {de:"sagen", foreign:"dīcere", icon:"🗣️"},
         {de:"warum?", foreign:"cūr?", icon:"❓"},
         {de:"immer", foreign:"semper", icon:"♾️"},
@@ -5256,7 +5256,7 @@ const BOOKS = {
         {de:"sich hinsetzen", foreign:"cōnsīdere", icon:"🪑"},
         {de:"und (angehängt)", foreign:"-que", icon:"➕"},
         {de:"haben, halten", foreign:"habēre", icon:"🤲"},
-        {de:"(zeigt eine Frage an)", foreign:"-ne?", icon:"❔"}
+        {de:"(zeigt eine Frage an)", foreign:"-ne?", icon:"❔", onlyDirection:"deToEn"}
       ],
       "Pontes-011": [
         {de:"das Wachstäfelchen", foreign:"tabula", icon:"📝"},
@@ -8023,7 +8023,10 @@ function sameLetter(a, b){
    independent alternatives, same as a spaced "/". */
 function getAlternatives(str){
   let scanDepth=0, terminalSeen=false, listSepAfterTerminal=false, prevChar="";
-  for(const ch of str){
+  // the dot of a dictionary abbreviation ("etw. weiter tun, fortsetzen")
+  // is not a sentence end -- otherwise that comma would never split
+  const scanStr = str.replace(/(?<![\p{L}])(etw|jdm|jdn|jds|sth|sb)\./giu, "$1");
+  for(const ch of scanStr){
     if(ch==="("){ scanDepth++; continue; }
     if(ch===")"){ scanDepth=Math.max(0, scanDepth-1); continue; }
     if(scanDepth>0) continue;
@@ -8106,10 +8109,53 @@ function expandParenGroups(part){
   return result;
 }
 
+/* Extra spellings that count as correct but are never shown as "the"
+   solution (letter boxes/hints keep using getAlternatives):
+   - German nouns without their article: "Vater" for "der Vater"
+   - a directional placeholder dropped: "zu" for "zu ... hin",
+     "in" for "in ... hinein" (only for these particles -- "sich" alone
+     must not pass for "sich ... ansehen")
+   The leading hyphen of suffixes ("-que", "-ne?") is optional via
+   normalizeForMatch. */
+const ELLIPSIS_PARTICLES = new Set(["hin","hinein","heraus","her","herein","herab","hinauf"]);
+function matchAlternatives(correctRaw){
+  const out = [];
+  for(const alt of getAlternatives(correctRaw)){
+    out.push(alt);
+    const noArticle = alt.replace(/^(der|die|das)\s+/i, "");
+    if(noArticle!==alt && noArticle.trim()) out.push(noArticle);
+    const m = alt.match(/^(.*?)\s*(?:\.\.\.|…)\s*(\S+)$/);
+    if(m && m[1].trim() && ELLIPSIS_PARTICLES.has(m[2].toLowerCase())) out.push(m[1]);
+  }
+  return out;
+}
+
 function answerMatches(inputVal, correctRaw){
-  const alts = getAlternatives(correctRaw);
   const normInput = normalizeForMatch(inputVal);
-  return alts.some(a => normalizeForMatch(a)===normInput);
+  return matchAlternatives(correctRaw).some(a => normalizeForMatch(a)===normInput);
+}
+
+/* Fully correct answer of ANOTHER vocab item of the same language whose
+   meaning covers everything the current prompt asks for: "vocāre" for
+   "rufen" when the card wanted "clāmāre", "cōnspicere" for "sehen"
+   (its German side is "erblicken, sehen"). Not the other way round --
+   "aber" doesn't cover "aber, sondern" -- and "ihr / euch" never accepts
+   "suus" just because "ihr(e)" is one of suus' meanings. Returns that
+   other entry, or null. */
+function findSynonymMatch(card, inputVal){
+  if(!card.key) return null;
+  const lang = card.key.split("|")[0];
+  const askDe = card.direction==="deToEn";
+  const promptAlts = getAlternatives(card.prompt).map(normalizeForMatch);
+  if(promptAlts.length===0) return null;
+  for(const [key, v] of getVocabIndex().byKey){
+    if(key===card.key || !key.startsWith(lang+"|")) continue;
+    const otherPrompt = askDe ? v.de : v.foreign;
+    const otherAlts = new Set(getAlternatives(otherPrompt).map(normalizeForMatch));
+    if(!promptAlts.every(a=>otherAlts.has(a))) continue;
+    if(answerMatches(inputVal, askDe ? v.foreign : v.de)) return v;
+  }
+  return null;
 }
 
 /* Common English contractions, expanded to a canonical long form so that
@@ -8158,6 +8204,7 @@ const ABBREVIATIONS = [
 
 function normalizeForMatch(str){
   let s = normalizeAnswer(str);
+  s = s.replace(/(^|\s)-(?=\p{L})/gu, "$1"); // "-que" = "que": suffix hyphen optional
   // the usual keyboard-less spellings of German umlauts/ß count as equal
   // ("schoen" = "schön", "strasse" = "Straße"), a bare base vowel does not
   s = s.replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss");
@@ -8464,10 +8511,32 @@ function migrateProfileToVocabKeys(prof){
   return true;
 }
 
+/* Vocab items whose text was edited keep their progress: old key ->
+   new key, moved once per profile wherever the old key still exists. */
+const VOCAB_KEY_RENAMES = {
+  "la|Sei gegrüßt!|Salvē!": "la|Sei gegrüßt! (zu einer Person)|Salvē!",
+  "la|Seid gegrüßt!|Salvēte!": "la|Seid gegrüßt! (zu mehreren)|Salvēte!"
+};
+function applyVocabKeyRenames(prof){
+  const st = prof.stats; let changed = false;
+  const maps = [st.wrongCounts, st.correctCounts, st.wordSchedule,
+    st.correctByDirection && st.correctByDirection.deToEn,
+    st.correctByDirection && st.correctByDirection.enToDe,
+    ...Object.values(st.pendingPageSetWords||{})];
+  for(const m of maps){
+    if(!m) continue;
+    for(const [oldKey, newKey] of Object.entries(VOCAB_KEY_RENAMES)){
+      if(oldKey in m && !(newKey in m)){ m[newKey] = m[oldKey]; delete m[oldKey]; changed = true; }
+    }
+  }
+  return changed;
+}
+
 function migrateAllProfilesToVocabKeys(){
   let changed = false;
   for(const prof of Object.values(state.profiles)){
     if(migrateProfileToVocabKeys(prof)) changed = true;
+    if(prof.stats && applyVocabKeyRenames(prof)) changed = true;
   }
   if(changed) saveProfiles();
 }
@@ -10544,7 +10613,7 @@ function isAdjacentKeyTypo(input, target){
    automatisch richtig, das Kind muss selbst korrekt nachtippen. */
 function isLikelyAdjacentKeyTypo(inputVal, correctRaw){
   const normInput = normalizeForMatch(inputVal);
-  return getAlternatives(correctRaw).some(alt => isAdjacentKeyTypo(normInput, normalizeForMatch(alt)));
+  return matchAlternatives(correctRaw).some(alt => isAdjacentKeyTypo(normInput, normalizeForMatch(alt)));
 }
 
 /* Simple Levenshtein distance, used only to judge how close a wrong
@@ -10689,7 +10758,9 @@ function checkAnswer(){
   const card = state.roundCards[state.roundIndex];
   const inputVal=document.getElementById("answerInput").value;
   const correct=card.answer;
-  const good = answerMatches(inputVal, correct);
+  // another item's translation with the same meaning counts fully, see findSynonymMatch
+  const synonym = answerMatches(inputVal, correct) ? null : findSynonymMatch(card, inputVal);
+  const good = answerMatches(inputVal, correct) || !!synonym;
 
   if(good){
     // correct
@@ -10765,11 +10836,14 @@ function checkAnswer(){
     setLearnControlsDisabled(true);
     maybeRequeueCard(card);
     const autoMs = autoAdvanceEnabled ? (card.example ? AUTO_ADVANCE_WITH_EXAMPLE_MS : AUTO_ADVANCE_MS) : 0;
-    showContinueOverlay(pickRandom(CORRECT_MESSAGES), "good", card.example, ()=>{
+    // synonym: say that it's right AND which word the book wanted here
+    const okMsg = synonym ? "Auch richtig! ✅" : pickRandom(CORRECT_MESSAGES);
+    const okAnswer = synonym ? `Im Buch steht hier: ${getAlternatives(correct)[0]}` : null;
+    showContinueOverlay(okMsg, "good", card.example, ()=>{
       state.roundIndex++;
       setLearnControlsDisabled(false);
       renderCurrentCard();
-    }, {text:card.foreign, lang:card.speechLang}, null, autoMs);
+    }, {text:card.foreign, lang:card.speechLang}, okAnswer, autoMs);
   } else {
     // Nachbartasten-Tippfehler: Hinweis + eigener Korrekturversuch, OHNE
     // Punktabzug/Combo-Bruch/firstTry-Verlust -- das Kind muss selbst
