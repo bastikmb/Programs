@@ -2515,6 +2515,8 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       </details>
     </div>
 
+    <div id="appVersionLabel" class="small-note" style="text-align:center;margin-top:var(--space-4);"></div>
+
     <div class="btn-row btn-row-sticky">
       <button id="btnProfilesBack" class="btn-secondary btn">⬅ Zurück</button>
     </div>
@@ -6605,6 +6607,20 @@ function ensureCloudId(prof){
    device/browser can host several children's profiles -- see the
    leaderboard_v1 security rules (FIREBASE_CONFIG comment above) which
    only allow a device to write ids prefixed with its own uid. */
+/* Ist diese Tabellenzeile das eigene Profil? Verglichen wird nur der
+   Profil-Teil der Dokument-id ("<uid>_<profil-cloudId>"), nicht die uid:
+   nach einer Neuinstallation (neue anonyme uid, Daten wiederhergestellt)
+   gehört der bestehende Eintrag noch der alten uid, ist aber weiterhin
+   dasselbe Kind -- die Startseite zeigte sonst "noch nicht gelistet",
+   obwohl das Kind in der Tabelle steht. */
+function leaderboardProfileKey(cloudDocId){
+  const id = String(cloudDocId||"");
+  return id.includes("_") ? id.slice(id.indexOf("_")+1) : id;
+}
+function isOwnLeaderboardRow(row, prof){
+  return !!(prof && prof.cloudId && leaderboardProfileKey(row.cloudId)===prof.cloudId);
+}
+
 function getCloudDocId(prof){
   if(!fbAuth || !fbAuth.currentUser) return null;
   return fbAuth.currentUser.uid + "_" + ensureCloudId(prof);
@@ -7138,8 +7154,7 @@ async function renderLeagueRankWidget(){
     const rows = await fetchLeaderboardRows();
     // gleiche Fleiß-Bonus-Sortierung wie die Detail-Tabelle
     const bonusedRows = applyDiligenceBonus(rows);
-    const ownDocId = getCloudDocId(prof);
-    const idx = bonusedRows.findIndex(r=>r.cloudId===ownDocId);
+    const idx = bonusedRows.findIndex(r=>isOwnLeaderboardRow(r, prof));
     if(idx>=0) show(`Platz ${idx+1}`, "Bundesliga"); else show("–", "noch nicht gelistet");
   } catch(e){
     console.error("renderLeagueRankWidget error", e);
@@ -10103,8 +10118,7 @@ function leaderboardRowTime(r){
 function dedupeLeaderboardRows(rows){
   const best = new Map();
   rows.forEach(r=>{
-    const id = String(r.cloudId||"");
-    const key = id.includes("_") ? id.slice(id.indexOf("_")+1) : id;
+    const key = leaderboardProfileKey(r.cloudId);
     const prev = best.get(key);
     if(!prev
       || leaderboardRowTime(r) > leaderboardRowTime(prev)
@@ -10112,10 +10126,7 @@ function dedupeLeaderboardRows(rows){
       best.set(key, r);
     }
   });
-  return rows.filter(r=>{
-    const id = String(r.cloudId||"");
-    return best.get(id.includes("_") ? id.slice(id.indexOf("_")+1) : id) === r;
-  });
+  return rows.filter(r=>best.get(leaderboardProfileKey(r.cloudId))===r);
 }
 
 // Platz 1/2/3 nach roundsCompleted INNERHALB der aktuell geladenen Tabelle
@@ -10180,11 +10191,10 @@ function renderLeaderboardRows(rows, prof){
   const nameCounts = {};
   bonusedRows.forEach(r=>{ nameCounts[r.nickname] = (nameCounts[r.nickname]||0)+1; });
 
-  const ownDocId = prof ? getCloudDocId(prof) : null;
 
   bonusedRows.forEach((r, idx)=>{
     const row=document.createElement("div");
-    row.className = "leaderboard-row" + (r.cloudId===ownDocId ? " own" : "");
+    row.className = "leaderboard-row" + (isOwnLeaderboardRow(r, prof) ? " own" : "");
 
     const rank=document.createElement("div");
     rank.className="rank";
@@ -12302,7 +12312,14 @@ function initHeroBanner(){
   splashLogo.setAttributeNS("http://www.w3.org/1999/xlink", "href", LANDO_LOGO.splash);
 }
 
+/* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
+   Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
+   Bei jeder veröffentlichten Änderung hochzählen. */
+const APP_BUILD = "2026-10-15.2";
+
 function initApp(){
+  const versionEl = document.getElementById("appVersionLabel");
+  if(versionEl) versionEl.textContent = `App-Version ${APP_BUILD}`;
   loadProfiles();
   loadCustomBooks();
   migrateAllProfilesToVocabKeys(); // needs both profiles and custom books loaded
