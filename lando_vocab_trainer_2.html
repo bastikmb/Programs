@@ -1166,6 +1166,14 @@ body.dark-theme { --flame:#c2410c; --flame-text:#fb923c; --freeze-bg:#075985; --
 }
 .box-row-count { text-align:right; font-weight:700; color:var(--ink); font-size:var(--text-sm); }
 .box-row.top .box-row-label { color:var(--flame-text); }
+/* "Nächstes Abzeichen" teaser on the start screen */
+.next-badge-tile {
+  flex-direction:row;
+  align-items:center;
+  gap:0.6rem;
+  margin-bottom:0.6rem;
+}
+.next-badge-tile .next-badge-icon { font-size:1.5rem; flex-shrink:0; }
 /* bonus cards (unlocked at streak thresholds) */
 .bonus-cards-block { margin-bottom:1rem; }
 .bonus-card-list { display:flex; flex-direction:column; gap:0.6rem; }
@@ -2212,6 +2220,7 @@ input:focus-visible {
       <div id="teamRankTile" class="stat-tile stat-tile-wide team-tile-row"></div>
     </div>
 
+    <div id="nextBadgeTile" class="stat-tile next-badge-tile"></div>
     <div id="bonusProgressTile" class="stat-tile bonus-progress-tile"></div>
     <div id="dueReviewTile" class="stat-tile bonus-progress-tile"></div>
 
@@ -2509,7 +2518,7 @@ input:focus-visible {
         <div><span class="muted">Dauer (Sek.):</span> <span id="sumDuration" class="bold">0</span></div>
         <div><span class="muted">Bester Combo:</span> <span id="sumBestCombo" class="bold">–</span></div>
         <div><span class="muted">Combo-Bonus:</span> <span id="sumComboBonus" class="bold">+0</span></div>
-        <div><span class="muted">Perfekte Runde:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
+        <div><span class="muted">Durchgespielt-Bonus:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
         <div><span class="muted">Wiederholungs-Bonus:</span> <span id="sumReviewBonus" class="bold">+0</span></div>
         <div><span class="muted">Sicher gelernt (Fach 6):</span> <span id="sumMasteredBonus" class="bold">+0</span></div>
       </div>
@@ -2593,7 +2602,7 @@ input:focus-visible {
     <h2 style="margin-top:0;margin-bottom:0.25rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
       <span>🔥 Lernfortschritt</span>
     </h2>
-    <div class="section-sub" style="margin-bottom:1rem;">Eine Flamme gibt es für jeden Tag, an dem du dein Tagesziel (<span id="progGoalTarget">15</span> richtige Antworten) erreichst und mindestens eine Runde fehlerfrei schaffst.</div>
+    <div class="section-sub" style="margin-bottom:1rem;">Eine Flamme gibt es für jeden Tag, an dem du dein Tagesziel (<span id="progGoalTarget">15</span> richtige Antworten) erreichst und mindestens eine Runde komplett durchspielst (nichts übersprungen oder aufgedeckt).</div>
     <div class="progress-stat-row">
       <div class="progress-stat"><div id="progDayStreak" class="progress-stat-value">0</div><div class="progress-stat-label">Tages-Serie</div></div>
       <div class="progress-stat"><div id="progWeekStreak" class="progress-stat-value">0</div><div class="progress-stat-label">Wochen-Serie</div></div>
@@ -5728,44 +5737,21 @@ function saveProfiles() {
    Hintergrund, ohne die übliche Freischalt-Banner-UI auszulösen (die
    hängt an newlyUnlockedAchievements aus finalizeRoundAndUpdateProfile,
    nicht an diesem Pfad). */
-const RETROFITTABLE_ACHIEVEMENT_IDS = [
-  "teamplayer", "millionaire", "streak_100", "globetrotter",
-  "full_book_mastery", "ballon_dor",
-  // Nur Stufen auf Basis von Statistiken, die schon lange vor dieser
-  // Session getrackt wurden (streak, completedPageSets, totalPoints/Level)
-  // -- NICHT dabei: Stufen auf consecutivePerfectRounds/perfectRoundsCount/
-  // bonusCardsRedeemedCount/typoCorrectedCount, da diese Zähler selbst erst
-  // in dieser Session eingeführt wurden (kein historischer Rückstand,
-  // gleiche Begründung wie bei hattrick/weisse_weste/perfectionist oben).
-  "streak_150", "streak_200", "level_3", "level_15", "level_20",
-  "pages_3", "pages_25",
-  // Stufen der neuen Familien, die auf schon vorhandenen Werten beruhen
-  "first_round", "rounds_25", "rounds_100", "rounds_250", "rounds_500",
-  "correct_100", "correct_500", "correct_1000", "correct_2500", "correct_5000",
-  "millionaire", "points_15000", "points_30000", "points_60000", "points_100000",
-  "libero", "libero_150", "libero_300", "libero_600", "libero_1000",
-  "catchup_pro", "catchup_50", "catchup_100", "catchup_250", "catchup_500",
-  "daily_goal_hit", "goal_days_15", "goal_days_30", "goal_days_75", "goal_days_150",
-  "sturmlauf", "combo_rounds_15", "combo_rounds_30", "combo_rounds_60", "combo_rounds_100",
-  "dribbelkoenig", "hintfree_15", "hintfree_30", "hintfree_60", "hintfree_100",
-  "aufholjagd", "hardcomeback_10", "hardcomeback_25", "hardcomeback_50", "hardcomeback_100",
-  "books_2", "bookworm", "polyglot", "books_all"
-];
+/* Alle Abzeichen werden aus gespeicherten Profilwerten geprüft (Zähler,
+   Serie, Punkte, Fächer ...) -- nur "Wiedereinstieg" hängt an einem
+   einmaligen Rundenereignis und lässt sich nicht nachträglich prüfen.
+   Läuft beim App-Start still, ohne Banner (siehe retrofitRetroactiveAchievements). */
+const RETROFIT_EXCLUDED_IDS = ["comeback_pause"];
 function retrofitRetroactiveAchievements(){
   let anyChanged = false;
   for(const prof of Object.values(state.profiles)){
     const unlocked = ensureAchievements(prof).unlocked;
-    // Derselbe sichere ctx-Builder wie redeemBonusCard() -- liefert streak
-    // UND levelInfo (plus neutrale Defaults für alles Rundenbezogene). Ein
-    // reines {streak:...} hier reichte nicht mehr aus, sobald level_3/15/20
-    // (die ctx.levelInfo.level brauchen) zur Liste hinzukamen -- siehe
-    // Hotfix-Kommentar in CLAUDE-Plan.
+    // neutraler ctx (siehe buildAchievementCtx) -- rundenbezogene Felder sind 0/false
     const ctx = buildAchievementCtx(prof, {});
-    for(const id of RETROFITTABLE_ACHIEVEMENT_IDS){
-      if(unlocked[id]) continue;
-      const def = ACHIEVEMENTS.find(a=>a.id===id);
-      if(def && def.check(prof, ctx)){
-        unlocked[id] = todayKey();
+    for(const def of ACHIEVEMENTS){
+      if(unlocked[def.id] || RETROFIT_EXCLUDED_IDS.includes(def.id)) continue;
+      if(def.check(prof, ctx)){
+        unlocked[def.id] = todayKey();
         anyChanged = true;
       }
     }
@@ -6377,7 +6363,7 @@ function computeLeagueScore(stats){
   // property stays untouched. Capped well below the base's own range so a
   // badge/record collector can't outrank genuine skill+consistency, only
   // meaningfully nudge the ranking.
-  const achievementsUnlocked = Object.keys((stats.achievements&&stats.achievements.unlocked)||{}).length;
+  const achievementsUnlocked = countUnlockedAchievements(stats.achievements && stats.achievements.unlocked);
   // 2 Punkte je Abzeichen, max. +100 -- fester Wert statt Anteil an ALLEN
   // Abzeichen, damit neue Abzeichen niemandem Tabellenpunkte wegnehmen
   const achievementBonus = Math.min(100, achievementsUnlocked * ACHIEVEMENT_LEAGUE_POINTS);
@@ -6537,7 +6523,7 @@ function doSyncProfileToLeaderboard(prof){
       roundsCompleted: prof.stats.roundsCompleted||0,
       bestFirstTryPct: (prof.stats.records&&prof.stats.records.bestFirstTryPct)||0,
       longestStreak: (prof.stats.streak&&prof.stats.streak.longest)||0,
-      achievementsUnlocked: Object.keys(ensureAchievements(prof).unlocked).length,
+      achievementsUnlocked: countUnlockedAchievements(ensureAchievements(prof).unlocked),
       distinctPageSetsCompleted: Object.keys(ensurePageSets(prof)).length,
       team: prof.team || null,
       appVersion: "1.0"
@@ -7265,6 +7251,58 @@ function redeemBonusCard(threshold){
    (progress bar, or "X Karte(n) verfügbar") that opens the dedicated
    screen-bonus-cards screen on click. The actual redeem UI and history
    live only there now, not expanded inline on the start screen. */
+/* Das am weitesten fortgeschrittene, noch nicht freigeschaltete Abzeichen --
+   je Familie nur die nächste offene Stufe, damit nicht eine höhere Stufe
+   "näher" wirkt als die, die tatsächlich als Nächstes dran ist. */
+function findNextBadge(prof){
+  const unlocked = ensureAchievements(prof).unlocked;
+  const candidates = [];
+  for(const fam of ACHIEVEMENT_FAMILIES){
+    const nextId = fam.tierIds.find(id=>!unlocked[id]);
+    if(nextId) candidates.push(ACHIEVEMENTS.find(a=>a.id===nextId));
+  }
+  for(const def of ACHIEVEMENTS){
+    if(!ACHIEVEMENT_FAMILY_LOOKUP[def.id] && !unlocked[def.id]) candidates.push(def);
+  }
+  let best = null;
+  for(const def of candidates){
+    if(!def || !def.progress) continue;
+    const pr = def.progress(prof);
+    if(!pr || !pr.target || pr.current>=pr.target) continue;
+    const pct = pr.current/pr.target;
+    if(!best || pct>best.pct) best = {def, pct, current:pr.current, target:pr.target};
+  }
+  return best;
+}
+
+function renderNextBadgeTile(prof){
+  const tile = document.getElementById("nextBadgeTile");
+  const next = prof && findNextBadge(prof);
+  if(!next){
+    tile.classList.remove("show");
+    return;
+  }
+  const {def, pct, current, target} = next;
+  tile.innerHTML = `
+    <span class="next-badge-icon"></span>
+    <div style="flex:1;min-width:0;">
+      <div class="stat-tile-head">Nächstes Abzeichen</div>
+      <div class="stat-tile-sub next-badge-title"></div>
+      <div class="stat-tile-bar-outer" style="margin-top:0.3rem;"><div class="stat-tile-bar-inner" style="width:${Math.round(pct*100)}%;background:var(--accent);"></div></div>
+    </div>
+  `;
+  tile.querySelector(".next-badge-icon").textContent = def.icon;
+  tile.querySelector(".next-badge-title").textContent = `${def.title}: ${def.desc} (noch ${target-current})`;
+  tile.classList.add("show");
+  tile.style.cursor = "pointer";
+  tile.onclick = ()=>{
+    state.backStackBeforeStats = "screen-start";
+    switchScreen("screen-stats");
+    renderStatsScreen();
+  };
+  makeTileAccessible(tile, `Nächstes Abzeichen: ${def.title}, Statistik öffnen`);
+}
+
 function renderBonusProgressTile(prof){
   const tile = document.getElementById("bonusProgressTile");
   if(!prof){
@@ -7714,6 +7752,22 @@ const FAST_ROUND_SEC_PER_WORD = 5;
 const FAST_ROUND_MIN_FIRST_TRY_PCT = 70;
 const STURMLAUF_COMBO = 15; // a round counts for "Sturmlauf" from this combo on
 
+// "Gedächtnis"-Familie: Wörter im höchsten Leitner-Fach, die es noch gibt
+function masteredWordsValue(p){
+  const schedule = p.stats.wordSchedule || {};
+  let n = 0;
+  for(const [key, entry] of Object.entries(schedule)){
+    if(entry && entry.box>=LEITNER_MAX_BOX && findVocabEntryByKey(key)) n++;
+  }
+  return n;
+}
+
+// Nur Abzeichen, die es (noch) gibt -- entfernte (z. B. die frühere
+// Punkte-Familie) bleiben gespeichert, zählen aber nirgends mehr mit
+function countUnlockedAchievements(unlocked){
+  return ACHIEVEMENTS.filter(a=>unlocked && unlocked[a.id]).length;
+}
+
 // "Libero"-Familie: richtig beantwortet in der SCHWÄCHEREN der beiden Richtungen
 function liberoValue(p){
   const d = p.stats.correctByDirection || {};
@@ -7722,58 +7776,51 @@ function liberoValue(p){
 }
 
 const ACHIEVEMENTS = [
-  {id:"first_round", icon:"🥇", title:"Newcomer", desc:"Deine ersten 5 Runden abgeschlossen",
+  {id:"first_round", icon:"🥇", title:"Newcomer", desc:"5 Runden abgeschlossen",
     check:(p,ctx)=>(p.stats.roundsCompleted||0)>=5,
     progress:p=>({current:(p.stats.roundsCompleted||0), target:5})},
-  {id:"correct_100", icon:"💯", title:"150 Richtige", desc:"150 richtige Antworten insgesamt",
+  {id:"correct_100", icon:"💯", title:"Torriecher", desc:"150 richtige Antworten insgesamt",
     check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=150,
     progress:p=>({current:(p.stats.totalCorrectAnswersEver||0), target:150})},
-  {id:"streak_7", icon:"🔥", title:"7-Tage-Serie", desc:"7 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=7,
-    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:7})},
-  {id:"streak_30", icon:"🌟", title:"30-Tage-Serie", desc:"30 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=30,
-    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:30})},
-  {id:"perfect_round", icon:"✨", title:"Perfekte Runde", desc:"5 perfekte Runden insgesamt",
-    // Gleiche Zählbasis wie "Mittelfeldstratege" (perfectRoundsCount), damit
-    // die Perfektion-Familie in sich konsistent ist -- siehe ACHIEVEMENT_FAMILIES.
-    // Bereits früher freigeschaltete Profile bleiben unangetastet (checkAchievements
-    // überspringt bereits freigeschaltete IDs, egal unter welcher alten Definition).
+  {id:"streak_7", icon:"🔥", title:"Wochenform", desc:"Eine Lernserie von 7 Tagen erreicht",
+    check:(p,ctx)=>((p.stats.streak&&p.stats.streak.longest)||0)>=7,
+    progress:p=>({current:((p.stats.streak&&p.stats.streak.longest)||0), target:7})},
+  {id:"streak_30", icon:"🌟", title:"Monatsform", desc:"Eine Lernserie von 30 Tagen erreicht",
+    check:(p,ctx)=>((p.stats.streak&&p.stats.streak.longest)||0)>=30,
+    progress:p=>({current:((p.stats.streak&&p.stats.streak.longest)||0), target:30})},
+  {id:"perfect_round", icon:"✅", title:"Abpfiff", desc:"5 Runden durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=5,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:5})},
-  {id:"level_5", icon:"🚀", title:"Level 7", desc:"Level 7 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=7,
-    progress:p=>({current:computeLevel(p.stats.totalPoints), target:7})},
-  {id:"level_10", icon:"🏆", title:"Level 10", desc:"Level 10 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=10,
+    progress:p=>({current:(p.stats.perfectRoundsCount||0), target:5})},
+  {id:"level_5", icon:"🚀", title:"Aufsteiger", desc:"Level 10 erreicht",
+    check:(p,ctx)=>computeLevel(p.stats.totalPoints)>=10,
     progress:p=>({current:computeLevel(p.stats.totalPoints), target:10})},
+  {id:"level_10", icon:"🏆", title:"Nationalspieler", desc:"Level 15 erreicht",
+    check:(p,ctx)=>computeLevel(p.stats.totalPoints)>=15,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:15})},
   {id:"fast_round", icon:"⚡", title:"Blitzschnell", desc:"Eine Runde schnell UND richtig geschafft",
     check:(p,ctx)=>(p.stats.fastRoundsCount||0)>=1,
     progress:p=>({current:(p.stats.fastRoundsCount||0), target:1})},
   {id:"comeback_word", icon:"💪", title:"Comeback", desc:"Ein schwieriges Wort (3+ Fehler) endlich auf Anhieb gemeistert",
     check:(p,ctx)=>(p.stats.comebackWordsCount||0)>=1,
     progress:p=>({current:(p.stats.comebackWordsCount||0), target:1})},
-  {id:"daily_goal_hit", icon:"🎯", title:"Startelf Spieler", desc:"Das Tagesziel an 5 verschiedenen Tagen erreicht",
+  {id:"daily_goal_hit", icon:"📋", title:"Startelf-Spieler", desc:"Das Tagesziel an 5 verschiedenen Tagen erreicht",
     check:(p,ctx)=>(p.stats.dailyGoalDaysCount||0)>=5,
     progress:p=>({current:(p.stats.dailyGoalDaysCount||0), target:5})},
-  {id:"streak_100", icon:"🌙", title:"Torschützenkönig", desc:"100 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=100,
-    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:100})},
-  {id:"marathon", icon:"🏔️", title:"Laufwunder", desc:"Eine einzelne Runde mit 50+ Wörtern abgeschlossen",
-    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=50,
-    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:50})},
-  {id:"millionaire", icon:"💰", title:"Punktemillionär", desc:"5.000 Gesamtpunkte erreicht",
-    check:(p,ctx)=>(p.stats.totalPoints||0)>=5000,
-    progress:p=>({current:(p.stats.totalPoints||0), target:5000})},
-  {id:"perfectionist", icon:"👑", title:"Mittelfeldstratege", desc:"25 perfekte Runden insgesamt",
+  {id:"streak_100", icon:"💪", title:"Formstark", desc:"Eine Lernserie von 60 Tagen erreicht",
+    check:(p,ctx)=>((p.stats.streak&&p.stats.streak.longest)||0)>=60,
+    progress:p=>({current:((p.stats.streak&&p.stats.streak.longest)||0), target:60})},
+  {id:"marathon", icon:"🏔️", title:"Laufwunder", desc:"Eine Runde mit 60 oder mehr Wörtern abgeschlossen",
+    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=60,
+    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:60})},
+  {id:"perfectionist", icon:"📏", title:"Volle Distanz", desc:"25 Runden durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=25,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:25})},
-  {id:"hattrick", icon:"🎩", title:"Hattrick", desc:"8 perfekte Runden direkt hintereinander",
+    progress:p=>({current:(p.stats.perfectRoundsCount||0), target:25})},
+  {id:"hattrick", icon:"🫁", title:"Ohne Auswechslung", desc:"8 Runden in Folge durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=8,
-    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:8})},
-  {id:"full_book_mastery", icon:"🧠", title:"Stammspieler", desc:"Jedes Wort eines Buches wirklich auswendig gelernt",
+    progress:p=>({current:(p.stats.consecutivePerfectRounds||0), target:8})},
+  {id:"full_book_mastery", icon:"🏆", title:"Meisterschale", desc:"Jedes Wort eines Buches sicher gelernt (Fach 6)",
     check:(p,ctx)=>Object.keys({...BOOKS, ...customBooks}).some(bk=>isBookFullyMastered(p, bk))},
-  {id:"globetrotter", icon:"🌍", title:"Weltenbummler", desc:"10 verschiedene Seiten fehlerfrei gelernt",
+  {id:"globetrotter", icon:"🔀", title:"Seitenwechsel", desc:"10 verschiedene Seiten-Auswahlen komplett durchgespielt",
     check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=10,
     progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:10})},
   {id:"bookworm", icon:"📚", title:"G.O.A.T.", desc:"In 3 verschiedenen Büchern gespielt",
@@ -7789,39 +7836,40 @@ const ACHIEVEMENTS = [
       const done = langs.filter(l=>p.stats.languagesPlayed && p.stats.languagesPlayed[l]).length;
       return {current:done, target:langs.length||1};
     }},
-  {id:"catchup_pro", icon:"🔁", title:"Nachholspiel", desc:"20 schwierige Wörter beim Üben später doch noch richtig hinbekommen",
+  {id:"catchup_pro", icon:"🔁", title:"Nachholspiel", desc:"20 schwierige Wörter später doch noch richtig hinbekommen",
     check:(p,ctx)=>(p.stats.catchUpWordsCount||0)>=20,
     progress:p=>({current:(p.stats.catchUpWordsCount||0), target:20})},
-  {id:"comeback_pause", icon:"🌅", title:"Wiedereinstieg", desc:"Nach mindestens 7 Tagen Pause wieder gelernt",
+  {id:"comeback_pause", icon:"🔆", title:"Wiedereinstieg", desc:"Nach mindestens 7 Tagen Pause wieder gelernt",
     check:(p,ctx)=>ctx.gapDaysSinceLastActive!=null && ctx.gapDaysSinceLastActive>=7},
   {id:"teamplayer", icon:"🤝", title:"Teamplayer", desc:"Einem Team beigetreten",
     check:(p,ctx)=>!!p.team},
-  {id:"ballon_dor", icon:"🏅", title:"Ballon D'or", desc:"Jedes Wort in allen Büchern einer Sprache wirklich auswendig gelernt",
+  {id:"ballon_dor", icon:"🏅", title:"Ballon d'Or", desc:"Jedes Wort in allen Büchern einer Sprache sicher gelernt (Fach 6)",
     check:(p,ctx)=>getAvailableLanguages().some(l=>isLanguageFullyMastered(p, l))},
-  {id:"dribbelkoenig", icon:"🎯", title:"Dribbelkönig", desc:"5 komplette Runden ohne Tipp oder \"Lösung zeigen\" gelöst",
+  {id:"dribbelkoenig", icon:"🌀", title:"Dribbelkönig", desc:"5 Runden ohne Tipp und ohne „Lösung zeigen“ geschafft",
     check:(p,ctx)=>(p.stats.hintFreeRoundsCount||0)>=5,
     progress:p=>({current:(p.stats.hintFreeRoundsCount||0), target:5})},
-  {id:"weisse_weste", icon:"🧤", title:"Weiße Weste", desc:"12 perfekte Runden direkt hintereinander",
+  {id:"weisse_weste", icon:"🐎", title:"Pferdelunge", desc:"12 Runden in Folge durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=12,
-    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:12})},
-  {id:"elfmeterkoenig", icon:"🥅", title:"Elfmeterkönig", desc:"Die erste Bonuskarte eingelöst",
-    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=1},
-  {id:"pokaljaeger", icon:"🏆", title:"Pokaljäger", desc:"5 Bonuskarten insgesamt eingelöst",
-    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=5,
-    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:5})},
+    progress:p=>({current:(p.stats.consecutivePerfectRounds||0), target:12})},
+  {id:"elfmeterkoenig", icon:"🥅", title:"Elfmeterkönig", desc:"Die erste Bonuskarte verdient (3 Tage Lernserie)",
+    check:(p,ctx)=>Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL)>=1,
+    progress:p=>({current:Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL), target:1})},
+  {id:"pokaljaeger", icon:"🎫", title:"Pokaljäger", desc:"3 Bonuskarten verdient (je 3 Tage Lernserie)",
+    check:(p,ctx)=>Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL)>=3,
+    progress:p=>({current:Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL), target:3})},
   {id:"flutlichtspiel", icon:"🌃", title:"Flutlichtspiel", desc:"5 Runden nach 21 Uhr abends abgeschlossen",
     check:(p,ctx)=>(p.stats.nightRoundsCount||0)>=5,
     progress:p=>({current:p.stats.nightRoundsCount||0, target:5})},
-  {id:"libero", icon:"🔄", title:"Libero", desc:"In beiden Richtungen (Deutsch→Fremdsprache und umgekehrt) je mindestens 50 Wörter richtig beantwortet",
+  {id:"libero", icon:"🔄", title:"Libero", desc:"In beiden Richtungen je 50 Wörter richtig beantwortet",
     check:(p,ctx)=>liberoValue(p)>=50,
     progress:p=>({current:liberoValue(p), target:50})},
-  {id:"sturmlauf", icon:"⚡", title:"Sturmlauf", desc:"In 5 Runden jeweils mindestens 15 Antworten in Folge richtig (Combo)",
+  {id:"sturmlauf", icon:"🌪️", title:"Sturmlauf", desc:"In 5 Runden eine 15er-Combo geschafft",
     check:(p,ctx)=>(p.stats.comboRoundsCount||0)>=5,
     progress:p=>({current:(p.stats.comboRoundsCount||0), target:5})},
-  {id:"graetsche", icon:"🛡️", title:"Grätsche", desc:"10-mal einen Nachbartasten-Tippfehler selbst erfolgreich korrigiert",
-    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=10,
-    progress:p=>({current:p.stats.typoCorrectedCount||0, target:10})},
-  {id:"aufholjagd", icon:"📈", title:"Aufholjagd", desc:"5 Runden mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+  {id:"graetsche", icon:"🛡️", title:"Grätsche", desc:"5 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=5,
+    progress:p=>({current:(p.stats.typoCorrectedCount||0), target:5})},
+  {id:"aufholjagd", icon:"📈", title:"Aufholjagd", desc:"5 Runden trotz mindestens 3 Fehlversuchen komplett durchgespielt",
     check:(p,ctx)=>(p.stats.hardComebackRoundsCount||0)>=5,
     progress:p=>({current:(p.stats.hardComebackRoundsCount||0), target:5})},
   {id:"wochenendprofi", icon:"📅", title:"Wochenendprofi", desc:"An Samstag UND Sonntag desselben Wochenendes gelernt",
@@ -7830,66 +7878,66 @@ const ACHIEVEMENTS = [
   // --- 20 neue Stufen für die Abzeichen-Familien (ACHIEVEMENT_FAMILIES
   // unten) -- alle nutzen bereits bestehende Statistiken, keine davon
   // braucht einen neuen Zähler. ---
-  {id:"streak_150", icon:"🏟️", title:"Dauerkarte", desc:"150 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=150,
-    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:150})},
-  {id:"streak_200", icon:"🐐", title:"Vereinsikone", desc:"200 Tage in Folge gelernt",
-    check:(p,ctx)=>ctx.streak.longest>=200,
-    progress:p=>({current:(p.stats.streak&&p.stats.streak.longest)||0, target:200})},
-  {id:"perfect_streak_2", icon:"🤝", title:"Anstoß", desc:"5 perfekte Runden direkt hintereinander",
+  {id:"streak_150", icon:"🎟️", title:"Dauerkarte", desc:"Eine Lernserie von 100 Tagen erreicht",
+    check:(p,ctx)=>((p.stats.streak&&p.stats.streak.longest)||0)>=100,
+    progress:p=>({current:((p.stats.streak&&p.stats.streak.longest)||0), target:100})},
+  {id:"streak_200", icon:"🐐", title:"Vereinsikone", desc:"Eine Lernserie von 200 Tagen erreicht",
+    check:(p,ctx)=>((p.stats.streak&&p.stats.streak.longest)||0)>=200,
+    progress:p=>({current:((p.stats.streak&&p.stats.streak.longest)||0), target:200})},
+  {id:"perfect_streak_2", icon:"🔋", title:"Durchspieler", desc:"5 Runden in Folge durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=5,
-    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:5})},
-  {id:"perfect_streak_10", icon:"🥇", title:"Galaform", desc:"20 perfekte Runden direkt hintereinander",
+    progress:p=>({current:(p.stats.consecutivePerfectRounds||0), target:5})},
+  {id:"perfect_streak_10", icon:"⚙️", title:"Unermüdlich", desc:"20 Runden in Folge durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=20,
-    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:20})},
-  {id:"perfect_streak_20", icon:"🐉", title:"Unaufhaltbar", desc:"30 perfekte Runden direkt hintereinander",
+    progress:p=>({current:(p.stats.consecutivePerfectRounds||0), target:20})},
+  {id:"perfect_streak_20", icon:"🐉", title:"Unaufhaltbar", desc:"30 Runden in Folge durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.consecutivePerfectRounds||0)>=30,
-    progress:p=>({current:p.stats.consecutivePerfectRounds||0, target:30})},
+    progress:p=>({current:(p.stats.consecutivePerfectRounds||0), target:30})},
   {id:"level_3", icon:"🌱", title:"Talent", desc:"Level 5 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=5,
+    check:(p,ctx)=>computeLevel(p.stats.totalPoints)>=5,
     progress:p=>({current:computeLevel(p.stats.totalPoints), target:5})},
-  {id:"level_15", icon:"⭐", title:"Weltklasse", desc:"Level 15 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=15,
-    progress:p=>({current:computeLevel(p.stats.totalPoints), target:15})},
-  {id:"level_20", icon:"👑", title:"Legendenstatus", desc:"Level 20 erreicht",
-    check:(p,ctx)=>ctx.levelInfo.level>=20,
+  {id:"level_15", icon:"⭐", title:"Weltklasse", desc:"Level 20 erreicht",
+    check:(p,ctx)=>computeLevel(p.stats.totalPoints)>=20,
     progress:p=>({current:computeLevel(p.stats.totalPoints), target:20})},
-  {id:"bonus_10", icon:"🎖️", title:"Vereinslegende", desc:"10 Bonuskarten insgesamt eingelöst",
-    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=10,
-    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:10})},
-  {id:"bonus_20", icon:"📿", title:"Rekordhalter", desc:"20 Bonuskarten insgesamt eingelöst",
-    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=20,
-    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:20})},
-  {id:"bonus_50", icon:"🏛️", title:"Hall of Fame", desc:"50 Bonuskarten insgesamt eingelöst",
-    check:(p,ctx)=>(p.stats.bonusCardsRedeemedCount||0)>=50,
-    progress:p=>({current:p.stats.bonusCardsRedeemedCount||0, target:50})},
-  {id:"pages_3", icon:"🧢", title:"Startaufstellung", desc:"5 verschiedene Seiten fehlerfrei gelernt",
+  {id:"level_20", icon:"👑", title:"Legendenstatus", desc:"Level 30 erreicht",
+    check:(p,ctx)=>computeLevel(p.stats.totalPoints)>=30,
+    progress:p=>({current:computeLevel(p.stats.totalPoints), target:30})},
+  {id:"bonus_10", icon:"🎖️", title:"Pokalheld", desc:"5 Bonuskarten verdient (je 3 Tage Lernserie)",
+    check:(p,ctx)=>Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL)>=5,
+    progress:p=>({current:Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL), target:5})},
+  {id:"bonus_20", icon:"🏵️", title:"Rekordhalter", desc:"10 Bonuskarten verdient (je 3 Tage Lernserie)",
+    check:(p,ctx)=>Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL)>=10,
+    progress:p=>({current:Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL), target:10})},
+  {id:"bonus_50", icon:"🏛️", title:"Hall of Fame", desc:"20 Bonuskarten verdient (je 3 Tage Lernserie)",
+    check:(p,ctx)=>Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL)>=20,
+    progress:p=>({current:Math.floor(((p.stats.streak&&p.stats.streak.longest)||0)/BONUS_CARD_INTERVAL), target:20})},
+  {id:"pages_3", icon:"🧢", title:"Startaufstellung", desc:"5 verschiedene Seiten-Auswahlen komplett durchgespielt",
     check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=5,
     progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:5})},
-  {id:"pages_25", icon:"🧩", title:"Einsatzzeiten König", desc:"25 verschiedene Seiten fehlerfrei gelernt",
+  {id:"pages_25", icon:"⏱️", title:"Einsatzzeiten-König", desc:"25 verschiedene Seiten-Auswahlen komplett durchgespielt",
     check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=25,
     progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:25})},
   {id:"typo_3", icon:"🩹", title:"Erste Hilfe", desc:"3 Nachbartasten-Tippfehler selbst korrigiert",
     check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=3,
-    progress:p=>({current:p.stats.typoCorrectedCount||0, target:3})},
-  {id:"typo_25", icon:"🧱", title:"Abwehrchef", desc:"25 Nachbartasten-Tippfehler selbst korrigiert",
+    progress:p=>({current:(p.stats.typoCorrectedCount||0), target:3})},
+  {id:"typo_25", icon:"🧱", title:"Abwehrchef", desc:"10 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=10,
+    progress:p=>({current:(p.stats.typoCorrectedCount||0), target:10})},
+  {id:"typo_50", icon:"🏰", title:"Abräumer", desc:"15 Nachbartasten-Tippfehler selbst korrigiert",
+    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=15,
+    progress:p=>({current:(p.stats.typoCorrectedCount||0), target:15})},
+  {id:"typo_100", icon:"🦾", title:"Abwehrhüne", desc:"25 Nachbartasten-Tippfehler selbst korrigiert",
     check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=25,
-    progress:p=>({current:p.stats.typoCorrectedCount||0, target:25})},
-  {id:"typo_50", icon:"🏰", title:"Abräumer", desc:"50 Nachbartasten-Tippfehler selbst korrigiert",
-    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=50,
-    progress:p=>({current:p.stats.typoCorrectedCount||0, target:50})},
-  {id:"typo_100", icon:"🦾", title:"Abwehrhühne", desc:"100 Nachbartasten-Tippfehler selbst korrigiert",
-    check:(p,ctx)=>(p.stats.typoCorrectedCount||0)>=100,
-    progress:p=>({current:p.stats.typoCorrectedCount||0, target:100})},
-  {id:"perfect_5", icon:"🎯", title:"Das weiße Ballett", desc:"10 perfekte Runden insgesamt",
+    progress:p=>({current:(p.stats.typoCorrectedCount||0), target:25})},
+  {id:"perfect_5", icon:"🕘", title:"90 Minuten", desc:"10 Runden durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=10,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:10})},
-  {id:"perfect_25", icon:"🧭", title:"Spielmacher", desc:"50 perfekte Runden insgesamt",
+    progress:p=>({current:(p.stats.perfectRoundsCount||0), target:10})},
+  {id:"perfect_25", icon:"🧠", title:"Mentalitätsmonster", desc:"50 Runden durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=50,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:50})},
-  {id:"perfect_50", icon:"🌟", title:"Weltfußballer", desc:"100 perfekte Runden insgesamt",
+    progress:p=>({current:(p.stats.perfectRoundsCount||0), target:50})},
+  {id:"perfect_50", icon:"🦿", title:"Iron Man", desc:"100 Runden durchgespielt – nichts übersprungen oder aufgedeckt",
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=100,
-    progress:p=>({current:p.stats.perfectRoundsCount||0, target:100})},
+    progress:p=>({current:(p.stats.perfectRoundsCount||0), target:100})},
   // "Doublesieger"-Familie: erledigte Wiederholungsrunden (Kachel "heute fällig")
   {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Wiederholungsrunden abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=5,
@@ -7928,31 +7976,19 @@ const ACHIEVEMENTS = [
   {id:"correct_2500", icon:"🎯", title:"Goalgetter", desc:"2.500 richtige Antworten insgesamt",
     check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=2500,
     progress:p=>({current:(p.stats.totalCorrectAnswersEver||0), target:2500})},
-  {id:"correct_5000", icon:"🏭", title:"Torfabrik", desc:"5.000 richtige Antworten insgesamt",
+  {id:"correct_5000", icon:"👑", title:"Torschützenkönig", desc:"5.000 richtige Antworten insgesamt",
     check:(p,ctx)=>(p.stats.totalCorrectAnswersEver||0)>=5000,
     progress:p=>({current:(p.stats.totalCorrectAnswersEver||0), target:5000})},
-  {id:"points_15000", icon:"💵", title:"Großverdiener", desc:"15.000 Gesamtpunkte erreicht",
-    check:(p,ctx)=>(p.stats.totalPoints||0)>=15000,
-    progress:p=>({current:(p.stats.totalPoints||0), target:15000})},
-  {id:"points_30000", icon:"🏦", title:"Schatzmeister", desc:"30.000 Gesamtpunkte erreicht",
-    check:(p,ctx)=>(p.stats.totalPoints||0)>=30000,
-    progress:p=>({current:(p.stats.totalPoints||0), target:30000})},
-  {id:"points_60000", icon:"💎", title:"Krösus", desc:"60.000 Gesamtpunkte erreicht",
-    check:(p,ctx)=>(p.stats.totalPoints||0)>=60000,
-    progress:p=>({current:(p.stats.totalPoints||0), target:60000})},
-  {id:"points_100000", icon:"🤑", title:"Fußball-Milliardär", desc:"100.000 Gesamtpunkte erreicht",
-    check:(p,ctx)=>(p.stats.totalPoints||0)>=100000,
-    progress:p=>({current:(p.stats.totalPoints||0), target:100000})},
   {id:"libero_150", icon:"↔️", title:"Allrounder", desc:"In beiden Richtungen je 150 Wörter richtig beantwortet",
     check:(p,ctx)=>liberoValue(p)>=150,
     progress:p=>({current:liberoValue(p), target:150})},
-  {id:"libero_300", icon:"🎼", title:"Taktgeber", desc:"In beiden Richtungen je 300 Wörter richtig beantwortet",
+  {id:"libero_300", icon:"🧭", title:"Spielgestalter", desc:"In beiden Richtungen je 300 Wörter richtig beantwortet",
     check:(p,ctx)=>liberoValue(p)>=300,
     progress:p=>({current:liberoValue(p), target:300})},
-  {id:"libero_600", icon:"🎬", title:"Regisseur", desc:"In beiden Richtungen je 600 Wörter richtig beantwortet",
+  {id:"libero_600", icon:"🕹️", title:"Strippenzieher", desc:"In beiden Richtungen je 600 Wörter richtig beantwortet",
     check:(p,ctx)=>liberoValue(p)>=600,
     progress:p=>({current:liberoValue(p), target:600})},
-  {id:"libero_1000", icon:"🌐", title:"Weltklasse-Libero", desc:"In beiden Richtungen je 1.000 Wörter richtig beantwortet",
+  {id:"libero_1000", icon:"🌐", title:"Libero-Legende", desc:"In beiden Richtungen je 1.000 Wörter richtig beantwortet",
     check:(p,ctx)=>liberoValue(p)>=1000,
     progress:p=>({current:liberoValue(p), target:1000})},
   {id:"catchup_50", icon:"🏆", title:"Pokalfight", desc:"50 schwierige Wörter später doch noch richtig hinbekommen",
@@ -7970,91 +8006,91 @@ const ACHIEVEMENTS = [
   {id:"goal_days_15", icon:"💪", title:"Leistungsträger", desc:"Das Tagesziel an 15 verschiedenen Tagen erreicht",
     check:(p,ctx)=>(p.stats.dailyGoalDaysCount||0)>=15,
     progress:p=>({current:(p.stats.dailyGoalDaysCount||0), target:15})},
-  {id:"goal_days_30", icon:"🌟", title:"Stammspieler-Plus", desc:"Das Tagesziel an 30 verschiedenen Tagen erreicht",
+  {id:"goal_days_30", icon:"🌟", title:"Führungsspieler", desc:"Das Tagesziel an 30 verschiedenen Tagen erreicht",
     check:(p,ctx)=>(p.stats.dailyGoalDaysCount||0)>=30,
     progress:p=>({current:(p.stats.dailyGoalDaysCount||0), target:30})},
-  {id:"goal_days_75", icon:"©️", title:"Kapitän", desc:"Das Tagesziel an 75 verschiedenen Tagen erreicht",
+  {id:"goal_days_75", icon:"🫡", title:"Kapitän", desc:"Das Tagesziel an 75 verschiedenen Tagen erreicht",
     check:(p,ctx)=>(p.stats.dailyGoalDaysCount||0)>=75,
     progress:p=>({current:(p.stats.dailyGoalDaysCount||0), target:75})},
   {id:"goal_days_150", icon:"🏛️", title:"Vereinslegende", desc:"Das Tagesziel an 150 verschiedenen Tagen erreicht",
     check:(p,ctx)=>(p.stats.dailyGoalDaysCount||0)>=150,
     progress:p=>({current:(p.stats.dailyGoalDaysCount||0), target:150})},
-  {id:"combo_rounds_15", icon:"🏃", title:"Flügelflitzer", desc:"In 15 Runden jeweils eine 15er-Combo geschafft",
+  {id:"combo_rounds_15", icon:"🪽", title:"Flügelflitzer", desc:"In 15 Runden eine 15er-Combo geschafft",
     check:(p,ctx)=>(p.stats.comboRoundsCount||0)>=15,
     progress:p=>({current:(p.stats.comboRoundsCount||0), target:15})},
-  {id:"combo_rounds_30", icon:"↩️", title:"Konterkönig", desc:"In 30 Runden jeweils eine 15er-Combo geschafft",
+  {id:"combo_rounds_30", icon:"↩️", title:"Konterkönig", desc:"In 30 Runden eine 15er-Combo geschafft",
     check:(p,ctx)=>(p.stats.comboRoundsCount||0)>=30,
     progress:p=>({current:(p.stats.comboRoundsCount||0), target:30})},
-  {id:"combo_rounds_60", icon:"🌪️", title:"Offensivwirbel", desc:"In 60 Runden jeweils eine 15er-Combo geschafft",
+  {id:"combo_rounds_60", icon:"💨", title:"Offensivwirbel", desc:"In 60 Runden eine 15er-Combo geschafft",
     check:(p,ctx)=>(p.stats.comboRoundsCount||0)>=60,
     progress:p=>({current:(p.stats.comboRoundsCount||0), target:60})},
-  {id:"combo_rounds_100", icon:"⚡", title:"Sturmlegende", desc:"In 100 Runden jeweils eine 15er-Combo geschafft",
+  {id:"combo_rounds_100", icon:"🌋", title:"Sturmlegende", desc:"In 100 Runden eine 15er-Combo geschafft",
     check:(p,ctx)=>(p.stats.comboRoundsCount||0)>=100,
     progress:p=>({current:(p.stats.comboRoundsCount||0), target:100})},
-  {id:"hintfree_15", icon:"🪄", title:"Ballzauberer", desc:"15 komplette Runden ohne Tipp oder \"Lösung zeigen\" gelöst",
+  {id:"hintfree_15", icon:"🪄", title:"Ballzauberer", desc:"15 Runden ohne Tipp und ohne „Lösung zeigen“ geschafft",
     check:(p,ctx)=>(p.stats.hintFreeRoundsCount||0)>=15,
     progress:p=>({current:(p.stats.hintFreeRoundsCount||0), target:15})},
-  {id:"hintfree_30", icon:"🎩", title:"Trickser", desc:"30 komplette Runden ohne Tipp oder \"Lösung zeigen\" gelöst",
+  {id:"hintfree_30", icon:"🃏", title:"Trickser", desc:"30 Runden ohne Tipp und ohne „Lösung zeigen“ geschafft",
     check:(p,ctx)=>(p.stats.hintFreeRoundsCount||0)>=30,
     progress:p=>({current:(p.stats.hintFreeRoundsCount||0), target:30})},
-  {id:"hintfree_60", icon:"🧵", title:"Filigrantechniker", desc:"60 komplette Runden ohne Tipp oder \"Lösung zeigen\" gelöst",
+  {id:"hintfree_60", icon:"🧵", title:"Filigrantechniker", desc:"60 Runden ohne Tipp und ohne „Lösung zeigen“ geschafft",
     check:(p,ctx)=>(p.stats.hintFreeRoundsCount||0)>=60,
     progress:p=>({current:(p.stats.hintFreeRoundsCount||0), target:60})},
-  {id:"hintfree_100", icon:"🏙️", title:"Straßenfußballer", desc:"100 komplette Runden ohne Tipp oder \"Lösung zeigen\" gelöst",
+  {id:"hintfree_100", icon:"🏙️", title:"Straßenfußballer", desc:"100 Runden ohne Tipp und ohne „Lösung zeigen“ geschafft",
     check:(p,ctx)=>(p.stats.hintFreeRoundsCount||0)>=100,
     progress:p=>({current:(p.stats.hintFreeRoundsCount||0), target:100})},
-  {id:"hardcomeback_10", icon:"🔥", title:"Kampfgeist", desc:"10 Runden mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+  {id:"hardcomeback_10", icon:"😤", title:"Kampfgeist", desc:"10 Runden trotz mindestens 3 Fehlversuchen komplett durchgespielt",
     check:(p,ctx)=>(p.stats.hardComebackRoundsCount||0)>=10,
     progress:p=>({current:(p.stats.hardComebackRoundsCount||0), target:10})},
-  {id:"hardcomeback_25", icon:"🧒", title:"Comeback-Kids", desc:"25 Runden mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+  {id:"hardcomeback_25", icon:"🧒", title:"Comeback-Kids", desc:"25 Runden trotz mindestens 3 Fehlversuchen komplett durchgespielt",
     check:(p,ctx)=>(p.stats.hardComebackRoundsCount||0)>=25,
     progress:p=>({current:(p.stats.hardComebackRoundsCount||0), target:25})},
-  {id:"hardcomeback_50", icon:"🌧️", title:"Wunder von Bern", desc:"50 Runden mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+  {id:"hardcomeback_50", icon:"🌧️", title:"Wunder von Bern", desc:"50 Runden trotz mindestens 3 Fehlversuchen komplett durchgespielt",
     check:(p,ctx)=>(p.stats.hardComebackRoundsCount||0)>=50,
     progress:p=>({current:(p.stats.hardComebackRoundsCount||0), target:50})},
-  {id:"hardcomeback_100", icon:"🦾", title:"Unkaputtbar", desc:"100 Runden mit mindestens 3 Fehlversuchen trotzdem komplett gemeistert",
+  {id:"hardcomeback_100", icon:"🦾", title:"Unkaputtbar", desc:"100 Runden trotz mindestens 3 Fehlversuchen komplett durchgespielt",
     check:(p,ctx)=>(p.stats.hardComebackRoundsCount||0)>=100,
     progress:p=>({current:(p.stats.hardComebackRoundsCount||0), target:100})},
   {id:"fast_5", icon:"🏃", title:"Sprinter", desc:"5 Runden schnell UND richtig geschafft",
     check:(p,ctx)=>(p.stats.fastRoundsCount||0)>=5,
     progress:p=>({current:(p.stats.fastRoundsCount||0), target:5})},
-  {id:"fast_15", icon:"🏎️", title:"Turbo", desc:"15 Runden schnell UND richtig geschafft",
+  {id:"fast_15", icon:"🎽", title:"Tempomacher", desc:"15 Runden schnell UND richtig geschafft",
     check:(p,ctx)=>(p.stats.fastRoundsCount||0)>=15,
     progress:p=>({current:(p.stats.fastRoundsCount||0), target:15})},
-  {id:"fast_30", icon:"🚀", title:"Rakete", desc:"30 Runden schnell UND richtig geschafft",
+  {id:"fast_30", icon:"🚀", title:"Flügelrakete", desc:"30 Runden schnell UND richtig geschafft",
     check:(p,ctx)=>(p.stats.fastRoundsCount||0)>=30,
     progress:p=>({current:(p.stats.fastRoundsCount||0), target:30})},
-  {id:"fast_60", icon:"💫", title:"Lichtgeschwindigkeit", desc:"60 Runden schnell UND richtig geschafft",
+  {id:"fast_60", icon:"💫", title:"Tempo-Legende", desc:"60 Runden schnell UND richtig geschafft",
     check:(p,ctx)=>(p.stats.fastRoundsCount||0)>=60,
     progress:p=>({current:(p.stats.fastRoundsCount||0), target:60})},
-  {id:"words_75", icon:"🏃", title:"Dauerläufer", desc:"Eine einzelne Runde mit 75+ Wörtern abgeschlossen",
-    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=75,
-    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:75})},
-  {id:"words_100", icon:"🫁", title:"Ausdauerwunder", desc:"Eine einzelne Runde mit 100+ Wörtern abgeschlossen",
+  {id:"words_75", icon:"🥾", title:"Dauerläufer", desc:"Eine Runde mit 70 oder mehr Wörtern abgeschlossen",
+    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=70,
+    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:70})},
+  {id:"words_100", icon:"🫁", title:"Ausdauerwunder", desc:"Eine Runde mit 80 oder mehr Wörtern abgeschlossen",
+    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=80,
+    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:80})},
+  {id:"words_150", icon:"🧗", title:"Marathonmann", desc:"Eine Runde mit 90 oder mehr Wörtern abgeschlossen",
+    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=90,
+    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:90})},
+  {id:"words_200", icon:"🦵", title:"Ultraläufer", desc:"Eine Runde mit 100 oder mehr Wörtern abgeschlossen",
     check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=100,
     progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:100})},
-  {id:"words_150", icon:"🏅", title:"Marathonmann", desc:"Eine einzelne Runde mit 150+ Wörtern abgeschlossen",
-    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=150,
-    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:150})},
-  {id:"words_200", icon:"🦵", title:"Ultraläufer", desc:"Eine einzelne Runde mit 200+ Wörtern abgeschlossen",
-    check:(p,ctx)=>((p.stats.records&&p.stats.records.mostWordsInRound)||0)>=200,
-    progress:p=>({current:((p.stats.records&&p.stats.records.mostWordsInRound)||0), target:200})},
   {id:"comeback_5", icon:"🧸", title:"Stehaufmännchen", desc:"5 schwierige Wörter endlich auf Anhieb gemeistert",
     check:(p,ctx)=>(p.stats.comebackWordsCount||0)>=5,
     progress:p=>({current:(p.stats.comebackWordsCount||0), target:5})},
-  {id:"comeback_15", icon:"🐦‍🔥", title:"Phönix", desc:"15 schwierige Wörter endlich auf Anhieb gemeistert",
+  {id:"comeback_15", icon:"🦅", title:"Phönix", desc:"15 schwierige Wörter endlich auf Anhieb gemeistert",
     check:(p,ctx)=>(p.stats.comebackWordsCount||0)>=15,
     progress:p=>({current:(p.stats.comebackWordsCount||0), target:15})},
   {id:"comeback_30", icon:"🔙", title:"Rückkehrer", desc:"30 schwierige Wörter endlich auf Anhieb gemeistert",
     check:(p,ctx)=>(p.stats.comebackWordsCount||0)>=30,
     progress:p=>({current:(p.stats.comebackWordsCount||0), target:30})},
-  {id:"comeback_60", icon:"👑", title:"Comeback-König", desc:"60 schwierige Wörter endlich auf Anhieb gemeistert",
+  {id:"comeback_60", icon:"🤴", title:"Comeback-König", desc:"60 schwierige Wörter endlich auf Anhieb gemeistert",
     check:(p,ctx)=>(p.stats.comebackWordsCount||0)>=60,
     progress:p=>({current:(p.stats.comebackWordsCount||0), target:60})},
   {id:"weekends_5", icon:"🏟️", title:"Bundesliga-Samstag", desc:"An 5 Wochenenden Samstag UND Sonntag gelernt",
     check:(p,ctx)=>(p.stats.weekendsCount||0)>=5,
     progress:p=>({current:(p.stats.weekendsCount||0), target:5})},
-  {id:"weekends_10", icon:"⚽", title:"Sonntagsschuss", desc:"An 10 Wochenenden Samstag UND Sonntag gelernt",
+  {id:"weekends_10", icon:"🌤️", title:"Sonntagsschuss", desc:"An 10 Wochenenden Samstag UND Sonntag gelernt",
     check:(p,ctx)=>(p.stats.weekendsCount||0)>=10,
     progress:p=>({current:(p.stats.weekendsCount||0), target:10})},
   {id:"weekends_25", icon:"🦸", title:"Wochenend-Held", desc:"An 25 Wochenenden Samstag UND Sonntag gelernt",
@@ -8083,7 +8119,58 @@ const ACHIEVEMENTS = [
     progress:p=>({current:Object.keys(p.stats.booksPlayed||{}).length, target:2})},
   {id:"books_all", icon:"✈️", title:"Weltreisender", desc:"In jedem eingebauten Buch mindestens eine Runde gespielt",
     check:(p,ctx)=>Object.keys(BOOKS).every(k=>p.stats.booksPlayed && p.stats.booksPlayed[k]),
-    progress:p=>({current:Object.keys(BOOKS).filter(k=>p.stats.booksPlayed && p.stats.booksPlayed[k]).length, target:Object.keys(BOOKS).length})}
+    progress:p=>({current:Object.keys(BOOKS).filter(k=>p.stats.booksPlayed && p.stats.booksPlayed[k]).length, target:Object.keys(BOOKS).length})},
+  {id:"pages_50", icon:"📒", title:"Saisonbilanz", desc:"50 verschiedene Seiten-Auswahlen komplett durchgespielt",
+    check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=50,
+    progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:50})},
+  {id:"pages_100", icon:"🥇", title:"Tabellenführer", desc:"100 verschiedene Seiten-Auswahlen komplett durchgespielt",
+    check:(p,ctx)=>Object.keys(p.stats.completedPageSets||{}).length>=100,
+    progress:p=>({current:Object.keys(p.stats.completedPageSets||{}).length, target:100})},
+  {id:"clean_1", icon:"🧤", title:"Weiße Weste", desc:"Eine Runde mit 100 % auf Anhieb richtig (ab 8 Wörtern, ohne Tipp)",
+    check:(p,ctx)=>(p.stats.cleanRoundsCount||0)>=1,
+    progress:p=>({current:(p.stats.cleanRoundsCount||0), target:1})},
+  {id:"clean_5", icon:"🔒", title:"Zu-Null-Spiel", desc:"5 Runden mit 100 % auf Anhieb richtig (ab 8 Wörtern, ohne Tipp)",
+    check:(p,ctx)=>(p.stats.cleanRoundsCount||0)>=5,
+    progress:p=>({current:(p.stats.cleanRoundsCount||0), target:5})},
+  {id:"clean_15", icon:"🏯", title:"Abwehrbollwerk", desc:"15 Runden mit 100 % auf Anhieb richtig (ab 8 Wörtern, ohne Tipp)",
+    check:(p,ctx)=>(p.stats.cleanRoundsCount||0)>=15,
+    progress:p=>({current:(p.stats.cleanRoundsCount||0), target:15})},
+  {id:"clean_30", icon:"💯", title:"Fehlerlos", desc:"30 Runden mit 100 % auf Anhieb richtig (ab 8 Wörtern, ohne Tipp)",
+    check:(p,ctx)=>(p.stats.cleanRoundsCount||0)>=30,
+    progress:p=>({current:(p.stats.cleanRoundsCount||0), target:30})},
+  {id:"clean_60", icon:"🌟", title:"Perfektionist", desc:"60 Runden mit 100 % auf Anhieb richtig (ab 8 Wörtern, ohne Tipp)",
+    check:(p,ctx)=>(p.stats.cleanRoundsCount||0)>=60,
+    progress:p=>({current:(p.stats.cleanRoundsCount||0), target:60})},
+  {id:"cleanstreak_2", icon:"✌️", title:"Doppelpack", desc:"2 Runden in Folge mit 100 % auf Anhieb richtig",
+    check:(p,ctx)=>(p.stats.consecutiveCleanRounds||0)>=2,
+    progress:p=>({current:(p.stats.consecutiveCleanRounds||0), target:2})},
+  {id:"cleanstreak_3", icon:"🎩", title:"Hattrick", desc:"3 Runden in Folge mit 100 % auf Anhieb richtig",
+    check:(p,ctx)=>(p.stats.consecutiveCleanRounds||0)>=3,
+    progress:p=>({current:(p.stats.consecutiveCleanRounds||0), target:3})},
+  {id:"cleanstreak_5", icon:"🖐️", title:"Fünferpack", desc:"5 Runden in Folge mit 100 % auf Anhieb richtig",
+    check:(p,ctx)=>(p.stats.consecutiveCleanRounds||0)>=5,
+    progress:p=>({current:(p.stats.consecutiveCleanRounds||0), target:5})},
+  {id:"cleanstreak_8", icon:"🎆", title:"Torrausch", desc:"8 Runden in Folge mit 100 % auf Anhieb richtig",
+    check:(p,ctx)=>(p.stats.consecutiveCleanRounds||0)>=8,
+    progress:p=>({current:(p.stats.consecutiveCleanRounds||0), target:8})},
+  {id:"cleanstreak_12", icon:"🚀", title:"Rekordserie", desc:"12 Runden in Folge mit 100 % auf Anhieb richtig",
+    check:(p,ctx)=>(p.stats.consecutiveCleanRounds||0)>=12,
+    progress:p=>({current:(p.stats.consecutiveCleanRounds||0), target:12})},
+  {id:"mastered_25", icon:"🧠", title:"Spielverständnis", desc:"25 Wörter sicher gelernt (Fach 6)",
+    check:(p,ctx)=>masteredWordsValue(p)>=25,
+    progress:p=>({current:masteredWordsValue(p), target:25})},
+  {id:"mastered_100", icon:"📖", title:"Taktikfuchs", desc:"100 Wörter sicher gelernt (Fach 6)",
+    check:(p,ctx)=>masteredWordsValue(p)>=100,
+    progress:p=>({current:masteredWordsValue(p), target:100})},
+  {id:"mastered_250", icon:"🗂️", title:"Spielintelligenz", desc:"250 Wörter sicher gelernt (Fach 6)",
+    check:(p,ctx)=>masteredWordsValue(p)>=250,
+    progress:p=>({current:masteredWordsValue(p), target:250})},
+  {id:"mastered_500", icon:"🎓", title:"Fußballprofessor", desc:"500 Wörter sicher gelernt (Fach 6)",
+    check:(p,ctx)=>masteredWordsValue(p)>=500,
+    progress:p=>({current:masteredWordsValue(p), target:500})},
+  {id:"mastered_1000", icon:"🦉", title:"Trainerlegende", desc:"1.000 Wörter sicher gelernt (Fach 6)",
+    check:(p,ctx)=>masteredWordsValue(p)>=1000,
+    progress:p=>({current:masteredWordsValue(p), target:1000})}
 ];
 
 /* Fasst Abzeichen, die eine aufsteigende Stufenreihe auf derselben
@@ -8094,51 +8181,57 @@ const ACHIEVEMENTS = [
    Zielreihenfolge. */
 const ACHIEVEMENT_FAMILIES = [
   { id:"serientaeter", icon:"🔥", name:"Serientäter-Familie",
-    tierIds:["streak_7","streak_30","streak_100","streak_150","streak_200"] },
-  { id:"fehlerfrei", icon:"🧤", name:"Fehlerfrei-Familie",
-    tierIds:["perfect_streak_2","hattrick","weisse_weste","perfect_streak_10","perfect_streak_20"] },
-  { id:"level", icon:"🏆", name:"Level-Familie",
-    tierIds:["level_3","level_5","level_10","level_15","level_20"] },
-  { id:"bonuskarten", icon:"🎖️", name:"Bonuskarten-Familie",
-    tierIds:["elfmeterkoenig","pokaljaeger","bonus_10","bonus_20","bonus_50"] },
-  { id:"meisterschaft", icon:"🏅", name:"Vokabel-Meisterschaft",
-    tierIds:["pages_3","globetrotter","pages_25","full_book_mastery","ballon_dor"] },
-  { id:"tippfehler", icon:"🛡️", name:"Tippfehler-Familie",
-    tierIds:["typo_3","graetsche","typo_25","typo_50","typo_100"] },
+    tierIds:["streak_7", "streak_30", "streak_100", "streak_150", "streak_200"] },
+  { id:"weisseweste", icon:"🧤", name:"Weiße-Weste-Familie",
+    tierIds:["clean_1", "clean_5", "clean_15", "clean_30", "clean_60"] },
+  { id:"hattrick", icon:"🎩", name:"Hattrick-Familie",
+    tierIds:["cleanstreak_2", "cleanstreak_3", "cleanstreak_5", "cleanstreak_8", "cleanstreak_12"] },
+  { id:"neunzig", icon:"⌛", name:"90-Minuten-Familie",
+    tierIds:["perfect_round", "perfect_5", "perfectionist", "perfect_25", "perfect_50"] },
+  { id:"ohneauswechslung", icon:"🔋", name:"Ohne-Auswechslung-Familie",
+    tierIds:["perfect_streak_2", "hattrick", "weisse_weste", "perfect_streak_10", "perfect_streak_20"] },
+  { id:"gedaechtnis", icon:"🧠", name:"Gedächtnis-Familie",
+    tierIds:["mastered_25", "mastered_100", "mastered_250", "mastered_500", "mastered_1000"] },
+  { id:"kroenung", icon:"👑", name:"Krönung-Familie",
+    tierIds:["full_book_mastery", "ballon_dor"] },
+  { id:"meisterschaft", icon:"🏅", name:"Meisterschafts-Familie",
+    tierIds:["pages_3", "globetrotter", "pages_25", "pages_50", "pages_100"] },
   { id:"doublesieger", icon:"🏆", name:"Doublesieger-Familie",
-    tierIds:["review_5","review_25","review_50","review_100","review_250"] },
-  { id:"perfektion", icon:"✨", name:"Perfektion-Familie",
-    tierIds:["perfect_round","perfect_5","perfectionist","perfect_25","perfect_50"] },
+    tierIds:["review_5", "review_25", "review_50", "review_100", "review_250"] },
+  { id:"level", icon:"⬆️", name:"Level-Familie",
+    tierIds:["level_3", "level_5", "level_10", "level_15", "level_20"] },
   { id:"spieltage", icon:"🗓️", name:"Spieltage-Familie",
     tierIds:["first_round", "rounds_25", "rounds_100", "rounds_250", "rounds_500"] },
   { id:"torjaeger", icon:"🥅", name:"Torjäger-Familie",
     tierIds:["correct_100", "correct_500", "correct_1000", "correct_2500", "correct_5000"] },
-  { id:"punkte", icon:"💰", name:"Punkte-Familie",
-    tierIds:["millionaire", "points_15000", "points_30000", "points_60000", "points_100000"] },
+  { id:"startelf", icon:"📋", name:"Startelf-Familie",
+    tierIds:["daily_goal_hit", "goal_days_15", "goal_days_30", "goal_days_75", "goal_days_150"] },
   { id:"libero", icon:"🔄", name:"Libero-Familie",
     tierIds:["libero", "libero_150", "libero_300", "libero_600", "libero_1000"] },
   { id:"nachholspiel", icon:"🔁", name:"Nachholspiel-Familie",
     tierIds:["catchup_pro", "catchup_50", "catchup_100", "catchup_250", "catchup_500"] },
-  { id:"startelf", icon:"🎯", name:"Startelf-Familie",
-    tierIds:["daily_goal_hit", "goal_days_15", "goal_days_30", "goal_days_75", "goal_days_150"] },
-  { id:"sturmlauf", icon:"⚡", name:"Sturmlauf-Familie",
-    tierIds:["sturmlauf", "combo_rounds_15", "combo_rounds_30", "combo_rounds_60", "combo_rounds_100"] },
-  { id:"dribbel", icon:"🎯", name:"Dribbelkönig-Familie",
+  { id:"comeback", icon:"💪", name:"Comeback-Familie",
+    tierIds:["comeback_word", "comeback_5", "comeback_15", "comeback_30", "comeback_60"] },
+  { id:"dribbel", icon:"🪄", name:"Dribbelkönig-Familie",
     tierIds:["dribbelkoenig", "hintfree_15", "hintfree_30", "hintfree_60", "hintfree_100"] },
+  { id:"sturmlauf", icon:"🌪️", name:"Sturmlauf-Familie",
+    tierIds:["sturmlauf", "combo_rounds_15", "combo_rounds_30", "combo_rounds_60", "combo_rounds_100"] },
   { id:"aufholjagd", icon:"📈", name:"Aufholjagd-Familie",
     tierIds:["aufholjagd", "hardcomeback_10", "hardcomeback_25", "hardcomeback_50", "hardcomeback_100"] },
-  { id:"blitz", icon:"⚡", name:"Blitzschnell-Familie",
+  { id:"blitz", icon:"⏱️", name:"Blitzschnell-Familie",
     tierIds:["fast_round", "fast_5", "fast_15", "fast_30", "fast_60"] },
   { id:"laufwunder", icon:"🏔️", name:"Laufwunder-Familie",
     tierIds:["marathon", "words_75", "words_100", "words_150", "words_200"] },
-  { id:"comeback", icon:"💪", name:"Comeback-Familie",
-    tierIds:["comeback_word", "comeback_5", "comeback_15", "comeback_30", "comeback_60"] },
+  { id:"tippfehler", icon:"🛡️", name:"Tippfehler-Familie",
+    tierIds:["typo_3", "graetsche", "typo_25", "typo_50", "typo_100"] },
+  { id:"bonuskarten", icon:"🎁", name:"Bonuskarten-Familie",
+    tierIds:["elfmeterkoenig", "pokaljaeger", "bonus_10", "bonus_20", "bonus_50"] },
   { id:"wochenende", icon:"📅", name:"Wochenend-Familie",
     tierIds:["wochenendprofi", "weekends_5", "weekends_10", "weekends_25", "weekends_52"] },
   { id:"frueh", icon:"🌅", name:"Frühaufsteher-Familie",
     tierIds:["early_1", "early_5", "early_15", "early_30", "early_60"] },
   { id:"weltreise", icon:"🌍", name:"Weltreise-Familie",
-    tierIds:["books_2","bookworm","polyglot","books_all"] }
+    tierIds:["books_2", "bookworm", "polyglot", "books_all"] }
 ];
 const ACHIEVEMENT_FAMILY_LOOKUP = {}; // achievementId -> family-Objekt
 ACHIEVEMENT_FAMILIES.forEach(fam=>{ fam.tierIds.forEach(id=>{ ACHIEVEMENT_FAMILY_LOOKUP[id]=fam; }); });
@@ -9457,6 +9550,17 @@ function finalizeRoundAndUpdateProfile(){
     if(achievementCtx.hintFreeRound) prof.stats.hintFreeRoundsCount = (prof.stats.hintFreeRoundsCount||0) + 1;
     if(achievementCtx.hardComebackRound) prof.stats.hardComebackRoundsCount = (prof.stats.hardComebackRoundsCount||0) + 1;
     if(achievementCtx.isNightRound) prof.stats.nightRoundsCount = (prof.stats.nightRoundsCount||0) + 1;
+    // "Weiße Weste"/"Hattrick": wirklich 100 % auf Anhieb -- jedes Wort beim
+    // ersten Versuch richtig, kein Tipp, keine Lösung, ganze Runde, ab 8 Wörtern
+    if(roundWasFullyPlayed && roundIsBigEnough){
+      const clean = !state.roundUsedHintOrReveal && originalCards.every(c=>c.done && c.firstTry);
+      if(clean){
+        prof.stats.cleanRoundsCount = (prof.stats.cleanRoundsCount||0) + 1;
+        prof.stats.consecutiveCleanRounds = (prof.stats.consecutiveCleanRounds||0) + 1;
+      } else {
+        prof.stats.consecutiveCleanRounds = 0;
+      }
+    }
     if(state.bestCombo>=STURMLAUF_COMBO) prof.stats.comboRoundsCount = (prof.stats.comboRoundsCount||0) + 1;
     if(dailyGoalJustMet) prof.stats.dailyGoalDaysCount = (prof.stats.dailyGoalDaysCount||0) + 1;
     newlyUnlockedAchievements = checkAchievements(prof, achievementCtx);
@@ -9550,7 +9654,7 @@ function buildFamilyBadgeEl(fam, prof, unlocked){
 
   const countChip=document.createElement("div");
   countChip.className="family-tier-count";
-  countChip.textContent = `${Math.max(highestIdx+1,0)}/${fam.tierIds.length}`;
+  countChip.textContent = `${fam.tierIds.filter(id=>unlocked[id]).length}/${fam.tierIds.length}`;
   badge.appendChild(countChip);
 
   badge.setAttribute("role","button");
@@ -9615,16 +9719,13 @@ function renderAchievementsGrid(prof){
   const unlocked = ensureAchievements(prof).unlocked;
   const grid = document.getElementById("achievementsGrid");
   grid.innerHTML = "";
-  const renderedFamilies = new Set();
+  // Familien in der thematischen Reihenfolge von ACHIEVEMENT_FAMILIES
+  // (Serie, Genauigkeit, Ausdauer, Lernerfolg ...), danach die Einzelnen
+  for(const fam of ACHIEVEMENT_FAMILIES){
+    grid.appendChild(buildFamilyBadgeEl(fam, prof, unlocked));
+  }
   for(const def of ACHIEVEMENTS){
-    const fam = ACHIEVEMENT_FAMILY_LOOKUP[def.id];
-    if(fam){
-      if(renderedFamilies.has(fam.id)) continue;
-      renderedFamilies.add(fam.id);
-      grid.appendChild(buildFamilyBadgeEl(fam, prof, unlocked));
-      continue;
-    }
-    grid.appendChild(buildAchievementBadgeEl(def, !!unlocked[def.id], prof));
+    if(!ACHIEVEMENT_FAMILY_LOOKUP[def.id]) grid.appendChild(buildAchievementBadgeEl(def, !!unlocked[def.id], prof));
   }
 }
 
@@ -10027,6 +10128,7 @@ function renderStartScreen(){
   applyProfileTheme();
   renderStreakBadge();
   const prof = getCurrentProfileObj();
+  renderNextBadgeTile(prof);
   renderBonusProgressTile(prof);
   renderDueReviewTile(prof);
   renderLevelBadge();
@@ -10812,7 +10914,16 @@ function showSummaryScreen(){
   // of significance: achievements, then records, then the daily-goal note
   const extraDiv=document.getElementById("summaryExtraBanners");
   extraDiv.innerHTML="";
-  newlyUnlockedAchievements.forEach(ach=>{
+  // höchstens 3 Abzeichen-Banner, der Rest zusammengefasst -- sonst
+  // verdrängt eine Lawine aus Bannern alles andere auf der Ergebnis-Seite
+  const MAX_BADGE_BANNERS = 3;
+  if(newlyUnlockedAchievements.length > MAX_BADGE_BANNERS){
+    const more = newlyUnlockedAchievements.length - (MAX_BADGE_BANNERS-1);
+    newlyUnlockedAchievements.slice(0, MAX_BADGE_BANNERS-1).forEach(ach=>{
+      addHighlightBanner(extraDiv, "achievement", `${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`);
+    });
+    addHighlightBanner(extraDiv, "achievement", `🏅 +${more} weitere Abzeichen – schau in der Statistik nach!`);
+  } else newlyUnlockedAchievements.forEach(ach=>{
     addHighlightBanner(extraDiv, "achievement", `${ach.icon} Abzeichen freigeschaltet: ${ach.title}!`);
   });
   newRecords.forEach(rec=>{
@@ -10822,7 +10933,7 @@ function showSummaryScreen(){
     addHighlightBanner(extraDiv, "bonuscard", `📱 Bonuskarte freigeschaltet: ${BONUS_CARD_REWARD_TITLE} (bei ${bc.threshold} Flammen)!`);
   });
   if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.amount>0){
-    addHighlightBanner(extraDiv, "pageset", `🎉 Neue Seiten-Kombination zum ersten Mal fehlerfrei geschafft! +${pageSetBonusAwarded.amount} Bonuspunkte`);
+    addHighlightBanner(extraDiv, "pageset", `🎉 Neue Seiten-Auswahl zum ersten Mal komplett durchgespielt! +${pageSetBonusAwarded.amount} Bonuspunkte`);
   } else if(pageSetBonusAwarded.isNewPageSet && pageSetBonusAwarded.catchUpCount>0){
     const label = pageSetBonusAwarded.catchUpCount===1 ? "Seiten-Set" : "Seiten-Sets";
     addHighlightBanner(extraDiv, "pageset", `🗺️ ${pageSetBonusAwarded.catchUpCount} ${label} durch Nachholen vervollständigt!`);
