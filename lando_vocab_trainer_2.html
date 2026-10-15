@@ -2202,7 +2202,7 @@ input:focus-visible {
   text-shadow:var(--board-glow);
   font-family:var(--board-num-font);
 }
-.sb-cell.static { cursor:default; }
+.sb-cell.static, .sb-cell.static:active { cursor:default; background:var(--board-cell); }
 .pitch.board .sb-cell { align-items:center; text-align:center; }
 .pitch-grid.board-3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
 .board-note {
@@ -2384,7 +2384,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
     <div id="scoreboard" class="pitch">
       <div class="pitch-grid">
         <button id="streakTile" class="sb-cell" type="button"></button>
-        <button id="dailyGoalTile" class="sb-cell" type="button"></button>
+        <div id="dailyGoalTile" class="sb-cell static" role="group"></div>
         <button id="levelTile" class="sb-cell" type="button"></button>
         <button id="leagueRankTile" class="sb-cell" type="button"></button>
       </div>
@@ -6986,8 +6986,8 @@ function renderDailyGoalWidget(){
   setScoreCell(tile, {
     label:"Tagesziel", value:`${goal.correctToday}:${DAILY_GOAL_TARGET}`,
     sub: left>0 ? `noch ${left} ${left===1?"Tor":"Tore"}` : "geschafft! 🎯",
-    aria:`Tagesziel: ${goal.correctToday} von ${DAILY_GOAL_TARGET} richtigen Antworten. Lernfortschritt öffnen`,
-    onClick:openProgressScreen
+    // reine Anzeige -- die Formkurve öffnet nur die Serie-Kachel
+    aria:`Tagesziel: ${goal.correctToday} von ${DAILY_GOAL_TARGET} richtigen Antworten`
   });
 }
 
@@ -12001,9 +12001,7 @@ function setupEventListeners(){
   });
 
   // Floating dark mode toggle
-  document.getElementById("btn-floating-theme").addEventListener("click", ()=>{
-    applyDarkMode(!document.body.classList.contains("dark-theme"));
-  });
+  document.getElementById("btn-floating-theme").addEventListener("click", toggleDarkModeManually);
 
   // Floating sound mute toggle
   document.getElementById("btn-floating-sound").addEventListener("click", ()=>{
@@ -12019,9 +12017,7 @@ function setupEventListeners(){
     setAutoAdvanceEnabled(!autoAdvanceEnabled);
   });
   // same toggles as the splash screen's floating buttons, reachable any time
-  document.getElementById("btnToggleTheme").addEventListener("click", ()=>{
-    applyDarkMode(!document.body.classList.contains("dark-theme"));
-  });
+  document.getElementById("btnToggleTheme").addEventListener("click", toggleDarkModeManually);
   document.getElementById("btnToggleSound").addEventListener("click", ()=>{
     setSoundMuted(!soundMuted);
   });
@@ -12086,6 +12082,45 @@ function setupEventListeners(){
    INIT
    =========================================================== */
 
+/* Hell/Dunkel folgt der Uhrzeit: tagsüber "Rasen", abends/nachts
+   "Flutlicht". Ein Tipp auf 🌙/☀️ gilt nur bis zum nächsten
+   Umschaltzeitpunkt -- danach übernimmt wieder die Uhr. */
+const DAY_START_HOUR = 7;
+const NIGHT_START_HOUR = 19;
+function isNightByClock(d){
+  const h = d.getHours();
+  return h < DAY_START_HOUR || h >= NIGHT_START_HOUR;
+}
+function nextThemeSwitchTime(d){
+  const next = new Date(d);
+  next.setMinutes(0, 0, 0);
+  const h = d.getHours();
+  if(h < DAY_START_HOUR) next.setHours(DAY_START_HOUR);
+  else if(h < NIGHT_START_HOUR) next.setHours(NIGHT_START_HOUR);
+  else { next.setDate(next.getDate()+1); next.setHours(DAY_START_HOUR); }
+  return next.getTime();
+}
+function resolveDarkMode(){
+  const now = new Date();
+  try {
+    const o = JSON.parse(localStorage.getItem("vocabDarkModeOverride") || "null");
+    if(o && typeof o.until==="number" && now.getTime() < o.until) return !!o.dark;
+    if(o) localStorage.removeItem("vocabDarkModeOverride");
+  } catch(e){ /* ignore */ }
+  return isNightByClock(now);
+}
+function toggleDarkModeManually(){
+  const on = !document.body.classList.contains("dark-theme");
+  try {
+    localStorage.setItem("vocabDarkModeOverride", JSON.stringify({dark:on, until:nextThemeSwitchTime(new Date())}));
+  } catch(e){ /* ignore */ }
+  applyDarkMode(on);
+}
+function syncDarkModeWithClock(){
+  const want = resolveDarkMode();
+  if(want !== document.body.classList.contains("dark-theme")) applyDarkMode(want);
+}
+
 function applyDarkMode(on){
   document.body.classList.toggle("dark-theme", on);
   ["btn-floating-theme", "btnToggleTheme"].forEach(id=>{
@@ -12094,7 +12129,6 @@ function applyDarkMode(on){
     themeBtn.textContent = on ? "☀️" : "🌙";
     themeBtn.setAttribute("aria-label", on ? "Helles Design einschalten" : "Dunkles Design einschalten");
   });
-  try { localStorage.setItem("vocabDarkMode", on ? "1" : "0"); } catch(e){ /* ignore */ }
   applyProfileTheme();
 }
 
@@ -12111,13 +12145,12 @@ function initApp(){
   loadCustomBooks();
   migrateAllProfilesToVocabKeys(); // needs both profiles and custom books loaded
   retrofitRetroactiveAchievements();
-  // no explicit choice yet -> follow the device's light/dark setting
-  let darkOn = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  try {
-    const stored = localStorage.getItem("vocabDarkMode");
-    if(stored!==null) darkOn = stored==="1";
-  } catch(e){ /* ignore */ }
-  applyDarkMode(darkOn);
+  // alte, dauerhafte Hell/Dunkel-Wahl würde die Uhrzeit-Automatik
+  // für immer blockieren -- einmalig verwerfen
+  try { localStorage.removeItem("vocabDarkMode"); } catch(e){ /* ignore */ }
+  applyDarkMode(resolveDarkMode());
+  setInterval(syncDarkModeWithClock, 60*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncDarkModeWithClock(); });
   let mutedInit = false;
   try { mutedInit = localStorage.getItem("vocabSoundMuted")==="1"; } catch(e){ /* ignore */ }
   setSoundMuted(mutedInit);
