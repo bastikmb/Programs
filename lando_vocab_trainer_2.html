@@ -2239,6 +2239,7 @@ body.dark-theme .leaderboard-row .score { color:var(--board-value); text-shadow:
 body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   box-shadow:0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+.next-unit-btn { width:100%; margin-bottom:var(--space-3); }
 /* Saison-Tabelle */
 .leaderboard-row.inactive { opacity:0.7; }
 .leaderboard-row .lb-hint {
@@ -2756,7 +2757,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
         <div><span class="muted">Bester Combo:</span> <span id="sumBestCombo" class="bold">–</span></div>
         <div><span class="muted">Combo-Bonus:</span> <span id="sumComboBonus" class="bold">+0</span></div>
         <div><span class="muted">Durchgespielt-Bonus:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
-        <div><span class="muted">Wiederholungs-Bonus:</span> <span id="sumReviewBonus" class="bold">+0</span></div>
+        <div><span class="muted">Trainings-Bonus:</span> <span id="sumReviewBonus" class="bold">+0</span></div>
         <div><span class="muted">Sicher gelernt (Fach 6):</span> <span id="sumMasteredBonus" class="bold">+0</span></div>
       </div>
     </div>
@@ -2899,7 +2900,8 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       <div class="progress-card-title">Wiederholungs-Fächer</div>
       <div id="progBoxSummary" class="progress-box-summary"></div>
       <div id="progBoxes" class="box-rows"></div>
-      <div class="section-sub" style="margin-top:var(--space-3);">Auf Anhieb richtig = ein Fach weiter, falsch = zurück in Fach 1. Jedes Wort, das in Fach 6 ankommt, bringt +5 Punkte.</div>
+      <div class="section-sub" style="margin-top:var(--space-3);">Auf Anhieb richtig = ein Fach weiter (ein neues Wort startet dann gleich in Fach 2), falsch = zurück in Fach 1. Jedes Wort, das in Fach 6 ankommt, bringt +5 Punkte.</div>
+      <div id="progReviewPlan" class="section-sub" style="margin-top:var(--space-3);display:none;"></div>
       <button id="btnProgressReview" class="btn" type="button" style="width:100%;margin-top:var(--space-3);display:none;"></button>
     </div>
 
@@ -6563,8 +6565,8 @@ function ensurePendingPageSetWords(prof){
   return prof.stats.pendingPageSetWords;
 }
 
-// Wiederholungs-Bonus: +50 % der Rundenpunkte, wenn eine Wiederholungsrunde
-// ALLE heute fälligen Wörter erledigt hat (Gegenstück zum Seiten-Bonus)
+// Trainings-Bonus: +50 % der Rundenpunkte für jede Trainingseinheit, in der
+// jedes Wort gelöst wurde (Gegenstück zum Seiten-Bonus)
 const REVIEW_BONUS_RATIO = 0.5;
 // je Wort, das (wieder) ins höchste Leitner-Fach aufrückt = "sicher gelernt"
 const MASTERED_WORD_BONUS = 5;
@@ -7761,11 +7763,15 @@ function renderBonusProgressTile(prof){
 function renderDueReviewTile(prof){
   const tile = document.getElementById("dueReviewTile");
   if(!prof) return;
-  const due = collectDueWords(prof);
-  if(due.length>0){
-    setListItem(tile, {icon:"📅", title:`Training: ${due.length} ${due.length===1?"Wort":"Wörter"} fällig`,
-      desc:"Alle schaffen = +50 % Bonus", hot:true, onClick:startDueReviewRound,
-      aria:`${due.length} Wörter zum Wiederholen fällig. Training starten`});
+  const dueCount = collectDueWords(prof).length;
+  const done = reviewUnitsDoneToday(prof);
+  if(dueCount>0 && done<REVIEW_UNITS_PER_DAY){
+    const n = Math.min(REVIEW_UNIT_SIZE, dueCount);
+    setListItem(tile, {icon:"📅", title:`Training bereit · ${n} ${n===1?"Wort":"Wörter"} · ca. ${reviewUnitMinutes(n)} Min.`,
+      desc:`Einheit ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %`, hot:true, onClick:startDueReviewRound,
+      aria:`Trainingseinheit mit ${n} Wörtern starten, Einheit ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
+  } else if(dueCount>0){
+    setListItem(tile, {icon:"✅", title:`Training für heute geschafft (${done}/${REVIEW_UNITS_PER_DAY})`, desc:"Morgen geht's weiter – stark!"});
   } else {
     setListItem(tile, {icon:"📅", title:"Kein Training fällig", desc:"Wiederholungen kommen von selbst wieder"});
   }
@@ -7781,7 +7787,7 @@ function renderDueReviewTile(prof){
 function startDueReviewRound(){
   const prof = getCurrentProfileObj();
   if(!prof) return;
-  const due = collectDueWords(prof);
+  const due = pickReviewUnit(prof);
   if(due.length===0) return;
   state.vocabPool = due.map(w=>({
     key:w.key, onlyDirection:w.onlyDirection||null,
@@ -7954,7 +7960,15 @@ function renderProgressBoxes(prof){
   const due = collectDueWords(prof).length;
   const btn = document.getElementById("btnProgressReview");
   btn.style.display = due>0 ? "" : "none";
-  btn.textContent = `📅 ${due} fällige${due===1?"s Wort":" Wörter"} jetzt wiederholen`;
+  const n = Math.min(REVIEW_UNIT_SIZE, due);
+  const extra = reviewUnitsDoneToday(prof)>=REVIEW_UNITS_PER_DAY ? " – freiwillig" : "";
+  btn.textContent = `📅 Trainingseinheit starten (${n} ${n===1?"Wort":"Wörter"}${extra})`;
+  const plan = document.getElementById("progReviewPlan");
+  if(due>0){
+    const days = Math.ceil(due/(REVIEW_UNIT_SIZE*REVIEW_UNITS_PER_DAY));
+    plan.textContent = `Wiederholungsplan: ${due} ${due===1?"Wort":"Wörter"} fällig${days>1 ? `, verteilt auf ca. ${days} Tage` : ""} (höchstens ${REVIEW_UNITS_PER_DAY} Einheiten à ${REVIEW_UNIT_SIZE} Wörter pro Tag).`;
+    plan.style.display = "";
+  } else plan.style.display = "none";
 }
 
 function renderProgressCalendar(log, today){
@@ -8328,19 +8342,19 @@ const ACHIEVEMENTS = [
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=100,
     progress:p=>({current:(p.stats.perfectRoundsCount||0), target:100})},
   // "Doublesieger"-Familie: erledigte Wiederholungsrunden (Kachel "heute fällig")
-  {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Wiederholungsrunden abgeschlossen",
+  {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Trainingseinheiten abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=5,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:5})},
-  {id:"review_25", icon:"🏆", title:"Doublesieger", desc:"25 Wiederholungsrunden abgeschlossen",
+  {id:"review_25", icon:"🏆", title:"Doublesieger", desc:"25 Trainingseinheiten abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=25,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:25})},
-  {id:"review_50", icon:"🥇", title:"Triplesieger", desc:"50 Wiederholungsrunden abgeschlossen",
+  {id:"review_50", icon:"🥇", title:"Triplesieger", desc:"50 Trainingseinheiten abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=50,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:50})},
-  {id:"review_100", icon:"🛡️", title:"Serienmeister", desc:"100 Wiederholungsrunden abgeschlossen",
+  {id:"review_100", icon:"🛡️", title:"Serienmeister", desc:"100 Trainingseinheiten abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=100,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:100})},
-  {id:"review_250", icon:"⭐", title:"Rekordmeister", desc:"250 Wiederholungsrunden abgeschlossen",
+  {id:"review_250", icon:"⭐", title:"Rekordmeister", desc:"250 Trainingseinheiten abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=250,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:250})},
   // --- Stufen der neuen Familien (siehe ACHIEVEMENT_FAMILIES) ---
@@ -9373,6 +9387,36 @@ function collectDueWords(prof){
   return due;
 }
 
+/* Training in Portionen: eine Einheit hat höchstens REVIEW_UNIT_SIZE
+   Wörter, pro Tag werden REVIEW_UNITS_PER_DAY Einheiten angeboten. Was
+   darüber liegt, bleibt einfach fällig und kommt an den Folgetagen dran
+   (die dringendsten zuerst) -- so verteilt sich ein großer Rückstau von
+   selbst, ohne dass ein Kind je eine dreistellige Zahl sieht. */
+const REVIEW_UNIT_SIZE = 20;
+const REVIEW_UNITS_PER_DAY = 3;
+const REVIEW_SECONDS_PER_WORD = 12; // für "ca. X Min."
+
+function reviewUnitsDoneToday(prof){
+  const u = prof.stats.reviewUnitsToday;
+  return (u && u.date===todayKey()) ? (u.count||0) : 0;
+}
+function countReviewUnitDone(prof){
+  prof.stats.reviewUnitsToday = {date: todayKey(), count: reviewUnitsDoneToday(prof)+1};
+}
+/* Dringendste zuerst: niedriges Fach (zuletzt falsch / neu), dann am
+   längsten überfällig. */
+function pickReviewUnit(prof){
+  const schedule = ensureWordSchedule(prof);
+  return collectDueWords(prof)
+    .map(w=>({w, e:schedule[w.key]||{}}))
+    .sort((a,b)=>(a.e.box||1)-(b.e.box||1) || String(a.e.dueDate).localeCompare(String(b.e.dueDate)))
+    .slice(0, REVIEW_UNIT_SIZE)
+    .map(x=>x.w);
+}
+function reviewUnitMinutes(n){
+  return Math.max(1, Math.round(n*REVIEW_SECONDS_PER_WORD/60));
+}
+
 /* "Fehlerfrei abgeschlossen" heißt NICHT "alles im ersten Versuch
    richtig" -- Wiederholungen über die normale Requeue-Mechanik sind
    erlaubt. Es bedeutet: jedes Wort der Runde wurde am Ende mindestens
@@ -9620,7 +9664,10 @@ function updateWordSchedule(prof, originalCards, today){
     if(card.attemptedWrong){
       schedule[key] = {box:1, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[0]), direction:originalDirection};
     } else if(card.done && card.firstTry){
-      const prevBox = (existing && existing.box) || 0;
+      // neues Wort, sofort richtig: Fach 2 (in 2 Tagen) statt Fach 1
+      // (morgen) -- sonst kommt jede gespielte Seite komplett am nächsten
+      // Tag wieder, und das Training wächst zum Berg
+      const prevBox = existing ? (existing.box || 0) : 1;
       const box = Math.min(prevBox+1, LEITNER_MAX_BOX);
       schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1]), direction:originalDirection};
       if(box===LEITNER_MAX_BOX && prevBox<LEITNER_MAX_BOX) newlyMastered++;
@@ -9836,15 +9883,17 @@ function finalizeRoundAndUpdateProfile(){
     const newlyMastered = updateWordSchedule(prof, originalCards, today);
 
     // Boni, die erst NACH der Einsortierung feststehen: Fach-6-Bonus und
-    // Wiederholungs-Bonus (alle heute fälligen Wörter erledigt -- übersprungene
-    // oder aufgedeckte bleiben fällig und verhindern ihn)
+    // Trainings-Bonus (Einheit komplett gelöst -- übersprungene oder
+    // aufgedeckte Wörter verhindern ihn)
     masteredWordsCount = newlyMastered;
     masteredBonus = newlyMastered * MASTERED_WORD_BONUS;
-    if(state.isDueReviewRound && roundWasFullyPlayed && collectDueWords(prof).length===0){
-      reviewBonus = Math.round(state.roundTotalPoints * REVIEW_BONUS_RATIO);
-    }
+    // +50 % für jede vollständig gespielte Trainingseinheit -- nicht erst,
+    // wenn der ganze Rückstau abgearbeitet ist
     if(state.isDueReviewRound && roundWasFullyPlayed){
-      prof.stats.reviewRoundsCount = (prof.stats.reviewRoundsCount||0) + 1; // "Doublesieger"
+      // Bonus nur, wenn jedes Wort am Ende gelöst wurde (nicht aufgedeckt/übersprungen)
+      if(isRoundFullyCorrect(originalCards, state.roundCards)) reviewBonus = Math.round(state.roundTotalPoints * REVIEW_BONUS_RATIO);
+      prof.stats.reviewRoundsCount = (prof.stats.reviewRoundsCount||0) + 1; // "Doublesieger" = abgeschlossene Einheiten
+      countReviewUnitDone(prof);
     }
     if(masteredBonus + reviewBonus > 0){
       state.roundTotalPoints += masteredBonus + reviewBonus;
@@ -11327,6 +11376,22 @@ function showSummaryScreen(){
   // of significance: achievements, then records, then the daily-goal note
   const extraDiv=document.getElementById("summaryExtraBanners");
   extraDiv.innerHTML="";
+  if(state.isDueReviewRound){
+    const prof = getCurrentProfileObj();
+    const dueLeft = prof ? collectDueWords(prof).length : 0;
+    const doneToday = prof ? reviewUnitsDoneToday(prof) : 0;
+    if(dueLeft>0 && doneToday<REVIEW_UNITS_PER_DAY){
+      const n = Math.min(REVIEW_UNIT_SIZE, dueLeft);
+      const nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.className = "btn next-unit-btn";
+      nextBtn.textContent = `📅 Noch eine Einheit? (${n} ${n===1?"Wort":"Wörter"}, ca. ${reviewUnitMinutes(n)} Min.)`;
+      nextBtn.addEventListener("click", startDueReviewRound);
+      extraDiv.appendChild(nextBtn);
+    } else if(doneToday>=REVIEW_UNITS_PER_DAY){
+      addHighlightBanner(extraDiv, "info", `✅ Training für heute geschafft (${doneToday}/${REVIEW_UNITS_PER_DAY}) – morgen geht's weiter!`);
+    }
+  }
   // höchstens 3 Abzeichen-Banner, der Rest zusammengefasst -- sonst
   // verdrängt eine Lawine aus Bannern alles andere auf der Ergebnis-Seite
   const MAX_BADGE_BANNERS = 3;
@@ -11354,7 +11419,7 @@ function showSummaryScreen(){
     addHighlightBanner(extraDiv, "pageset", `🗺️ Seiten-Set abgeschlossen -- alle Wörter schon vorher gelernt!`);
   }
   if(reviewBonus>0){
-    addHighlightBanner(extraDiv, "pageset", `📅 Alle fälligen Wörter wiederholt! +${reviewBonus} Wiederholungs-Bonus`);
+    addHighlightBanner(extraDiv, "pageset", `📅 Trainingseinheit komplett gelöst! +${reviewBonus} Trainings-Bonus`);
   }
   if(masteredWordsCount>0){
     addHighlightBanner(extraDiv, "record", `🎓 ${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"} jetzt sicher gelernt (Fach 6)! +${masteredBonus} Punkte`);
@@ -12433,7 +12498,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-15.3";
+const APP_BUILD = "2026-10-17.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
