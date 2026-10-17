@@ -2240,6 +2240,28 @@ body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   box-shadow:0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .next-unit-btn { width:100%; margin-bottom:var(--space-3); }
+/* Sprach-Plakette auf der Lernkarte */
+.learn-lang-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:0.4rem;
+  font-size:var(--text-xs);
+  font-weight:700;
+  color:var(--muted);
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:0.2rem 0.6rem 0.2rem 0.3rem;
+  margin-bottom:var(--space-2);
+}
+.learn-lang-chip .llc-part { display:inline-flex; align-items:center; gap:0.25rem; }
+.learn-lang-chip .llc-icon { width:1.5em; height:1.5em; object-fit:contain; }
+.learn-lang-chip .llc-arrow { color:var(--accent); }
+.learn-lang-chip.multi { font-size:var(--text-sm); color:var(--ink); border-width:2px; padding:0.3rem 0.8rem 0.3rem 0.4rem; }
+.learn-lang-chip.multi .llc-icon { width:1.9em; height:1.9em; }
+.learn-lang-chip.multi[data-lang="en"] { border-color:#3b82f6; }
+.learn-lang-chip.multi[data-lang="la"] { border-color:#dc2626; }
+.learn-lang-chip.multi[data-lang="fr"] { border-color:#7c3aed; }
 /* Saison-Tabelle */
 .leaderboard-row.inactive { opacity:0.7; }
 .leaderboard-row .lb-hint {
@@ -2696,6 +2718,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
     <div id="learnDailyGoalBanner" class="daily-goal-mini-banner" style="display:none;"></div>
 
     <div class="learn-card-area" id="learnCardArea">
+      <div id="learnLangChip" class="learn-lang-chip" aria-live="polite"></div>
       <div class="learn-word-prompt">
         <div id="learnIcon" class="learn-icon">❓</div>
         <div id="learnPromptText">...</div>
@@ -11233,6 +11256,22 @@ function renderCurrentCard(){
   document.getElementById("learnProgressInfo").textContent=`⏱ ${state.roundIndex+1}. Minute · Wort ${state.roundIndex+1} / ${totalCards}`;
   document.getElementById("learnRoundProgressInner").style.width = (totalCards>0 ? Math.round(state.roundIndex/totalCards*100) : 0)+"%";
 
+  // Sprach-Plakette: aus welcher in welche Sprache -- wichtig v.a. im
+  // Training, das fällige Wörter aus Englisch UND Latein mischt
+  // Sprachkürzel aus dem Wortschlüssel ("en|Haus|house") -- speechLang
+  // ist je nach Rundenart mal "en", mal ein BCP-47-Code wie "en-US"
+  const foreignLang = String(card.key||"").split("|")[0] || String(card.speechLang||state.currentLang||"").slice(0,2).toLowerCase();
+  const foreignName = LANG_DISPLAY_NAMES[foreignLang] || "Fremdsprache";
+  const chipPart = (lang, name)=>`<span class="llc-part">${langIconImg(lang, "llc-icon")}<span>${name}</span></span>`;
+  const fromPart = card.direction==="enToDe" ? chipPart(foreignLang, foreignName) : chipPart("de", "Deutsch");
+  const toPart = card.direction==="enToDe" ? chipPart("de", "Deutsch") : chipPart(foreignLang, foreignName);
+  const chip = document.getElementById("learnLangChip");
+  chip.innerHTML = `${fromPart}<span class="llc-arrow" aria-hidden="true">→</span>${toPart}`;
+  chip.dataset.lang = foreignLang;
+  // mehrere Sprachen in einer Runde: Plakette deutlicher hervorheben
+  chip.classList.toggle("multi", new Set(state.roundCards.map(c=>String(c.key||"").split("|")[0])).size>1);
+  chip.setAttribute("aria-label", card.direction==="enToDe" ? `${foreignName} nach Deutsch` : `Deutsch nach ${foreignName}`);
+
   // card info
   document.getElementById("learnIcon").textContent=card.icon||"❓";
   document.getElementById("learnPromptText").textContent=card.prompt;
@@ -12498,7 +12537,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-17.2";
+const APP_BUILD = "2026-10-17.3";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
