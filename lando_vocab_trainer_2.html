@@ -7768,8 +7768,8 @@ function renderDueReviewTile(prof){
   if(dueCount>0 && done<REVIEW_UNITS_PER_DAY){
     const n = Math.min(REVIEW_UNIT_SIZE, dueCount);
     setListItem(tile, {icon:"📅", title:`Training bereit · ${n} ${n===1?"Wort":"Wörter"} · ca. ${reviewUnitMinutes(n)} Min.`,
-      desc:`Einheit ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %`, hot:true, onClick:startDueReviewRound,
-      aria:`Trainingseinheit mit ${n} Wörtern starten, Einheit ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
+      desc:`Trainings-Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %`, hot:true, onClick:startDueReviewRound,
+      aria:`Trainings-Session mit ${n} Wörtern starten, Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
   } else if(dueCount>0){
     setListItem(tile, {icon:"✅", title:`Training für heute geschafft (${done}/${REVIEW_UNITS_PER_DAY})`, desc:"Morgen geht's weiter – stark!"});
   } else {
@@ -7962,11 +7962,11 @@ function renderProgressBoxes(prof){
   btn.style.display = due>0 ? "" : "none";
   const n = Math.min(REVIEW_UNIT_SIZE, due);
   const extra = reviewUnitsDoneToday(prof)>=REVIEW_UNITS_PER_DAY ? " – freiwillig" : "";
-  btn.textContent = `📅 Trainingseinheit starten (${n} ${n===1?"Wort":"Wörter"}${extra})`;
+  btn.textContent = `📅 Trainings-Session starten (${n} ${n===1?"Wort":"Wörter"}${extra})`;
   const plan = document.getElementById("progReviewPlan");
   if(due>0){
     const days = Math.ceil(due/(REVIEW_UNIT_SIZE*REVIEW_UNITS_PER_DAY));
-    plan.textContent = `Wiederholungsplan: ${due} ${due===1?"Wort":"Wörter"} fällig${days>1 ? `, verteilt auf ca. ${days} Tage` : ""} (höchstens ${REVIEW_UNITS_PER_DAY} Einheiten à ${REVIEW_UNIT_SIZE} Wörter pro Tag).`;
+    plan.textContent = `Wiederholungsplan: ${due} ${due===1?"Wort":"Wörter"} fällig${days>1 ? `, verteilt auf ca. ${days} Tage` : ""} (höchstens ${REVIEW_UNITS_PER_DAY} Trainings-Sessions à ${REVIEW_UNIT_SIZE} Wörter pro Tag).`;
     plan.style.display = "";
   } else plan.style.display = "none";
 }
@@ -8342,19 +8342,19 @@ const ACHIEVEMENTS = [
     check:(p,ctx)=>(p.stats.perfectRoundsCount||0)>=100,
     progress:p=>({current:(p.stats.perfectRoundsCount||0), target:100})},
   // "Doublesieger"-Familie: erledigte Wiederholungsrunden (Kachel "heute fällig")
-  {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Trainingseinheiten abgeschlossen",
+  {id:"review_5", icon:"🔁", title:"Rückspiel", desc:"5 Trainings-Sessions abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=5,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:5})},
-  {id:"review_25", icon:"🏆", title:"Doublesieger", desc:"25 Trainingseinheiten abgeschlossen",
+  {id:"review_25", icon:"🏆", title:"Doublesieger", desc:"25 Trainings-Sessions abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=25,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:25})},
-  {id:"review_50", icon:"🥇", title:"Triplesieger", desc:"50 Trainingseinheiten abgeschlossen",
+  {id:"review_50", icon:"🥇", title:"Triplesieger", desc:"50 Trainings-Sessions abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=50,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:50})},
-  {id:"review_100", icon:"🛡️", title:"Serienmeister", desc:"100 Trainingseinheiten abgeschlossen",
+  {id:"review_100", icon:"🛡️", title:"Serienmeister", desc:"100 Trainings-Sessions abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=100,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:100})},
-  {id:"review_250", icon:"⭐", title:"Rekordmeister", desc:"250 Trainingseinheiten abgeschlossen",
+  {id:"review_250", icon:"⭐", title:"Rekordmeister", desc:"250 Trainings-Sessions abgeschlossen",
     check:(p,ctx)=>(p.stats.reviewRoundsCount||0)>=250,
     progress:p=>({current:p.stats.reviewRoundsCount||0, target:250})},
   // --- Stufen der neuen Familien (siehe ACHIEVEMENT_FAMILIES) ---
@@ -11385,7 +11385,7 @@ function showSummaryScreen(){
       const nextBtn = document.createElement("button");
       nextBtn.type = "button";
       nextBtn.className = "btn next-unit-btn";
-      nextBtn.textContent = `📅 Noch eine Einheit? (${n} ${n===1?"Wort":"Wörter"}, ca. ${reviewUnitMinutes(n)} Min.)`;
+      nextBtn.textContent = `📅 Noch eine Trainings-Session? (${n} ${n===1?"Wort":"Wörter"}, ca. ${reviewUnitMinutes(n)} Min.)`;
       nextBtn.addEventListener("click", startDueReviewRound);
       extraDiv.appendChild(nextBtn);
     } else if(doneToday>=REVIEW_UNITS_PER_DAY){
@@ -11419,7 +11419,7 @@ function showSummaryScreen(){
     addHighlightBanner(extraDiv, "pageset", `🗺️ Seiten-Set abgeschlossen -- alle Wörter schon vorher gelernt!`);
   }
   if(reviewBonus>0){
-    addHighlightBanner(extraDiv, "pageset", `📅 Trainingseinheit komplett gelöst! +${reviewBonus} Trainings-Bonus`);
+    addHighlightBanner(extraDiv, "pageset", `📅 Trainings-Session komplett gelöst! +${reviewBonus} Trainings-Bonus`);
   }
   if(masteredWordsCount>0){
     addHighlightBanner(extraDiv, "record", `🎓 ${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"} jetzt sicher gelernt (Fach 6)! +${masteredBonus} Punkte`);
@@ -12498,7 +12498,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-17.1";
+const APP_BUILD = "2026-10-17.2";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
