@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Osler Tracker">
-<meta name="theme-color" content="#8c1d24">
+<meta name="theme-color" content="#c92a44">
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -16,12 +16,13 @@
 <style>
 /* Layout: iPhone-first app shell – red header, scrolling content, fixed bottom tab bar (Erfassen · Verlauf · Liste · ESS) */
 :root{
-  --bg:#f4f2f1; --panel:#ffffff; --fg:#1d1a1a; --muted:#6e6767; --line:#e4e0de; --fill:#efebea;
-  --accent:#8c1d24; --accent-ink:#ffffff; --accent-soft:#f5e4e4;
-  --i1:#e9aaaa; --i2:#c8535a; --i3:#7a1219;
-  --h0:#ebe7e6; --h1:#f2c4c4; --h2:#de8a8f; --h3:#b8414a; --h4:#7a1219;
-  --ok:#2f7a4b; --warn:#a86a0c; --bad:#a3232b;
-  --band1:#e6f1ea; --band2:#f7ecd8; --band3:#f6dede;
+  --bg:#fcf8f7; --panel:#ffffff; --fg:#2a2225; --muted:#766a6e; --line:#f1e6e7; --fill:#f8eff0;
+  --accent:#d02b43; --accent-ink:#ffffff; --accent-soft:#fde9ec;
+  --i1:#f9b4bd; --i2:#ec6377; --i3:#bf1d38;
+  --h0:#f4ecec; --h1:#fcd2d8; --h2:#f697a4; --h3:#e3536a; --h4:#bf1d38;
+  --ok:#1a7a50; --warn:#9a6008; --bad:#c8283f;
+  --band1:#e3f6ec; --band2:#fdf1dc; --band3:#fde6e9;
+  --head:linear-gradient(120deg,#c92a44 0%,#e04a62 60%,#ec6a74 100%);
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
   --font-round:ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;
@@ -29,12 +30,13 @@
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#121010; --panel:#1e1b1b; --fg:#f0ebeb; --muted:#a59d9d; --line:#332e2e; --fill:#2a2626;
-  --accent:#e2737a; --accent-ink:#1d1a1a; --accent-soft:#3b2325;
-  --i1:#8a4a4e; --i2:#c9545c; --i3:#f08d93;
-  --h0:#2a2626; --h1:#4d2a2d; --h2:#7d363c; --h3:#b8474f; --h4:#f08d93;
-  --ok:#6cc08b; --warn:#e0a54a; --bad:#f07a80;
-  --band1:#1d2a22; --band2:#2d2617; --band3:#2f1d1e;
+  --bg:#17131a; --panel:#221d24; --fg:#f5eef0; --muted:#ab9fa4; --line:#362e35; --fill:#2d262e;
+  --accent:#ff7a8c; --accent-ink:#2a1218; --accent-soft:#42252d;
+  --i1:#8f4553; --i2:#d9566b; --i3:#ff95a3;
+  --h0:#2d262e; --h1:#4f2a35; --h2:#80364a; --h3:#c24a60; --h4:#ff95a3;
+  --ok:#6fd19c; --warn:#f0b75a; --bad:#ff8090;
+  --band1:#1a2e25; --band2:#30281a; --band3:#36202a;
+  --head:linear-gradient(120deg,#7a1c30 0%,#9c2a42 100%);
   color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
@@ -43,9 +45,8 @@ body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px))}
 button{font:inherit;color:inherit}
 .num{font-variant-numeric:tabular-nums}
 
-header.top{position:sticky;top:0;z-index:20;background:var(--accent);color:#fff;
+header.top{position:sticky;top:0;z-index:20;background:var(--head);color:#fff;
   padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
-@media (prefers-color-scheme:dark){header.top{background:#5e1419}}
 header.top h1{margin:0;font:700 20px/1.2 var(--font-round);letter-spacing:.01em}
 header.top p{margin:2px 0 0;font-size:13px;opacity:.85}
 
@@ -54,7 +55,7 @@ main{max-width:640px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-rig
 .view[hidden]{display:none!important}
 h2{margin:0;font:700 17px/1.25 var(--font-round)}
 .lbl{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
-.card{background:var(--panel);border-radius:14px;padding:14px}
+.card{background:var(--panel);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(150,40,60,.06),0 4px 14px rgba(150,40,60,.05)}
 .muted{color:var(--muted)}
 .small{font-size:13px}
 
@@ -81,7 +82,7 @@ details.more summary::-webkit-details-marker{display:none}
 details.more summary::after{content:"＋";color:var(--muted);font-size:18px}
 details.more[open] summary::after{content:"－"}
 details.more .inner{display:flex;flex-direction:column;gap:14px;margin-top:12px}
-.save{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 10px);z-index:5;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font:700 17px var(--font-round);min-height:54px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.save{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 10px);z-index:5;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font:700 17px var(--font-round);min-height:54px;cursor:pointer;box-shadow:0 6px 18px rgba(208,43,67,.3)}
 .save:disabled{opacity:.45;box-shadow:none}
 .editbar{display:flex;justify-content:space-between;align-items:center;background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600}
 .editbar button{border:0;background:transparent;color:var(--accent);font-weight:600;cursor:pointer}
@@ -89,7 +90,7 @@ details.more .inner{display:flex;flex-direction:column;gap:14px;margin-top:12px}
 
 /* ---------- stats ---------- */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.tile{background:var(--panel);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.tile{background:var(--panel);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(150,40,60,.06),0 4px 14px rgba(150,40,60,.05);display:flex;flex-direction:column;gap:3px;min-width:0}
 .tile small{font-size:12.5px;color:var(--muted);line-height:1.25}
 .tile b{font:700 26px/1.05 var(--font-round);font-variant-numeric:tabular-nums}
 .delta{font:600 12.5px var(--mono)}
