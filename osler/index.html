@@ -218,12 +218,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
         <button type="button" class="chip" data-v="Erkältung">Erkältung</button>
         <button type="button" class="chip" data-v="Schlag/äußerer Einfluss">Schlag, äußerer Einfluss</button>
       </div></div>
-      <div><div class="lbl">Wie gestoppt</div><div class="chips" id="f-stop">
+      <div><div class="lbl">Wie gestoppt <span style="text-transform:none;letter-spacing:0;font-weight:400">(mehrere möglich)</span></div><div class="chips" id="f-stop">
         <button type="button" class="chip" data-v="von selbst">von selbst</button>
         <button type="button" class="chip" data-v="Abdrücken">Abdrücken</button>
         <button type="button" class="chip" data-v="Abtupfen">Abtupfen</button>
-        <button type="button" class="chip" data-v="Ausstopfen">Ausstopfen</button>
-        <button type="button" class="chip" data-v="Tamponade selbst">Tamponade selbst</button>
+        <button type="button" class="chip" data-v="Ausstopfen / Tamponade">Ausstopfen / Tamponade</button>
         <button type="button" class="chip" data-v="ärztlich">ärztlich / Notaufnahme</button>
       </div></div>
       <div><div class="lbl">Notiz</div><textarea id="f-note" placeholder="z. B. Situation, Begleitumstände"></textarea></div>
@@ -342,10 +341,14 @@ const dm=d=>d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
 const fmtD=s=>parse(s).toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"2-digit"});
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc=s=>String(s??"");
+// "stopped" is stored as a comma-joined string; old single values are mapped onto the merged chip
+const STOP_ALIAS={"Tamponade selbst":"Ausstopfen / Tamponade","Ausstopfen":"Ausstopfen / Tamponade"};
+const stopList=s=>[...new Set(String(s||"").split(",").map(x=>x.trim()).filter(Boolean).map(x=>STOP_ALIAS[x]||x))];
+const normStop=s=>stopList(s).join(", ");
 
 /* ---------- storage ---------- */
 let store={episodes:[],ess:[],lastBackup:null};
-function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||"null");if(r&&Array.isArray(r.episodes))store=Object.assign({episodes:[],ess:[],lastBackup:null},r)}catch(e){}}
+function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||"null");if(r&&Array.isArray(r.episodes))store=Object.assign({episodes:[],ess:[],lastBackup:null},r);store.episodes.forEach(e=>{e.stopped=normStop(e.stopped)})}catch(e){}}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(store));return true}catch(e){toast("Speichern fehlgeschlagen – Speicher voll?");return false}}
 load();
 if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{})}
@@ -369,17 +372,17 @@ function sheet(build){const L=$("#layer");const bg=document.createElement("div")
 
 /* ---------- entry form ---------- */
 let form, editingId=null;
-function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,side:"",triggers:[],stopped:"",note:""}}
+function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,side:"",triggers:[],stopped:[],note:""}}
 function paintForm(){
   $("#f-date").value=form.date;$("#f-time").value=form.time;
   $("#dur-out").textContent=form.dur==null?"– min":(form.dur<1?"< 1 min":fmt1(form.dur)+" min");
   document.querySelectorAll("#f-dur .big").forEach(b=>b.setAttribute("aria-pressed",String(form.dur!=null&&bucketOf(form.dur)===b.dataset.v)));
   document.querySelectorAll("#f-int .big").forEach(b=>b.setAttribute("aria-pressed",String(String(form.intensity)===b.dataset.v)));
   document.querySelectorAll("#f-side .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.side===b.dataset.v)));
-  document.querySelectorAll("#f-stop .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.stopped===b.dataset.v)));
+  document.querySelectorAll("#f-stop .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.stopped.includes(b.dataset.v))));
   document.querySelectorAll("#f-trig .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.triggers.includes(b.dataset.v))));
   $("#f-note").value=form.note;
-  const parts=[form.side,...form.triggers,form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
+  const parts=[form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
   $("#f-save").disabled=!(form.dur!=null&&form.intensity);
   $("#f-save").textContent=editingId?"Änderung speichern":"Speichern";
   $("#editbar").hidden=!editingId; $("#f-hint").textContent="";
@@ -394,14 +397,14 @@ $("#dur-minus").addEventListener("click",()=>{form.dur=form.dur==null?0.5:form.d
 $("#dur-plus").addEventListener("click",()=>{form.dur=form.dur==null?1:form.dur<1?1:Math.round(form.dur)+1;paintForm()});
 $("#f-int").addEventListener("click",e=>{const b=e.target.closest(".big");if(!b)return;form.intensity=Number(b.dataset.v);paintForm()});
 $("#f-side").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.side=form.side===b.dataset.v?"":b.dataset.v;paintForm()});
-$("#f-stop").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.stopped=form.stopped===b.dataset.v?"":b.dataset.v;paintForm()});
+$("#f-stop").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.stopped=form.stopped.includes(v)?form.stopped.filter(x=>x!==v):[...form.stopped,v];paintForm()});
 $("#f-trig").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.triggers=form.triggers.includes(v)?form.triggers.filter(x=>x!==v):[...form.triggers,v];paintForm()});
 $("#f-note").addEventListener("input",e=>{form.note=e.target.value});
 $("#edit-cancel").addEventListener("click",()=>{editingId=null;form=blankForm();$("#f-more").open=false;paintForm()});
 $("#f-save").addEventListener("click",()=>{
   if(!form.date){$("#f-hint").textContent="Bitte ein Datum wählen.";return}
   if(form.date>iso(new Date())){$("#f-hint").textContent="Das Datum liegt in der Zukunft.";return}
-  const row={date:form.date,time:form.time||"",duration_min:form.dur,intensity:form.intensity,side:form.side,triggers:[...form.triggers],stopped:form.stopped,note:form.note.trim()};
+  const row={date:form.date,time:form.time||"",duration_min:form.dur,intensity:form.intensity,side:form.side,triggers:[...form.triggers],stopped:form.stopped.join(", "),note:form.note.trim()};
   if(editingId){const i=store.episodes.findIndex(e=>e.id===editingId);if(i>=0)store.episodes[i]=Object.assign({},store.episodes[i],row,{updated:new Date().toISOString()});
     if(!persist())return;editingId=null;form=blankForm();$("#f-more").open=false;paintForm();toast("Änderung gespeichert");show("v-list");return}
   const ep=Object.assign({id:uid(),created:new Date().toISOString()},row);store.episodes.push(ep);if(!persist()){store.episodes.pop();return}
@@ -410,8 +413,8 @@ $("#f-save").addEventListener("click",()=>{
   toast("Gespeichert","Rückgängig",()=>{store.episodes=store.episodes.filter(e=>e.id!==ep.id);persist();render()});
 });
 function startEdit(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;editingId=id;
-  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,side:e.side||"",triggers:[...(e.triggers||[])],stopped:e.stopped||"",note:e.note||""};
-  $("#f-more").open=!!(form.side||form.triggers.length||form.stopped||form.note);show("v-add");paintForm()}
+  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,side:e.side||"",triggers:[...(e.triggers||[])],stopped:stopList(e.stopped),note:e.note||""};
+  $("#f-more").open=!!(form.side||form.triggers.length||form.stopped.length||form.note);show("v-add");paintForm()}
 
 /* ---------- aggregates ---------- */
 function win(from,to){const r=store.episodes.filter(e=>e.date>=from&&e.date<=to);const min=r.reduce((a,e)=>a+(+e.duration_min||0),0);
@@ -533,7 +536,7 @@ $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.t
   catch(err){toast("Datei konnte nicht gelesen werden.");return}
   const key=x=>x.date+"|"+(x.time||"")+"|"+x.duration_min+"|"+x.intensity;const have=new Set(store.episodes.map(key));let added=0;
   eps.forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!(+x.duration_min>=0)||![1,2,3].includes(+x.intensity))return;
-    const r={id:x.id||uid(),created:x.created||new Date().toISOString(),date:x.date,time:x.time||"",duration_min:+x.duration_min,intensity:+x.intensity,side:x.side||"",triggers:Array.isArray(x.triggers)?x.triggers:[],stopped:x.stopped||"",note:x.note||""};
+    const r={id:x.id||uid(),created:x.created||new Date().toISOString(),date:x.date,time:x.time||"",duration_min:+x.duration_min,intensity:+x.intensity,side:x.side||"",triggers:Array.isArray(x.triggers)?x.triggers:[],stopped:normStop(x.stopped),note:x.note||""};
     if(have.has(key(r)))return;have.add(key(r));store.episodes.push(r);added++});
   const hk=new Set(store.ess.map(x=>x.date+"|"+x.score));let addE=0;ess.forEach(x=>{if(x&&typeof x.score==="number"&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&!hk.has(x.date+"|"+x.score)){store.ess.push({id:x.id||uid(),date:x.date,score:x.score,answers:x.answers||{}});addE++}});
   persist();render();toast(`${added} Episode${added===1?"":"n"}${addE?` und ${addE} ESS`:""} importiert`)});
