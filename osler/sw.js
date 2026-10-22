@@ -1,7 +1,7 @@
 /* Network-first service worker, scoped to /osler/ only.
    Online: always the newest version from GitHub Pages.
    Offline: the last cached copy, so an episode can still be logged. */
-const CACHE = "osler-v2";
+const CACHE = "osler-v3";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
