@@ -1,6 +1,6 @@
 {
-  "name": "Nasenbluten-Tagebuch",
-  "short_name": "Nasenbluten",
+  "name": "Osler Tracker",
+  "short_name": "Osler Tracker",
   "description": "Episoden schnell erfassen und den Verlauf sehen – Morbus Osler",
   "lang": "de",
   "start_url": "./",
