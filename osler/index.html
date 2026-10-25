@@ -495,8 +495,10 @@ function hbars(box,rows,emptyText){if(!rows.some(r=>r[1])){box.innerHTML=`<div c
     const c=document.createElement("span");c.className="n";c.textContent=n;el.append(a,tr,c);box.append(el)})}
 function renderTrig(){const from=rangeStart();const cnt={};store.episodes.filter(e=>e.date>=from).forEach(e=>{const t=(e.triggers&&e.triggers.length)?e.triggers:["ohne Angabe"];t.forEach(x=>cnt[x]=(cnt[x]||0)+1)});
   hbars($("#trig"),Object.entries(cnt).sort((a,b)=>b[1]-a[1]),"Noch keine Episoden in diesem Zeitraum.")}
-function renderTod(){const from=rangeStart();const b=[["Nacht · 0–6 Uhr",0],["Morgen · 6–12 Uhr",0],["Nachmittag · 12–18 Uhr",0],["Abend · 18–24 Uhr",0]];
-  store.episodes.filter(e=>e.date>=from&&e.time).forEach(e=>{const h=+e.time.slice(0,2);b[Math.min(3,Math.floor(h/6))][1]++});hbars($("#tod"),b,"Noch keine Episoden mit Uhrzeit in diesem Zeitraum.")}
+function renderTod(){const from=rangeStart();const keys=["morgens","mittags","abends","nachts"];
+  const b=[["morgens · 5–11 Uhr",0],["mittags · 11–17 Uhr",0],["abends · 17–22 Uhr",0],["nachts · 22–5 Uhr",0]];
+  // the chosen Tageszeit wins; otherwise it is derived from the clock time
+  store.episodes.filter(e=>e.date>=from).forEach(e=>{const i=keys.indexOf(e.daytime||daytimeFor(e.time||""));if(i>=0)b[i][1]++});hbars($("#tod"),b,"Noch keine Episoden mit Tageszeit in diesem Zeitraum.")}
 $("#m-n").addEventListener("click",()=>{metric="n";$("#m-n").setAttribute("aria-pressed","true");$("#m-min").setAttribute("aria-pressed","false");renderWeeks()});
 $("#m-min").addEventListener("click",()=>{metric="min";$("#m-min").setAttribute("aria-pressed","true");$("#m-n").setAttribute("aria-pressed","false");renderWeeks()});
 $("#range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;weeks=+b.dataset.w;$("#range").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));renderStats()});
