@@ -5,24 +5,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Osler Tracker">
-<meta name="theme-color" content="#c92a44">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1d2226" media="(prefers-color-scheme: dark)">
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Osler Tracker</title>
 <style>
-/* Layout: iPhone-first app shell – red header, scrolling content, fixed bottom tab bar (Erfassen · Verlauf · Liste · ESS) */
+/* Layout: iPhone-first app shell – light header, scrolling content, fixed bottom tab bar (Erfassen · Verlauf · Liste · ESS) */
 :root{
-  --bg:#fcf8f7; --panel:#ffffff; --fg:#2a2225; --muted:#766a6e; --line:#f1e6e7; --fill:#f8eff0;
-  --accent:#d02b43; --accent-ink:#ffffff; --accent-soft:#fde9ec;
-  --i1:#f9b4bd; --i2:#ec6377; --i3:#bf1d38;
-  --h0:#f4ecec; --h1:#fcd2d8; --h2:#f697a4; --h3:#e3536a; --h4:#bf1d38;
-  --ok:#1a7a50; --warn:#9a6008; --bad:#c8283f;
-  --band1:#e3f6ec; --band2:#fdf1dc; --band3:#fde6e9;
-  --head:linear-gradient(120deg,#c92a44 0%,#e04a62 60%,#ec6a74 100%);
+  --bg:#f6f8f9; --panel:#ffffff; --fg:#22292f; --muted:#66727b; --line:#e8edf0; --fill:#f1f4f6;
+  --accent:#0f7c7e; --accent-ink:#ffffff; --accent-soft:#e4f3f2;
+  --i1:#ffd58f; --i2:#f6a26f; --i3:#e2606f;
+  --h0:#edf1f3; --h1:#fde6c4; --h2:#f9c08e; --h3:#f08f72; --h4:#dc5a6c;
+  --ok:#1a7a50; --warn:#9a6008; --bad:#c43c50;
+  --band1:#e3f6ec; --band2:#fdf1dc; --band3:#fde8ea;
+  --head:#ffffff; --head-ink:#22292f; --shadow:rgba(30,50,60,.06);
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
   --font-round:ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;
@@ -30,13 +31,13 @@
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#17131a; --panel:#221d24; --fg:#f5eef0; --muted:#ab9fa4; --line:#362e35; --fill:#2d262e;
-  --accent:#ff7a8c; --accent-ink:#2a1218; --accent-soft:#42252d;
-  --i1:#8f4553; --i2:#d9566b; --i3:#ff95a3;
-  --h0:#2d262e; --h1:#4f2a35; --h2:#80364a; --h3:#c24a60; --h4:#ff95a3;
-  --ok:#6fd19c; --warn:#f0b75a; --bad:#ff8090;
+  --bg:#14181b; --panel:#1d2226; --fg:#eef2f4; --muted:#9aa6ae; --line:#2c343a; --fill:#262d32;
+  --accent:#5ccfc9; --accent-ink:#0c2423; --accent-soft:#1c3634;
+  --i1:#a8844a; --i2:#d98a5c; --i3:#f08a96;
+  --h0:#262d32; --h1:#4a3d2a; --h2:#7a5536; --h3:#b4644f; --h4:#f08a96;
+  --ok:#6fd19c; --warn:#f0b75a; --bad:#ff8a98;
   --band1:#1a2e25; --band2:#30281a; --band3:#36202a;
-  --head:linear-gradient(120deg,#7a1c30 0%,#9c2a42 100%);
+  --head:#1d2226; --head-ink:#eef2f4; --shadow:rgba(0,0,0,.25);
   color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
@@ -45,17 +46,17 @@ body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px))}
 button{font:inherit;color:inherit}
 .num{font-variant-numeric:tabular-nums}
 
-header.top{position:sticky;top:0;z-index:20;background:var(--head);color:#fff;
+header.top{position:sticky;top:0;z-index:20;background:var(--head);color:var(--head-ink);border-bottom:1px solid var(--line);
   padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
-header.top h1{margin:0;font:700 20px/1.2 var(--font-round);letter-spacing:.01em}
-header.top p{margin:2px 0 0;font-size:13px;opacity:.85}
+header.top h1{margin:0;color:var(--accent);font:700 20px/1.2 var(--font-round);letter-spacing:.01em}
+header.top p{margin:2px 0 0;font-size:13px;color:var(--muted)}
 
 main{max-width:640px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
 .view{display:flex;flex-direction:column;gap:16px}
 .view[hidden]{display:none!important}
 h2{margin:0;font:700 17px/1.25 var(--font-round)}
 .lbl{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
-.card{background:var(--panel);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(150,40,60,.06),0 4px 14px rgba(150,40,60,.05)}
+.card{background:var(--panel);border-radius:14px;padding:14px;box-shadow:0 1px 2px var(--shadow),0 4px 14px var(--shadow)}
 .muted{color:var(--muted)}
 .small{font-size:13px}
 
@@ -82,7 +83,7 @@ details.more summary::-webkit-details-marker{display:none}
 details.more summary::after{content:"＋";color:var(--muted);font-size:18px}
 details.more[open] summary::after{content:"－"}
 details.more .inner{display:flex;flex-direction:column;gap:14px;margin-top:12px}
-.save{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 10px);z-index:5;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font:700 17px var(--font-round);min-height:54px;cursor:pointer;box-shadow:0 6px 18px rgba(208,43,67,.3)}
+.save{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 10px);z-index:5;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font:700 17px var(--font-round);min-height:54px;cursor:pointer;box-shadow:0 6px 18px rgba(15,124,126,.25)}
 .save:disabled{opacity:.45;box-shadow:none}
 .editbar{display:flex;justify-content:space-between;align-items:center;background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600}
 .editbar button{border:0;background:transparent;color:var(--accent);font-weight:600;cursor:pointer}
@@ -90,7 +91,7 @@ details.more .inner{display:flex;flex-direction:column;gap:14px;margin-top:12px}
 
 /* ---------- stats ---------- */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.tile{background:var(--panel);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(150,40,60,.06),0 4px 14px rgba(150,40,60,.05);display:flex;flex-direction:column;gap:3px;min-width:0}
+.tile{background:var(--panel);border-radius:14px;padding:12px;box-shadow:0 1px 2px var(--shadow),0 4px 14px var(--shadow);display:flex;flex-direction:column;gap:3px;min-width:0}
 .tile small{font-size:12.5px;color:var(--muted);line-height:1.25}
 .tile b{font:700 26px/1.05 var(--font-round);font-variant-numeric:tabular-nums}
 .delta{font:600 12.5px var(--mono)}
@@ -141,7 +142,7 @@ svg text{font-family:var(--mono);font-size:10px;fill:var(--muted)}
 .kv dt{color:var(--muted)}.kv dd{margin:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 78px);z-index:50;
   background:#2a2424;color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:14px;align-items:center;font-size:15px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
-.toast button{border:0;background:transparent;color:#ffb3b7;font-weight:700;cursor:pointer;padding:6px}
+.toast button{border:0;background:transparent;color:#8fe0dc;font-weight:700;cursor:pointer;padding:6px}
 
 /* ---------- tab bar ---------- */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--panel) 92%,transparent);
