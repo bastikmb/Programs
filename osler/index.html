@@ -202,7 +202,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
   <details class="card more" id="f-more">
     <summary>Details <span class="muted small" id="more-sum" style="margin-left:auto;margin-right:8px;font-weight:400"></span></summary>
     <div class="inner">
-      <div><div class="lbl">Wann</div><div class="chips" id="f-daytime">
+      <div><div class="lbl">Tageszeit</div><div class="chips" id="f-daytime">
         <button type="button" class="chip" data-v="morgens">morgens</button>
         <button type="button" class="chip" data-v="mittags">mittags</button>
         <button type="button" class="chip" data-v="abends">abends</button>
@@ -352,6 +352,8 @@ const esc=s=>String(s??"");
 const STOP_ALIAS={"Tamponade selbst":"Ausstopfen / Tamponade","Ausstopfen":"Ausstopfen / Tamponade"};
 const stopList=s=>[...new Set(String(s||"").split(",").map(x=>x.trim()).filter(Boolean).map(x=>STOP_ALIAS[x]||x))];
 const normStop=s=>stopList(s).join(", ");
+// Preselection from the clock time: 5–11 morgens, 11–17 mittags, 17–22 abends, otherwise nachts
+const daytimeFor=t=>{const h=parseInt(t,10);return isNaN(h)?"":h>=5&&h<11?"morgens":h>=11&&h<17?"mittags":h>=17&&h<22?"abends":"nachts"};
 
 /* ---------- storage ---------- */
 let store={episodes:[],ess:[],lastBackup:null};
@@ -379,18 +381,19 @@ function sheet(build){const L=$("#layer");const bg=document.createElement("div")
 
 /* ---------- entry form ---------- */
 let form, editingId=null;
-function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,daytime:"",side:"",triggers:[],stopped:[],note:""}}
+function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,daytime:"",dtAuto:true,side:"",triggers:[],stopped:[],note:""}}
 function paintForm(){
   $("#f-date").value=form.date;$("#f-time").value=form.time;
   $("#dur-out").textContent=form.dur==null?"– min":(form.dur<1?"< 1 min":fmt1(form.dur)+" min");
   document.querySelectorAll("#f-dur .big").forEach(b=>b.setAttribute("aria-pressed",String(form.dur!=null&&bucketOf(form.dur)===b.dataset.v)));
   document.querySelectorAll("#f-int .big").forEach(b=>b.setAttribute("aria-pressed",String(String(form.intensity)===b.dataset.v)));
+  if(form.dtAuto)form.daytime=daytimeFor(form.time);
   document.querySelectorAll("#f-daytime .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.daytime===b.dataset.v)));
   document.querySelectorAll("#f-side .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.side===b.dataset.v)));
   document.querySelectorAll("#f-stop .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.stopped.includes(b.dataset.v))));
   document.querySelectorAll("#f-trig .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.triggers.includes(b.dataset.v))));
   $("#f-note").value=form.note;
-  const parts=[form.daytime,form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
+  const parts=[form.dtAuto?"":form.daytime,form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
   $("#f-save").disabled=!(form.dur!=null&&form.intensity);
   $("#f-save").textContent=editingId?"Änderung speichern":"Speichern";
   $("#editbar").hidden=!editingId; $("#f-hint").textContent="";
@@ -398,13 +401,13 @@ function paintForm(){
 function bucketOf(m){return m<1?"0.5":m<=5?"3":m<=15?"10":m<=30?"20":"40"}
 form=blankForm();
 $("#f-date").addEventListener("change",e=>{form.date=e.target.value||form.date});
-$("#f-time").addEventListener("change",e=>{form.time=e.target.value});
+$("#f-time").addEventListener("change",e=>{form.time=e.target.value;paintForm()});
 $("#f-now").addEventListener("click",()=>{const b=blankForm();form.date=b.date;form.time=b.time;paintForm()});
 $("#f-dur").addEventListener("click",e=>{const b=e.target.closest(".big");if(!b)return;form.dur=Number(b.dataset.v);paintForm()});
 $("#dur-minus").addEventListener("click",()=>{form.dur=form.dur==null?0.5:form.dur<=1?0.5:Math.round(form.dur)-1;paintForm()});
 $("#dur-plus").addEventListener("click",()=>{form.dur=form.dur==null?1:form.dur<1?1:Math.round(form.dur)+1;paintForm()});
 $("#f-int").addEventListener("click",e=>{const b=e.target.closest(".big");if(!b)return;form.intensity=Number(b.dataset.v);paintForm()});
-$("#f-daytime").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.daytime=form.daytime===b.dataset.v?"":b.dataset.v;paintForm()});
+$("#f-daytime").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.dtAuto=false;form.daytime=form.daytime===b.dataset.v?"":b.dataset.v;paintForm()});
 $("#f-side").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.side=form.side===b.dataset.v?"":b.dataset.v;paintForm()});
 $("#f-stop").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.stopped=form.stopped.includes(v)?form.stopped.filter(x=>x!==v):[...form.stopped,v];paintForm()});
 $("#f-trig").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.triggers=form.triggers.includes(v)?form.triggers.filter(x=>x!==v):[...form.triggers,v];paintForm()});
@@ -422,7 +425,7 @@ $("#f-save").addEventListener("click",()=>{
   toast("Gespeichert","Rückgängig",()=>{store.episodes=store.episodes.filter(e=>e.id!==ep.id);persist();render()});
 });
 function startEdit(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;editingId=id;
-  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,daytime:e.daytime||"",side:e.side||"",triggers:[...(e.triggers||[])],stopped:stopList(e.stopped),note:e.note||""};
+  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,daytime:e.daytime||"",dtAuto:!e.daytime,side:e.side||"",triggers:[...(e.triggers||[])],stopped:stopList(e.stopped),note:e.note||""};
   $("#f-more").open=!!(form.daytime||form.side||form.triggers.length||form.stopped.length||form.note);show("v-add");paintForm()}
 
 /* ---------- aggregates ---------- */
@@ -515,7 +518,7 @@ function renderList(){
 function openEp(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;
   sheet((sh,close)=>{const h=document.createElement("h3");h.textContent=fmtD(e.date)+(e.time?" · "+e.time:"");
     const dl=document.createElement("dl");dl.className="kv";
-    [["Dauer",(+e.duration_min<1?"< 1":fmt1(+e.duration_min))+" min"],["Stärke",INT[e.intensity]],["Wann",e.daytime],["Seite",e.side],["Auslöser",(e.triggers||[]).join(", ")],["Gestoppt",e.stopped],["Notiz",e.note]]
+    [["Dauer",(+e.duration_min<1?"< 1":fmt1(+e.duration_min))+" min"],["Stärke",INT[e.intensity]],["Tageszeit",e.daytime],["Seite",e.side],["Auslöser",(e.triggers||[]).join(", ")],["Gestoppt",e.stopped],["Notiz",e.note]]
       .filter(r=>r[1]).forEach(([k,v])=>{const dt=document.createElement("dt");dt.textContent=k;const dd=document.createElement("dd");dd.textContent=v;dl.append(dt,dd)});
     const row=document.createElement("div");row.className="rowbtns";
     const ed=document.createElement("button");ed.type="button";ed.className="btn2";ed.textContent="Bearbeiten";ed.addEventListener("click",()=>{close();startEdit(id)});
