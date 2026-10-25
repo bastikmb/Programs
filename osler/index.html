@@ -202,6 +202,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
   <details class="card more" id="f-more">
     <summary>Details <span class="muted small" id="more-sum" style="margin-left:auto;margin-right:8px;font-weight:400"></span></summary>
     <div class="inner">
+      <div><div class="lbl">Wann</div><div class="chips" id="f-daytime">
+        <button type="button" class="chip" data-v="morgens">morgens</button>
+        <button type="button" class="chip" data-v="mittags">mittags</button>
+        <button type="button" class="chip" data-v="abends">abends</button>
+        <button type="button" class="chip" data-v="nachts">nachts</button>
+      </div></div>
       <div><div class="lbl">Seite</div><div class="chips" id="f-side">
         <button type="button" class="chip" data-v="links">links</button>
         <button type="button" class="chip" data-v="rechts">rechts</button>
@@ -373,17 +379,18 @@ function sheet(build){const L=$("#layer");const bg=document.createElement("div")
 
 /* ---------- entry form ---------- */
 let form, editingId=null;
-function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,side:"",triggers:[],stopped:[],note:""}}
+function blankForm(){const n=new Date();return{date:iso(n),time:pad(n.getHours())+":"+pad(n.getMinutes()),dur:null,intensity:null,daytime:"",side:"",triggers:[],stopped:[],note:""}}
 function paintForm(){
   $("#f-date").value=form.date;$("#f-time").value=form.time;
   $("#dur-out").textContent=form.dur==null?"– min":(form.dur<1?"< 1 min":fmt1(form.dur)+" min");
   document.querySelectorAll("#f-dur .big").forEach(b=>b.setAttribute("aria-pressed",String(form.dur!=null&&bucketOf(form.dur)===b.dataset.v)));
   document.querySelectorAll("#f-int .big").forEach(b=>b.setAttribute("aria-pressed",String(String(form.intensity)===b.dataset.v)));
+  document.querySelectorAll("#f-daytime .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.daytime===b.dataset.v)));
   document.querySelectorAll("#f-side .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.side===b.dataset.v)));
   document.querySelectorAll("#f-stop .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.stopped.includes(b.dataset.v))));
   document.querySelectorAll("#f-trig .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.triggers.includes(b.dataset.v))));
   $("#f-note").value=form.note;
-  const parts=[form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
+  const parts=[form.daytime,form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
   $("#f-save").disabled=!(form.dur!=null&&form.intensity);
   $("#f-save").textContent=editingId?"Änderung speichern":"Speichern";
   $("#editbar").hidden=!editingId; $("#f-hint").textContent="";
@@ -397,6 +404,7 @@ $("#f-dur").addEventListener("click",e=>{const b=e.target.closest(".big");if(!b)
 $("#dur-minus").addEventListener("click",()=>{form.dur=form.dur==null?0.5:form.dur<=1?0.5:Math.round(form.dur)-1;paintForm()});
 $("#dur-plus").addEventListener("click",()=>{form.dur=form.dur==null?1:form.dur<1?1:Math.round(form.dur)+1;paintForm()});
 $("#f-int").addEventListener("click",e=>{const b=e.target.closest(".big");if(!b)return;form.intensity=Number(b.dataset.v);paintForm()});
+$("#f-daytime").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.daytime=form.daytime===b.dataset.v?"":b.dataset.v;paintForm()});
 $("#f-side").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;form.side=form.side===b.dataset.v?"":b.dataset.v;paintForm()});
 $("#f-stop").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.stopped=form.stopped.includes(v)?form.stopped.filter(x=>x!==v):[...form.stopped,v];paintForm()});
 $("#f-trig").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;form.triggers=form.triggers.includes(v)?form.triggers.filter(x=>x!==v):[...form.triggers,v];paintForm()});
@@ -405,7 +413,7 @@ $("#edit-cancel").addEventListener("click",()=>{editingId=null;form=blankForm();
 $("#f-save").addEventListener("click",()=>{
   if(!form.date){$("#f-hint").textContent="Bitte ein Datum wählen.";return}
   if(form.date>iso(new Date())){$("#f-hint").textContent="Das Datum liegt in der Zukunft.";return}
-  const row={date:form.date,time:form.time||"",duration_min:form.dur,intensity:form.intensity,side:form.side,triggers:[...form.triggers],stopped:form.stopped.join(", "),note:form.note.trim()};
+  const row={date:form.date,time:form.time||"",duration_min:form.dur,intensity:form.intensity,daytime:form.daytime,side:form.side,triggers:[...form.triggers],stopped:form.stopped.join(", "),note:form.note.trim()};
   if(editingId){const i=store.episodes.findIndex(e=>e.id===editingId);if(i>=0)store.episodes[i]=Object.assign({},store.episodes[i],row,{updated:new Date().toISOString()});
     if(!persist())return;editingId=null;form=blankForm();$("#f-more").open=false;paintForm();toast("Änderung gespeichert");show("v-list");return}
   const ep=Object.assign({id:uid(),created:new Date().toISOString()},row);store.episodes.push(ep);if(!persist()){store.episodes.pop();return}
@@ -414,8 +422,8 @@ $("#f-save").addEventListener("click",()=>{
   toast("Gespeichert","Rückgängig",()=>{store.episodes=store.episodes.filter(e=>e.id!==ep.id);persist();render()});
 });
 function startEdit(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;editingId=id;
-  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,side:e.side||"",triggers:[...(e.triggers||[])],stopped:stopList(e.stopped),note:e.note||""};
-  $("#f-more").open=!!(form.side||form.triggers.length||form.stopped.length||form.note);show("v-add");paintForm()}
+  form={date:e.date,time:e.time||"",dur:Number(e.duration_min),intensity:e.intensity,daytime:e.daytime||"",side:e.side||"",triggers:[...(e.triggers||[])],stopped:stopList(e.stopped),note:e.note||""};
+  $("#f-more").open=!!(form.daytime||form.side||form.triggers.length||form.stopped.length||form.note);show("v-add");paintForm()}
 
 /* ---------- aggregates ---------- */
 function win(from,to){const r=store.episodes.filter(e=>e.date>=from&&e.date<=to);const min=r.reduce((a,e)=>a+(+e.duration_min||0),0);
@@ -499,7 +507,7 @@ function renderList(){
       const b=document.createElement("button");b.type="button";b.className="ep";
       const bar=document.createElement("i");bar.className="bar";bar.style.background=ICOL[e.intensity]||ICOL[1];
       const mid=document.createElement("div");const t=document.createElement("div");t.className="t";t.textContent=fmtD(e.date)+(e.time?" · "+e.time:"");
-      const d=document.createElement("div");d.className="d";d.textContent=[INT[e.intensity],e.side,(e.triggers||[]).join(", "),e.stopped].filter(Boolean).join(" · ");mid.append(t,d);
+      const d=document.createElement("div");d.className="d";d.textContent=[INT[e.intensity],e.daytime,e.side,(e.triggers||[]).join(", "),e.stopped].filter(Boolean).join(" · ");mid.append(t,d);
       const mm=document.createElement("span");mm.className="m";mm.textContent=(+e.duration_min<1?"<1":fmt1(+e.duration_min))+" min";
       b.append(bar,mid,mm);b.addEventListener("click",()=>openEp(e.id));grp.append(b)})}
   const n=store.episodes.length;$("#data-info").textContent=`${n} Episode${n===1?"":"n"}, ${store.ess.length} ESS-Wert${store.ess.length===1?"":"e"} gespeichert.`+(store.lastBackup?` Letztes Backup: ${fmtD(store.lastBackup.slice(0,10))}.`:" Noch kein Backup.");
@@ -507,7 +515,7 @@ function renderList(){
 function openEp(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;
   sheet((sh,close)=>{const h=document.createElement("h3");h.textContent=fmtD(e.date)+(e.time?" · "+e.time:"");
     const dl=document.createElement("dl");dl.className="kv";
-    [["Dauer",(+e.duration_min<1?"< 1":fmt1(+e.duration_min))+" min"],["Stärke",INT[e.intensity]],["Seite",e.side],["Auslöser",(e.triggers||[]).join(", ")],["Gestoppt",e.stopped],["Notiz",e.note]]
+    [["Dauer",(+e.duration_min<1?"< 1":fmt1(+e.duration_min))+" min"],["Stärke",INT[e.intensity]],["Wann",e.daytime],["Seite",e.side],["Auslöser",(e.triggers||[]).join(", ")],["Gestoppt",e.stopped],["Notiz",e.note]]
       .filter(r=>r[1]).forEach(([k,v])=>{const dt=document.createElement("dt");dt.textContent=k;const dd=document.createElement("dd");dd.textContent=v;dl.append(dt,dd)});
     const row=document.createElement("div");row.className="rowbtns";
     const ed=document.createElement("button");ed.type="button";ed.className="btn2";ed.textContent="Bearbeiten";ed.addEventListener("click",()=>{close();startEdit(id)});
@@ -527,8 +535,8 @@ async function deliver(filename,text,mime){
 $("#b-backup").addEventListener("click",async()=>{const ok=await deliver(`nasenbluten-backup-${iso(new Date())}.json`,JSON.stringify({app:"nasenbluten",version:1,exported:new Date().toISOString(),episodes:store.episodes,ess:store.ess},null,1),"application/json");
   if(ok){store.lastBackup=new Date().toISOString();persist();renderList()}});
 $("#b-csv").addEventListener("click",()=>{const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
-  const L=[["Datum","Uhrzeit","Dauer_min","Staerke","Seite","Ausloeser","Gestoppt","Notiz"].join(";")];
-  [...sorted()].reverse().forEach(e=>L.push([e.date,e.time,String(e.duration_min).replace(".",","),INT[e.intensity]||"",e.side,(e.triggers||[]).join(", "),e.stopped,e.note].map(q).join(";")));
+  const L=[["Datum","Uhrzeit","Dauer_min","Staerke","Tageszeit","Seite","Ausloeser","Gestoppt","Notiz"].join(";")];
+  [...sorted()].reverse().forEach(e=>L.push([e.date,e.time,String(e.duration_min).replace(".",","),INT[e.intensity]||"",e.daytime||"",e.side,(e.triggers||[]).join(", "),e.stopped,e.note].map(q).join(";")));
   deliver(`nasenbluten-${iso(new Date())}.csv`,"﻿"+L.join("\r\n"),"text/csv")});
 $("#b-import").addEventListener("click",()=>$("#imp-file").click());
 $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const txt=(await f.text()).replace(/^﻿/,"");
@@ -537,7 +545,7 @@ $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.t
   catch(err){toast("Datei konnte nicht gelesen werden.");return}
   const key=x=>x.date+"|"+(x.time||"")+"|"+x.duration_min+"|"+x.intensity;const have=new Set(store.episodes.map(key));let added=0;
   eps.forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!(+x.duration_min>=0)||![1,2,3].includes(+x.intensity))return;
-    const r={id:x.id||uid(),created:x.created||new Date().toISOString(),date:x.date,time:x.time||"",duration_min:+x.duration_min,intensity:+x.intensity,side:x.side||"",triggers:Array.isArray(x.triggers)?x.triggers:[],stopped:normStop(x.stopped),note:x.note||""};
+    const r={id:x.id||uid(),created:x.created||new Date().toISOString(),date:x.date,time:x.time||"",duration_min:+x.duration_min,intensity:+x.intensity,daytime:x.daytime||"",side:x.side||"",triggers:Array.isArray(x.triggers)?x.triggers:[],stopped:normStop(x.stopped),note:x.note||""};
     if(have.has(key(r)))return;have.add(key(r));store.episodes.push(r);added++});
   const hk=new Set(store.ess.map(x=>x.date+"|"+x.score));let addE=0;ess.forEach(x=>{if(x&&typeof x.score==="number"&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&!hk.has(x.date+"|"+x.score)){store.ess.push({id:x.id||uid(),date:x.date,score:x.score,answers:x.answers||{}});addE++}});
   persist();render();toast(`${added} Episode${added===1?"":"n"}${addE?` und ${addE} ESS`:""} importiert`)});
@@ -545,7 +553,7 @@ function parseCsv(t){const lines=t.split(/\r?\n/).filter(l=>l.trim());if(!lines.
   const split=l=>{const out=[];let cur="",q=false;for(let i=0;i<l.length;i++){const c=l[i];if(q){if(c==='"'&&l[i+1]==='"'){cur+='"';i++}else if(c==='"')q=false;else cur+=c}else if(c==='"')q=true;else if(c===";"){out.push(cur);cur=""}else cur+=c}out.push(cur);return out};
   const head=split(lines[0]).map(h=>h.trim().toLowerCase());const col=n=>head.indexOf(n);const rev={tropfen:1,rinnsal:2,strom:3};
   return lines.slice(1).map(l=>{const c=split(l);const g=n=>col(n)>=0?(c[col(n)]||"").trim():"";
-    return{date:g("datum"),time:g("uhrzeit"),duration_min:Number(g("dauer_min").replace(",",".")),intensity:rev[g("staerke").toLowerCase()]||0,side:g("seite"),
+    return{date:g("datum"),time:g("uhrzeit"),duration_min:Number(g("dauer_min").replace(",",".")),intensity:rev[g("staerke").toLowerCase()]||0,daytime:g("tageszeit"),side:g("seite"),
       triggers:g("ausloeser")?g("ausloeser").split(",").map(s=>s.trim()).filter(Boolean):[],stopped:g("gestoppt"),note:g("notiz")}})}
 
 /* ---------- ESS ---------- */
