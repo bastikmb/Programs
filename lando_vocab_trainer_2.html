@@ -2250,6 +2250,9 @@ body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   width:auto;
   padding:0 0.05em;
 }
+/* Sprachauswahl: alle Sprachen gleich groß untereinander */
+.lang-list { display:flex; flex-direction:column; gap:0.5rem; margin-bottom:var(--space-3); }
+.lang-list > .select-pill { width:100%; min-height:3.2rem; justify-content:flex-start; text-align:left; }
 /* Buchauswahl: Gruppen, gleich breite Kacheln, Erwachsenenbücher abgesetzt */
 :root { --adult-bg:#eef2fa; --adult-border:#2b4a80; --adult-ink:#1f3a6b; --family-bg:#fff6e5; --family-border:#c2410c; --family-ink:#9a3412; }
 body.dark-theme { --adult-bg:#14203a; --adult-border:#5b7fc4; --adult-ink:#a9c1ee; --family-bg:#2a1c10; --family-border:#fb923c; --family-ink:#fdba74; }
@@ -2544,7 +2547,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
 
     <div class="section-block">
       <div class="section-title">Sprache wählen</div>
-      <div id="languageList" class="flex-row-wrap"></div>
+      <div id="languageList" class="lang-list"></div>
       <div class="section-sub">Englisch, Latein und Tagalog bringen fertige Vokabeln mit. Du kannst dir aber auch jederzeit eigene Bücher/Seiten/Vokabeln anlegen.</div>
     </div>
 
@@ -14137,7 +14140,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-27.7";
+const APP_BUILD = "2026-10-27.8";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
