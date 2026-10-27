@@ -6597,325 +6597,422 @@ const BOOKS = {
     cover: BOOK_COVERS.tl_family,
     extra: true,  // kein Schulbuch -- zählt nicht für "Weltreisender"
     family: true, // eigene Gruppe "Für die ganze Familie" (siehe renderBookList)
+    lessons: true, // Kapitel in Lektionen à 5 Wörter -- neue Sprache, kurze Runden
     pages: {
-      "TL-01": [
+      "TL-01-1": [
         {de:"Hallo, wie geht's?", foreign:"Kumusta? / Kamusta?", icon:"👋", example:"Kumusta ka, Lola?"},
         {de:"Guten Morgen", foreign:"Magandang umaga", icon:"🌅", example:"Magandang umaga po, Tito!"},
         {de:"Guten Tag (mittags)", foreign:"Magandang tanghali", icon:"☀️", example:"Magandang tanghali po sa inyong lahat."},
         {de:"Guten Nachmittag", foreign:"Magandang hapon", icon:"🌤️", example:"Magandang hapon po, Tita."},
-        {de:"Guten Abend", foreign:"Magandang gabi", icon:"🌙", example:"Magandang gabi po, Lolo."},
+        {de:"Guten Abend", foreign:"Magandang gabi", icon:"🌙", example:"Magandang gabi po, Lolo."}
+      ],
+      "TL-01-2": [
         {de:"Danke", foreign:"Salamat (po)", icon:"🙏", example:"Salamat po sa pagkain."},
         {de:"Vielen Dank", foreign:"Maraming salamat (po)", icon:"💐", example:"Maraming salamat po sa lahat."},
         {de:"Gern geschehen", foreign:"Walang anuman", icon:"🙂", example:"Walang anuman, anak."},
         {de:"Ja (höflich)", foreign:"Opo", icon:"👍", example:"Opo, Lola, kumain na ako."},
-        {de:"Ja", foreign:"Oo", icon:"✔️", example:"Oo, gusto ko."},
+        {de:"Ja", foreign:"Oo", icon:"✔️", example:"Oo, gusto ko."}
+      ],
+      "TL-01-3": [
         {de:"Nein", foreign:"Hindi (po)", icon:"✖️", example:"Hindi po, salamat."},
         {de:"bitte (beim Bitten)", foreign:"paki-", icon:"🤲", example:"Pakiabot po ng tubig."},
         {de:"Entschuldigung", foreign:"Pasensya na / Pasensiya na", icon:"😔", example:"Pasensya na po, late ako."},
         {de:"Darf ich vorbei?", foreign:"Makikiraan po.", icon:"🚶", example:"Makikiraan po, salamat."},
-        {de:"Auf Wiedersehen", foreign:"Paalam", icon:"👋", example:"Paalam na po, salamat sa lahat."},
+        {de:"Auf Wiedersehen", foreign:"Paalam", icon:"👋", example:"Paalam na po, salamat sa lahat."}
+      ],
+      "TL-01-4": [
         {de:"Pass auf dich auf!", foreign:"Ingat!", icon:"💚", example:"Ingat ka sa biyahe!"},
         {de:"Bis später!", foreign:"Kita tayo mamaya!", icon:"⏰", example:"Sige, kita tayo mamaya!"},
         {de:"Willkommen", foreign:"Maligayang pagdating", icon:"🎉", example:"Maligayang pagdating sa Pilipinas!"},
         {de:"Mir geht es gut.", foreign:"Mabuti naman.", icon:"😊", example:"Mabuti naman po, salamat."},
-        {de:"Und dir?", foreign:"Ikaw?", icon:"👉", example:"Mabuti ako. Ikaw?"},
+        {de:"Und dir?", foreign:"Ikaw?", icon:"👉", example:"Mabuti ako. Ikaw?"}
+      ],
+      "TL-01-5": [
         {de:"Höflichkeitswort (gegenüber Älteren)", foreign:"po", icon:"🙇", example:"Salamat po, Lolo."},
         {de:"Segensgruß an Ältere", foreign:"Mano po", icon:"🤚", example:"Mano po, Lola."},
         {de:"Kein Problem", foreign:"Walang problema", icon:"👌", example:"Walang problema, ako na ang bahala."},
         {de:"Herzlichen Glückwunsch", foreign:"Binabati kita", icon:"🎊", example:"Binabati kita sa bagong trabaho mo!"},
         {de:"okay / in Ordnung", foreign:"Sige", icon:"🆗", example:"Sige, tara na."}
       ],
-      "TL-02": [
+      "TL-02-1": [
         {de:"Familie", foreign:"pamilya", icon:"👨‍👩‍👧‍👦", example:"Malaki ang pamilya namin."},
         {de:"Mutter", foreign:"nanay / inay", icon:"👩", example:"Ang nanay ko ay taga-Maynila."},
         {de:"Vater", foreign:"tatay / itay", icon:"👨", example:"Nasa trabaho pa si Tatay."},
         {de:"Großvater", foreign:"lolo", icon:"👴", example:"Si Lolo ay walumpung taon na."},
-        {de:"Großmutter", foreign:"lola", icon:"👵", example:"Masarap magluto si Lola."},
+        {de:"Großmutter", foreign:"lola", icon:"👵", example:"Masarap magluto si Lola."}
+      ],
+      "TL-02-2": [
         {de:"älterer Bruder (Anrede)", foreign:"kuya", icon:"🧑", example:"Kuya, tulungan mo ako."},
         {de:"ältere Schwester (Anrede)", foreign:"ate", icon:"👧", example:"Ate, saan ka pupunta?"},
         {de:"jüngstes Kind", foreign:"bunso", icon:"🧒", example:"Siya ang bunso sa pamilya."},
         {de:"Onkel", foreign:"tito", icon:"🧔", example:"Si Tito ang susundo sa amin."},
-        {de:"Tante", foreign:"tita", icon:"👩‍🦱", example:"Si Tita ay nakatira sa Quezon City."},
+        {de:"Tante", foreign:"tita", icon:"👩‍🦱", example:"Si Tita ay nakatira sa Quezon City."}
+      ],
+      "TL-02-3": [
         {de:"Cousin / Cousine", foreign:"pinsan", icon:"🧑‍🤝‍🧑", example:"Marami akong pinsan sa Pilipinas."},
         {de:"Neffe / Nichte", foreign:"pamangkin", icon:"👶", example:"Ang pamangkin ko ay limang taon na."},
         {de:"Enkel / Enkelin", foreign:"apo", icon:"🧸", example:"Mahal na mahal ni Lola ang mga apo niya."},
         {de:"Geschwister", foreign:"kapatid", icon:"👫", example:"Ilan ang kapatid mo?"},
-        {de:"Bruder", foreign:"kapatid na lalaki", icon:"👦", example:"May isang kapatid na lalaki ako."},
+        {de:"Bruder", foreign:"kapatid na lalaki", icon:"👦", example:"May isang kapatid na lalaki ako."}
+      ],
+      "TL-02-4": [
         {de:"Schwester", foreign:"kapatid na babae", icon:"👧", example:"Ang kapatid na babae ko ay nasa Cebu."},
         {de:"Kind (Sohn oder Tochter)", foreign:"anak", icon:"🧒", example:"Tatlo ang anak nila."},
         {de:"Ehepartner", foreign:"asawa", icon:"💑", example:"Ito ang asawa ko."},
         {de:"Baby", foreign:"sanggol / baby", icon:"🍼", example:"Natutulog ang sanggol."},
-        {de:"Verwandte", foreign:"kamag-anak", icon:"👪", example:"Darating ang mga kamag-anak namin bukas."},
+        {de:"Verwandte", foreign:"kamag-anak", icon:"👪", example:"Darating ang mga kamag-anak namin bukas."}
+      ],
+      "TL-02-5": [
         {de:"Schwiegervater / Schwiegermutter", foreign:"biyenan", icon:"🏡", example:"Mabait ang biyenan ko."},
         {de:"Taufpate", foreign:"ninong", icon:"🤵", example:"Si Tito Ben ang ninong ko."},
         {de:"Taufpatin", foreign:"ninang", icon:"👰", example:"Binigyan ako ng regalo ng ninang ko."},
         {de:"Das ist meine Mutter.", foreign:"Siya ang nanay ko.", icon:"👉", example:"Lola, siya ang nanay ko."},
         {de:"Wie viele Geschwister hast du?", foreign:"Ilan ang kapatid mo?", icon:"❓", example:"Ilan ang kapatid mo, Kuya?"}
       ],
-      "TL-03": [
+      "TL-03-1": [
         {de:"Wie heißt du?", foreign:"Ano ang pangalan mo?", icon:"🏷️", example:"Hi! Ano ang pangalan mo?"},
         {de:"Ich heiße ...", foreign:"Ako si ...", icon:"🙋", example:"Ako si Anna."},
         {de:"Woher kommst du?", foreign:"Taga-saan ka?", icon:"🌍", example:"Taga-saan ka sa Pilipinas?"},
         {de:"Ich komme aus Deutschland.", foreign:"Taga-Germany ako. / Taga-Alemanya ako.", icon:"🇩🇪", example:"Taga-Germany ako, pero Pilipina ang nanay ko."},
-        {de:"Wie alt bist du?", foreign:"Ilang taon ka na?", icon:"🎂", example:"Ilang taon ka na, iha?"},
+        {de:"Wie alt bist du?", foreign:"Ilang taon ka na?", icon:"🎂", example:"Ilang taon ka na, iha?"}
+      ],
+      "TL-03-2": [
         {de:"Ich bin zehn Jahre alt.", foreign:"Sampung taon na ako.", icon:"🔟", example:"Sampung taon na ako, Lola."},
         {de:"Ich spreche ein bisschen Tagalog.", foreign:"Marunong ako ng kaunting Tagalog.", icon:"🗣️", example:"Marunong ako ng kaunting Tagalog."},
         {de:"Ich verstehe.", foreign:"Naiintindihan ko.", icon:"💡", example:"Ah, naiintindihan ko na."},
         {de:"Name", foreign:"pangalan", icon:"📛", example:"Ang ganda ng pangalan mo!"},
-        {de:"Deutschland", foreign:"Alemanya / Germany", icon:"🗺️", example:"Malamig sa Alemanya kapag Disyembre."},
+        {de:"Deutschland", foreign:"Alemanya / Germany", icon:"🗺️", example:"Malamig sa Alemanya kapag Disyembre."}
+      ],
+      "TL-03-3": [
         {de:"Deutscher / Deutsche", foreign:"Aleman", icon:"🧑", example:"Aleman ang tatay ko."},
         {de:"ich", foreign:"ako", icon:"☝️", example:"Ako ang bunso."},
         {de:"du", foreign:"ikaw / ka", icon:"👉", example:"Ikaw ba si Kuya Mark?"},
         {de:"er / sie (eine Person)", foreign:"siya", icon:"🧍", example:"Siya ang pinsan ko."},
-        {de:"wir (alle zusammen)", foreign:"tayo", icon:"🤝", example:"Kain na tayo!"},
+        {de:"wir (alle zusammen)", foreign:"tayo", icon:"🤝", example:"Kain na tayo!"}
+      ],
+      "TL-03-4": [
         {de:"wir (ohne dich)", foreign:"kami", icon:"👥", example:"Kami ay taga-Germany."},
         {de:"ihr / Sie (höflich)", foreign:"kayo", icon:"🙌", example:"Taga-saan po kayo?"},
         {de:"sie (mehrere)", foreign:"sila", icon:"👨‍👩‍👧", example:"Sila ang mga kapatid ko."},
         {de:"Freut mich, dich kennenzulernen.", foreign:"Ikinagagalak kitang makilala.", icon:"🤗", example:"Ikinagagalak kitang makilala, Tita."},
-        {de:"Ich wohne in ...", foreign:"Nakatira ako sa ...", icon:"🏘️", example:"Nakatira ako sa Munich."},
+        {de:"Ich wohne in ...", foreign:"Nakatira ako sa ...", icon:"🏘️", example:"Nakatira ako sa Munich."}
+      ],
+      "TL-03-5": [
         {de:"Was arbeitest du?", foreign:"Ano ang trabaho mo?", icon:"💼", example:"Ano ang trabaho mo sa Germany?"},
         {de:"Ich mag ...", foreign:"Gusto ko ng ...", icon:"❤️", example:"Gusto ko ng mangga."},
         {de:"Ich mag kein ...", foreign:"Ayoko ng ...", icon:"🙅", example:"Ayoko ng maanghang."},
         {de:"Freund / Freundin", foreign:"kaibigan", icon:"🧑‍🤝‍🧑", example:"Siya ang matalik kong kaibigan."},
         {de:"Bist du verheiratet?", foreign:"May asawa ka na ba?", icon:"💍", example:"May asawa ka na ba, Kuya?"}
       ],
-      "TL-04": [
+      "TL-04-1": [
         {de:"Haus", foreign:"bahay", icon:"🏠", example:"Malaki ang bahay ni Lola."},
         {de:"Zimmer", foreign:"kuwarto / kwarto", icon:"🚪", example:"Dito ang kuwarto mo."},
         {de:"Toilette", foreign:"CR / banyo", icon:"🚻", example:"Nasa likod ang CR."},
         {de:"Küche", foreign:"kusina", icon:"🍳", example:"Nasa kusina si Nanay."},
-        {de:"Wohnzimmer", foreign:"sala", icon:"🛋️", example:"Manood tayo ng TV sa sala."},
+        {de:"Wohnzimmer", foreign:"sala", icon:"🛋️", example:"Manood tayo ng TV sa sala."}
+      ],
+      "TL-04-2": [
         {de:"Bett", foreign:"kama", icon:"🛏️", example:"Malambot ang kama."},
         {de:"schlafen", foreign:"matulog", icon:"😴", example:"Gusto ko nang matulog."},
         {de:"aufwachen", foreign:"gumising", icon:"⏰", example:"Gumising ka na, almusal na!"},
         {de:"duschen / baden", foreign:"maligo", icon:"🚿", example:"Maligo ka muna bago kumain."},
-        {de:"Tür", foreign:"pinto", icon:"🚪", example:"Isara mo ang pinto."},
+        {de:"Tür", foreign:"pinto", icon:"🚪", example:"Isara mo ang pinto."}
+      ],
+      "TL-04-3": [
         {de:"Fenster", foreign:"bintana", icon:"🪟", example:"Buksan mo ang bintana, mainit."},
         {de:"Tisch", foreign:"mesa", icon:"🍽️", example:"Nasa mesa ang pagkain."},
         {de:"Stuhl", foreign:"upuan", icon:"🪑", example:"Umupo ka dito sa upuan."},
         {de:"Ventilator", foreign:"bentilador / electric fan", icon:"🌀", example:"Pakibukas ang electric fan."},
-        {de:"Klimaanlage", foreign:"aircon", icon:"❄️", example:"May aircon sa kuwarto."},
+        {de:"Klimaanlage", foreign:"aircon", icon:"❄️", example:"May aircon sa kuwarto."}
+      ],
+      "TL-04-4": [
         {de:"Licht", foreign:"ilaw", icon:"💡", example:"Patayin mo ang ilaw."},
         {de:"Wäsche waschen", foreign:"maglaba", icon:"🧺", example:"Maglalaba si Ate mamaya."},
         {de:"putzen", foreign:"maglinis", icon:"🧹", example:"Tutulong ako maglinis ng bahay."},
         {de:"Schlüssel", foreign:"susi", icon:"🔑", example:"Nasaan ang susi ng bahay?"},
-        {de:"Handtuch", foreign:"tuwalya", icon:"🧻", example:"Pahingi po ng tuwalya."},
+        {de:"Handtuch", foreign:"tuwalya", icon:"🧻", example:"Pahingi po ng tuwalya."}
+      ],
+      "TL-04-5": [
         {de:"Seife", foreign:"sabon", icon:"🧼", example:"Nasa banyo ang sabon."},
         {de:"Zahnbürste", foreign:"sipilyo", icon:"🪥", example:"Nakalimutan ko ang sipilyo ko."},
         {de:"Wo ist die Toilette?", foreign:"Saan ang CR?", icon:"❓", example:"Tita, saan ang CR?"},
         {de:"Ich bin müde.", foreign:"Pagod ako.", icon:"🥱", example:"Pagod ako sa biyahe."},
         {de:"Ich gehe schlafen.", foreign:"Matutulog na ako.", icon:"🌙", example:"Good night, matutulog na ako."}
       ],
-      "TL-05": [
+      "TL-05-1": [
         {de:"Lass uns essen!", foreign:"Kain tayo!", icon:"🍽️", example:"Halika, kain tayo!"},
         {de:"Hast du schon gegessen?", foreign:"Kumain ka na ba?", icon:"🍚", example:"Kumain ka na ba, anak?"},
         {de:"essen", foreign:"kumain", icon:"🥄", example:"Gusto kong kumain ng adobo."},
         {de:"trinken", foreign:"uminom", icon:"🥤", example:"Uminom ka ng tubig."},
-        {de:"lecker", foreign:"masarap", icon:"😋", example:"Masarap ang luto ni Lola."},
+        {de:"lecker", foreign:"masarap", icon:"😋", example:"Masarap ang luto ni Lola."}
+      ],
+      "TL-05-2": [
         {de:"Wie lecker!", foreign:"Ang sarap!", icon:"🤤", example:"Ang sarap ng lechon!"},
         {de:"Ich bin satt.", foreign:"Busog na ako.", icon:"🫃", example:"Salamat po, busog na ako."},
         {de:"Ich habe Hunger.", foreign:"Gutom na ako.", icon:"😩", example:"Nanay, gutom na ako!"},
         {de:"Ich habe Durst.", foreign:"Nauuhaw ako.", icon:"🥵", example:"Nauuhaw ako, may tubig ba?"},
-        {de:"Reis (gekocht)", foreign:"kanin", icon:"🍚", example:"Gusto mo pa ng kanin?"},
+        {de:"Reis (gekocht)", foreign:"kanin", icon:"🍚", example:"Gusto mo pa ng kanin?"}
+      ],
+      "TL-05-3": [
         {de:"Reis (ungekocht)", foreign:"bigas", icon:"🌾", example:"Bumili si Tatay ng bigas."},
         {de:"Gericht zum Reis", foreign:"ulam", icon:"🍲", example:"Ano ang ulam natin ngayon?"},
         {de:"Zwischenmahlzeit", foreign:"merienda", icon:"🍰", example:"Merienda tayo ng alas-tres."},
         {de:"Frühstück", foreign:"almusal", icon:"🍳", example:"Sinangag at itlog ang almusal namin."},
-        {de:"Mittagessen", foreign:"tanghalian", icon:"🥘", example:"Handa na ang tanghalian."},
+        {de:"Mittagessen", foreign:"tanghalian", icon:"🥘", example:"Handa na ang tanghalian."}
+      ],
+      "TL-05-4": [
         {de:"Abendessen", foreign:"hapunan", icon:"🌙", example:"Sabay-sabay tayong maghapunan."},
         {de:"Wasser", foreign:"tubig", icon:"💧", example:"Pahingi po ng tubig."},
         {de:"Fisch", foreign:"isda", icon:"🐟", example:"Sariwa ang isda sa palengke."},
         {de:"Fleisch", foreign:"karne", icon:"🥩", example:"Hindi ako kumakain ng karne."},
-        {de:"Huhn", foreign:"manok", icon:"🍗", example:"Adobong manok ang ulam."},
+        {de:"Huhn", foreign:"manok", icon:"🍗", example:"Adobong manok ang ulam."}
+      ],
+      "TL-05-5": [
         {de:"Schweinefleisch", foreign:"baboy", icon:"🐖", example:"Gusto ko ng adobong baboy."},
         {de:"Spanferkel", foreign:"lechon", icon:"🐷", example:"May lechon sa handaan!"},
         {de:"Obst", foreign:"prutas", icon:"🍍", example:"Maraming prutas sa Pilipinas."},
         {de:"Mango", foreign:"mangga", icon:"🥭", example:"Matamis ang mangga dito."},
         {de:"Darf ich noch etwas haben?", foreign:"Pahingi pa po.", icon:"🙏", example:"Ang sarap! Pahingi pa po."}
       ],
-      "TL-06": [
+      "TL-06-1": [
         {de:"eins", foreign:"isa", icon:"1️⃣", example:"Isang kanin lang po."},
         {de:"zwei", foreign:"dalawa", icon:"2️⃣", example:"Dalawa ang kapatid ko."},
         {de:"drei", foreign:"tatlo", icon:"3️⃣", example:"Tatlong araw kami sa Batangas."},
         {de:"vier", foreign:"apat", icon:"4️⃣", example:"Apat kami sa pamilya."},
-        {de:"fünf", foreign:"lima", icon:"5️⃣", example:"Limang taon na ang pamangkin ko."},
+        {de:"fünf", foreign:"lima", icon:"5️⃣", example:"Limang taon na ang pamangkin ko."}
+      ],
+      "TL-06-2": [
         {de:"sechs", foreign:"anim", icon:"6️⃣", example:"Anim na mangga po."},
         {de:"sieben", foreign:"pito", icon:"7️⃣", example:"Pitong araw sa isang linggo."},
         {de:"acht", foreign:"walo", icon:"8️⃣", example:"Walo ang apo ni Lola."},
         {de:"neun", foreign:"siyam", icon:"9️⃣", example:"Siyam na taon na si Bunso."},
-        {de:"zehn", foreign:"sampu", icon:"🔟", example:"Sampu ang pinsan ko."},
+        {de:"zehn", foreign:"sampu", icon:"🔟", example:"Sampu ang pinsan ko."}
+      ],
+      "TL-06-3": [
         {de:"zwanzig", foreign:"dalawampu", icon:"2️⃣0️⃣", example:"Dalawampung piso ang pamasahe."},
         {de:"hundert", foreign:"isang daan / sandaan", icon:"💯", example:"Isang daang piso po ito."},
         {de:"tausend", foreign:"isang libo / sanlibo", icon:"💰", example:"Isang libong piso ang regalo."},
         {de:"Geld", foreign:"pera", icon:"💵", example:"Wala na akong pera."},
-        {de:"Peso", foreign:"piso", icon:"🪙", example:"Limang piso lang ito."},
+        {de:"Peso", foreign:"piso", icon:"🪙", example:"Limang piso lang ito."}
+      ],
+      "TL-06-4": [
         {de:"Wie viel kostet das?", foreign:"Magkano (po) ito?", icon:"🏷️", example:"Ate, magkano po ito?"},
         {de:"teuer", foreign:"mahal", icon:"💸", example:"Mahal ang mga damit sa mall."},
         {de:"billig", foreign:"mura", icon:"👍", example:"Mura ang prutas sa palengke."},
         {de:"Wechselgeld", foreign:"sukli", icon:"🧾", example:"Ito po ang sukli ninyo."},
-        {de:"bezahlen", foreign:"magbayad", icon:"💳", example:"Saan po ako magbabayad?"},
+        {de:"bezahlen", foreign:"magbayad", icon:"💳", example:"Saan po ako magbabayad?"}
+      ],
+      "TL-06-5": [
         {de:"Zahl / Nummer", foreign:"numero", icon:"🔢", example:"Ano ang numero ng telepono mo?"},
         {de:"Es ist drei Uhr.", foreign:"Alas-tres na.", icon:"🕒", example:"Alas-tres na, merienda na!"},
         {de:"eins (spanisch, Preise und Uhrzeit)", foreign:"uno", icon:"🇪🇸", example:"Alas-uno ang tanghalian."},
         {de:"zwei (spanisch, Preise und Uhrzeit)", foreign:"dos", icon:"🇪🇸", example:"Alas-dos tayo aalis."},
         {de:"drei (spanisch, Preise und Uhrzeit)", foreign:"tres", icon:"🇪🇸", example:"Alas-tres ang misa."}
       ],
-      "TL-07": [
+      "TL-07-1": [
         {de:"jetzt", foreign:"ngayon", icon:"⏱️", example:"Aalis na tayo ngayon."},
         {de:"heute", foreign:"ngayong araw", icon:"📅", example:"Mainit ngayong araw."},
         {de:"morgen", foreign:"bukas", icon:"➡️", example:"Pupunta tayo sa beach bukas."},
         {de:"gestern", foreign:"kahapon", icon:"⬅️", example:"Dumating kami kahapon."},
-        {de:"Morgen (Tageszeit)", foreign:"umaga", icon:"🌅", example:"Maaga kaming gumising ngayong umaga."},
+        {de:"Morgen (Tageszeit)", foreign:"umaga", icon:"🌅", example:"Maaga kaming gumising ngayong umaga."}
+      ],
+      "TL-07-2": [
         {de:"Mittag", foreign:"tanghali", icon:"🌞", example:"Mainit kapag tanghali."},
         {de:"Nachmittag", foreign:"hapon", icon:"🌤️", example:"Maglaro tayo mamayang hapon."},
         {de:"Abend / Nacht", foreign:"gabi", icon:"🌙", example:"Malamig na kapag gabi."},
         {de:"Tag", foreign:"araw", icon:"📆", example:"Isang araw lang kami dito."},
-        {de:"Woche", foreign:"linggo", icon:"🗓️", example:"Dalawang linggo kami sa Pilipinas."},
+        {de:"Woche", foreign:"linggo", icon:"🗓️", example:"Dalawang linggo kami sa Pilipinas."}
+      ],
+      "TL-07-3": [
         {de:"Monat", foreign:"buwan", icon:"🈷️", example:"Isang buwan ang bakasyon namin."},
         {de:"Jahr", foreign:"taon", icon:"🎆", example:"Bumibisita kami bawat taon."},
         {de:"Montag", foreign:"Lunes", icon:"1️⃣", example:"Babalik kami sa Lunes."},
         {de:"Dienstag", foreign:"Martes", icon:"2️⃣", example:"Sa Martes ang kaarawan ni Lola."},
-        {de:"Mittwoch", foreign:"Miyerkules", icon:"3️⃣", example:"Pupunta tayo sa mall sa Miyerkules."},
+        {de:"Mittwoch", foreign:"Miyerkules", icon:"3️⃣", example:"Pupunta tayo sa mall sa Miyerkules."}
+      ],
+      "TL-07-4": [
         {de:"Donnerstag", foreign:"Huwebes", icon:"4️⃣", example:"Darating si Tito sa Huwebes."},
         {de:"Freitag", foreign:"Biyernes", icon:"5️⃣", example:"Biyernes ng gabi ang handaan."},
         {de:"Samstag", foreign:"Sabado", icon:"6️⃣", example:"Sabado tayo pupunta sa beach."},
         {de:"Sonntag", foreign:"Linggo", icon:"⛪", example:"Magsisimba tayo sa Linggo."},
-        {de:"später", foreign:"mamaya", icon:"⏳", example:"Mamaya na lang tayo kumain."},
+        {de:"später", foreign:"mamaya", icon:"⏳", example:"Mamaya na lang tayo kumain."}
+      ],
+      "TL-07-5": [
         {de:"noch nicht", foreign:"hindi pa", icon:"🚫", example:"Hindi pa ako kumakain."},
         {de:"Wann?", foreign:"Kailan?", icon:"❓", example:"Kailan ka babalik sa Germany?"},
         {de:"Wie spät ist es?", foreign:"Anong oras na?", icon:"🕰️", example:"Kuya, anong oras na?"},
         {de:"Uhrzeit / Stunde", foreign:"oras", icon:"⌚", example:"Tatlong oras ang biyahe."},
         {de:"sofort", foreign:"agad", icon:"⚡", example:"Tumawag ka agad pagdating mo."}
       ],
-      "TL-08": [
+      "TL-08-1": [
         {de:"Jeepney (Sammeltaxi)", foreign:"jeepney / dyip", icon:"🚙", example:"Sasakay tayo ng jeepney."},
         {de:"Motorrad-Taxi mit Beiwagen", foreign:"tricycle / traysikel", icon:"🛺", example:"Mag-tricycle na lang tayo."},
         {de:"Auto", foreign:"kotse", icon:"🚗", example:"Susunduin tayo ni Tito ng kotse."},
         {de:"Wo ist ...?", foreign:"Saan ang ...?", icon:"📍", example:"Saan ang simbahan?"},
-        {de:"hier", foreign:"dito", icon:"👇", example:"Dito tayo bababa."},
+        {de:"hier", foreign:"dito", icon:"👇", example:"Dito tayo bababa."}
+      ],
+      "TL-08-2": [
         {de:"dort", foreign:"doon", icon:"👉", example:"Doon ang bahay ni Lola."},
         {de:"rechts", foreign:"kanan", icon:"➡️", example:"Kumanan ka sa kanto."},
         {de:"links", foreign:"kaliwa", icon:"⬅️", example:"Nasa kaliwa ang tindahan."},
         {de:"geradeaus", foreign:"diretso", icon:"⬆️", example:"Diretso lang po."},
-        {de:"Halt bitte! (zum Fahrer)", foreign:"Para po!", icon:"🛑", example:"Para po, dito na lang!"},
+        {de:"Halt bitte! (zum Fahrer)", foreign:"Para po!", icon:"🛑", example:"Para po, dito na lang!"}
+      ],
+      "TL-08-3": [
         {de:"Hier ist das Fahrgeld.", foreign:"Bayad po.", icon:"🪙", example:"Bayad po, isa lang."},
         {de:"Straße", foreign:"kalye / daan", icon:"🛣️", example:"Mahaba ang kalye na ito."},
         {de:"Flughafen", foreign:"paliparan / airport", icon:"✈️", example:"Susunduin kami sa airport."},
         {de:"Kirche", foreign:"simbahan", icon:"⛪", example:"Malapit ang simbahan sa bahay."},
-        {de:"Meer", foreign:"dagat", icon:"🌊", example:"Ang ganda ng dagat!"},
+        {de:"Meer", foreign:"dagat", icon:"🌊", example:"Ang ganda ng dagat!"}
+      ],
+      "TL-08-4": [
         {de:"Insel", foreign:"isla", icon:"🏝️", example:"Pupunta kami sa isla ng Boracay."},
         {de:"nah", foreign:"malapit", icon:"📌", example:"Malapit lang ang palengke."},
         {de:"weit", foreign:"malayo", icon:"🧭", example:"Malayo ang probinsya."},
         {de:"Ist es weit?", foreign:"Malayo ba?", icon:"🤔", example:"Malayo ba ang beach?"},
-        {de:"Lass uns gehen!", foreign:"Tara na!", icon:"🏃", example:"Tara na, late na tayo!"},
+        {de:"Lass uns gehen!", foreign:"Tara na!", icon:"🏃", example:"Tara na, late na tayo!"}
+      ],
+      "TL-08-5": [
         {de:"Wohin gehst du?", foreign:"Saan ka pupunta?", icon:"🗺️", example:"Saan ka pupunta, Ate?"},
         {de:"Stau", foreign:"trapik / traffic", icon:"🚦", example:"Grabe ang trapik sa EDSA."},
         {de:"Fahrer", foreign:"drayber / driver", icon:"🧑‍✈️", example:"Mabait ang drayber."},
         {de:"Boot", foreign:"bangka", icon:"🚣", example:"Sumakay kami ng bangka papunta sa isla."},
         {de:"Schiff / Fähre", foreign:"barko", icon:"🚢", example:"Mahaba ang biyahe sa barko."}
       ],
-      "TL-09": [
+      "TL-09-1": [
         {de:"Markt", foreign:"palengke", icon:"🧺", example:"Pupunta kami ni Lola sa palengke."},
         {de:"kleiner Laden an der Ecke", foreign:"sari-sari store", icon:"🏪", example:"Bumili ako ng tinapay sa sari-sari store."},
         {de:"Mitbringsel (von der Reise)", foreign:"pasalubong", icon:"🎁", example:"May pasalubong ako para sa inyo!"},
         {de:"Geht es billiger?", foreign:"May tawad pa po?", icon:"🤝", example:"Ang mahal, may tawad pa po?"},
-        {de:"kaufen", foreign:"bumili", icon:"🛍️", example:"Gusto kong bumili ng mangga."},
+        {de:"kaufen", foreign:"bumili", icon:"🛍️", example:"Gusto kong bumili ng mangga."}
+      ],
+      "TL-09-2": [
         {de:"verkaufen", foreign:"magbenta", icon:"💲", example:"Nagbebenta siya ng isda."},
         {de:"Ich möchte ... kaufen.", foreign:"Gusto kong bumili ng ...", icon:"🛒", example:"Gusto kong bumili ng pasalubong."},
         {de:"Haben Sie ...?", foreign:"Mayroon po ba kayong ...?", icon:"❓", example:"Mayroon po ba kayong tubig?"},
         {de:"Geschenk", foreign:"regalo", icon:"🎀", example:"Para sa iyo ang regalong ito."},
-        {de:"Kleidung", foreign:"damit", icon:"👗", example:"Bago ang damit ko."},
+        {de:"Kleidung", foreign:"damit", icon:"👗", example:"Bago ang damit ko."}
+      ],
+      "TL-09-3": [
         {de:"Schuhe", foreign:"sapatos", icon:"👟", example:"Masikip ang sapatos ko."},
         {de:"Größe", foreign:"sukat", icon:"📏", example:"Ano ang sukat mo?"},
         {de:"Farbe", foreign:"kulay", icon:"🎨", example:"Anong kulay ang gusto mo?"},
         {de:"groß", foreign:"malaki", icon:"🐘", example:"Malaki ang bahay nila."},
-        {de:"klein", foreign:"maliit", icon:"🐜", example:"Maliit lang ang tindahan."},
+        {de:"klein", foreign:"maliit", icon:"🐜", example:"Maliit lang ang tindahan."}
+      ],
+      "TL-09-4": [
         {de:"Tüte", foreign:"supot", icon:"🛍️", example:"Pahingi po ng supot."},
         {de:"dies / das hier", foreign:"ito", icon:"👇", example:"Magkano ito?"},
         {de:"das da", foreign:"iyan", icon:"👉", example:"Gusto ko iyan."},
         {de:"Ich schaue nur.", foreign:"Tumitingin lang po.", icon:"👀", example:"Salamat, tumitingin lang po."},
-        {de:"Laden", foreign:"tindahan", icon:"🏬", example:"Sarado na ang tindahan."},
+        {de:"Laden", foreign:"tindahan", icon:"🏬", example:"Sarado na ang tindahan."}
+      ],
+      "TL-09-5": [
         {de:"Verkäufer / Verkäuferin", foreign:"tindero / tindera", icon:"🧑‍🌾", example:"Mabait ang tindera sa palengke."},
         {de:"neu", foreign:"bago", icon:"✨", example:"Bago ang cellphone ni Kuya."},
         {de:"alt (Sachen)", foreign:"luma", icon:"📦", example:"Luma na ang sapatos ko."},
         {de:"Ich nehme das.", foreign:"Kukunin ko ito.", icon:"✅", example:"Sige po, kukunin ko ito."},
         {de:"Das ist ja teuer!", foreign:"Ang mahal naman!", icon:"😮", example:"Isang libo? Ang mahal naman!"}
       ],
-      "TL-10": [
+      "TL-10-1": [
         {de:"Weihnachten", foreign:"Pasko", icon:"🎄", example:"Masaya ang Pasko sa Pilipinas."},
         {de:"Frohe Weihnachten!", foreign:"Maligayang Pasko!", icon:"🎅", example:"Maligayang Pasko sa inyong lahat!"},
         {de:"Frohes neues Jahr!", foreign:"Manigong Bagong Taon!", icon:"🎆", example:"Manigong Bagong Taon, Lola!"},
         {de:"Neujahr", foreign:"Bagong Taon", icon:"🎇", example:"Maingay sa Bagong Taon."},
-        {de:"Fest (Ortsfest)", foreign:"pista / fiesta", icon:"🎉", example:"Pista sa bayan namin bukas."},
+        {de:"Fest (Ortsfest)", foreign:"pista / fiesta", icon:"🎉", example:"Pista sa bayan namin bukas."}
+      ],
+      "TL-10-2": [
         {de:"Geburtstag", foreign:"kaarawan", icon:"🎂", example:"Kaarawan ni Lolo ngayon."},
         {de:"Alles Gute zum Geburtstag!", foreign:"Maligayang kaarawan!", icon:"🥳", example:"Maligayang kaarawan, Tita!"},
         {de:"Festessen", foreign:"handaan", icon:"🍖", example:"Maraming pagkain sa handaan."},
         {de:"Hochzeit", foreign:"kasal", icon:"💒", example:"Ikakasal ang pinsan ko sa Disyembre."},
-        {de:"Taufe", foreign:"binyag", icon:"👶", example:"Pupunta tayo sa binyag ng pamangkin ko."},
+        {de:"Taufe", foreign:"binyag", icon:"👶", example:"Pupunta tayo sa binyag ng pamangkin ko."}
+      ],
+      "TL-10-3": [
         {de:"Messe (Gottesdienst)", foreign:"misa", icon:"⛪", example:"Alas-otso ang misa sa Linggo."},
         {de:"Frühmessen vor Weihnachten", foreign:"simbang gabi", icon:"🕯️", example:"Nagsisimbang gabi kami tuwing Disyembre."},
         {de:"Weihnachtsstern-Laterne", foreign:"parol", icon:"⭐", example:"Ang ganda ng parol sa bintana!"},
         {de:"Heimkehrer aus dem Ausland", foreign:"balikbayan", icon:"🧳", example:"Balikbayan si Tita galing Germany."},
-        {de:"Paket für die Familie", foreign:"balikbayan box", icon:"📦", example:"Dumating na ang balikbayan box!"},
+        {de:"Paket für die Familie", foreign:"balikbayan box", icon:"📦", example:"Dumating na ang balikbayan box!"}
+      ],
+      "TL-10-4": [
         {de:"Gast / Besuch", foreign:"bisita", icon:"🚪", example:"May bisita tayo mamaya."},
         {de:"feiern", foreign:"magdiwang", icon:"🎊", example:"Magdiriwang tayo ng Pasko kasama si Lola."},
         {de:"Karaoke", foreign:"videoke", icon:"🎤", example:"Mag-videoke tayo pagkatapos kumain!"},
         {de:"tanzen", foreign:"sumayaw", icon:"💃", example:"Sumayaw tayo!"},
-        {de:"singen", foreign:"kumanta", icon:"🎶", example:"Kumanta si Lolo sa videoke."},
+        {de:"singen", foreign:"kumanta", icon:"🎶", example:"Kumanta si Lolo sa videoke."}
+      ],
+      "TL-10-5": [
         {de:"Lied", foreign:"kanta", icon:"🎵", example:"Paborito ko ang kantang ito."},
         {de:"Karwoche", foreign:"Mahal na Araw / Semana Santa", icon:"✝️", example:"Sarado ang maraming tindahan sa Mahal na Araw."},
         {de:"Allerheiligen", foreign:"Undas", icon:"🕯️", example:"Bumibisita kami sa sementeryo tuwing Undas."},
         {de:"Familientreffen", foreign:"reunion", icon:"👨‍👩‍👧‍👦", example:"May family reunion kami sa Batangas."},
         {de:"Prost!", foreign:"Tagay!", icon:"🍻", example:"Tagay para sa pamilya!"}
       ],
-      "TL-11": [
+      "TL-11-1": [
         {de:"heiß", foreign:"mainit", icon:"🔥", example:"Sobrang init ngayon!"},
         {de:"kalt", foreign:"malamig", icon:"🧊", example:"Malamig ang tubig."},
         {de:"Regen", foreign:"ulan", icon:"🌧️", example:"Malakas ang ulan kagabi."},
         {de:"Es regnet.", foreign:"Umuulan.", icon:"☔", example:"Umuulan, magdala ka ng payong."},
-        {de:"Taifun", foreign:"bagyo", icon:"🌀", example:"May bagyo raw bukas."},
+        {de:"Taifun", foreign:"bagyo", icon:"🌀", example:"May bagyo raw bukas."}
+      ],
+      "TL-11-2": [
         {de:"Sonne", foreign:"araw", icon:"🌞", example:"Mainit ang araw sa tanghali."},
         {de:"Hitze", foreign:"init", icon:"🥵", example:"Hindi ako sanay sa init."},
         {de:"Mücke", foreign:"lamok", icon:"🦟", example:"Maraming lamok sa gabi."},
         {de:"Medizin", foreign:"gamot", icon:"💊", example:"Inumin mo ang gamot mo."},
-        {de:"Arzt / Ärztin", foreign:"doktor", icon:"🩺", example:"Kailangan kong magpatingin sa doktor."},
+        {de:"Arzt / Ärztin", foreign:"doktor", icon:"🩺", example:"Kailangan kong magpatingin sa doktor."}
+      ],
+      "TL-11-3": [
         {de:"Krankenhaus", foreign:"ospital", icon:"🏥", example:"Malapit ang ospital dito."},
         {de:"Apotheke", foreign:"botika", icon:"⚕️", example:"Bumili si Nanay ng gamot sa botika."},
         {de:"krank", foreign:"may sakit", icon:"🤒", example:"May sakit si Bunso."},
         {de:"Ich habe Kopfschmerzen.", foreign:"Masakit ang ulo ko.", icon:"🤕", example:"Masakit ang ulo ko dahil sa init."},
-        {de:"Ich habe Bauchschmerzen.", foreign:"Masakit ang tiyan ko.", icon:"🤢", example:"Masakit ang tiyan ko, Nanay."},
+        {de:"Ich habe Bauchschmerzen.", foreign:"Masakit ang tiyan ko.", icon:"🤢", example:"Masakit ang tiyan ko, Nanay."}
+      ],
+      "TL-11-4": [
         {de:"Fieber", foreign:"lagnat", icon:"🌡️", example:"May lagnat ang pamangkin ko."},
         {de:"Husten", foreign:"ubo", icon:"😷", example:"May ubo at sipon ako."},
         {de:"Hilfe!", foreign:"Saklolo!", icon:"🆘", example:"Saklolo! Tulungan ninyo ako!"},
         {de:"Mir ist heiß.", foreign:"Naiinitan ako.", icon:"😓", example:"Naiinitan ako, buksan natin ang aircon."},
-        {de:"Wetter", foreign:"panahon", icon:"⛅", example:"Maganda ang panahon ngayon."},
+        {de:"Wetter", foreign:"panahon", icon:"⛅", example:"Maganda ang panahon ngayon."}
+      ],
+      "TL-11-5": [
         {de:"Wind", foreign:"hangin", icon:"🌬️", example:"Malakas ang hangin dahil sa bagyo."},
         {de:"Überschwemmung", foreign:"baha", icon:"🌊", example:"Baha sa kalye pagkatapos ng ulan."},
         {de:"Erdbeben", foreign:"lindol", icon:"🏚️", example:"Lumindol kagabi pero mahina lang."},
         {de:"Schweiß", foreign:"pawis", icon:"💦", example:"Basang-basa ako ng pawis."},
         {de:"Ich fühle mich nicht gut.", foreign:"Masama ang pakiramdam ko.", icon:"😞", example:"Masama ang pakiramdam ko ngayon."}
       ],
-      "TL-12": [
+      "TL-12-1": [
         {de:"Ich liebe dich.", foreign:"Mahal kita.", icon:"❤️", example:"Mahal kita, Lola."},
         {de:"Ich vermisse dich.", foreign:"Miss na kita.", icon:"🥺", example:"Miss na kita, Kuya!"},
         {de:"Ich verstehe das nicht.", foreign:"Hindi ko maintindihan.", icon:"🤷", example:"Pasensya na, hindi ko maintindihan."},
         {de:"Bitte wiederholen Sie das.", foreign:"Pakiulit po.", icon:"🔁", example:"Pakiulit po, hindi ko narinig."},
-        {de:"Langsam bitte.", foreign:"Dahan-dahan lang (po).", icon:"🐢", example:"Dahan-dahan lang po, nag-aaral pa ako."},
+        {de:"Langsam bitte.", foreign:"Dahan-dahan lang (po).", icon:"🐢", example:"Dahan-dahan lang po, nag-aaral pa ako."}
+      ],
+      "TL-12-2": [
         {de:"Einen Moment.", foreign:"Sandali lang.", icon:"✋", example:"Sandali lang, kukunin ko ang bag ko."},
         {de:"Ich weiß es nicht.", foreign:"Hindi ko alam.", icon:"❔", example:"Hindi ko alam kung nasaan si Ate."},
         {de:"glücklich / froh", foreign:"masaya", icon:"😄", example:"Masaya ako na nandito kayo."},
         {de:"traurig", foreign:"malungkot", icon:"😢", example:"Malungkot ako dahil aalis na kami."},
-        {de:"müde", foreign:"pagod", icon:"🥱", example:"Pagod na pagod ako."},
+        {de:"müde", foreign:"pagod", icon:"🥱", example:"Pagod na pagod ako."}
+      ],
+      "TL-12-3": [
         {de:"Was ist das?", foreign:"Ano ito?", icon:"🔍", example:"Ano ito, Lola?"},
         {de:"Was bedeutet ...?", foreign:"Ano ang ibig sabihin ng ...?", icon:"📖", example:"Ano ang ibig sabihin ng pasalubong?"},
         {de:"Wie sagt man ... auf Tagalog?", foreign:"Paano sabihin ang ... sa Tagalog?", icon:"🗣️", example:"Paano sabihin ang Danke sa Tagalog?"},
         {de:"schön / hübsch", foreign:"maganda", icon:"🌸", example:"Ang ganda mo, Ate!"},
-        {de:"gutaussehend", foreign:"guwapo / gwapo", icon:"😎", example:"Ang guwapo ni Kuya."},
+        {de:"gutaussehend", foreign:"guwapo / gwapo", icon:"😎", example:"Ang guwapo ni Kuya."}
+      ],
+      "TL-12-4": [
         {de:"Ich bin glücklich hier.", foreign:"Masaya ako dito.", icon:"🏝️", example:"Masaya ako dito sa Pilipinas."},
         {de:"Schon gut.", foreign:"Okay lang.", icon:"👌", example:"Okay lang, huwag kang mag-alala."},
         {de:"Wirklich?", foreign:"Talaga?", icon:"😲", example:"Talaga? Ang galing!"},
         {de:"Wie Gott will. / Mal sehen.", foreign:"Bahala na.", icon:"🤞", example:"Bahala na, basta sama-sama tayo."},
-        {de:"Komm her!", foreign:"Halika!", icon:"🫴", example:"Halika dito, anak!"},
+        {de:"Komm her!", foreign:"Halika!", icon:"🫴", example:"Halika dito, anak!"}
+      ],
+      "TL-12-5": [
         {de:"Warte!", foreign:"Teka!", icon:"⏸️", example:"Teka lang, sasama ako!"},
         {de:"Ich habe Angst.", foreign:"Natatakot ako.", icon:"😨", example:"Natatakot ako sa kidlat."},
         {de:"Toll gemacht!", foreign:"Ang galing!", icon:"👏", example:"Ang galing mong mag-Tagalog!"},
@@ -9239,7 +9336,7 @@ function renderDueReviewTile(prof){
   const dueCount = collectDueWords(prof).length;
   const done = reviewUnitsDoneToday(prof);
   if(dueCount>0 && done<REVIEW_UNITS_PER_DAY){
-    const n = Math.min(REVIEW_UNIT_SIZE, dueCount);
+    const n = pickReviewUnit(prof).length;
     setListItem(tile, {icon:"📅", title:`Training bereit · ${n} ${n===1?"Wort":"Wörter"} · ca. ${reviewUnitMinutes(n)} Min.`,
       desc:`Trainings-Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %`, hot:true, onClick:startDueReviewRound,
       aria:`Trainings-Session mit ${n} Wörtern starten, Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
@@ -9433,7 +9530,7 @@ function renderProgressBoxes(prof){
   const due = collectDueWords(prof).length;
   const btn = document.getElementById("btnProgressReview");
   btn.style.display = due>0 ? "" : "none";
-  const n = Math.min(REVIEW_UNIT_SIZE, due);
+  const n = pickReviewUnit(prof).length;
   const extra = reviewUnitsDoneToday(prof)>=REVIEW_UNITS_PER_DAY ? " – freiwillig" : "";
   btn.textContent = `📅 Trainings-Session starten (${n} ${n===1?"Wort":"Wörter"}${extra})`;
   const plan = document.getElementById("progReviewPlan");
@@ -9582,18 +9679,66 @@ const PAGE_TITLES = {
   "Eng-10": "10 · Fluidtechnik & Energie",
   "Eng-11": "11 · Projekt & Produktion",
   "Eng-12": "12 · Sicherheit & Kommunikation",
-  "TL-01": "1 · Begrüßung & Höflichkeit",
-  "TL-02": "2 · Familie & Verwandte",
-  "TL-03": "3 · Sich vorstellen",
-  "TL-04": "4 · Zuhause & Alltag",
-  "TL-05": "5 · Essen & Trinken",
-  "TL-06": "6 · Zahlen & Geld",
-  "TL-07": "7 · Zeit & Tage",
-  "TL-08": "8 · Unterwegs",
-  "TL-09": "9 · Einkaufen & Markt",
-  "TL-10": "10 · Feste & Traditionen",
-  "TL-11": "11 · Gesundheit & Wetter",
-  "TL-12": "12 · Gefühle & nützliche Sätze"
+  "TL-01-1": "1.1 Begrüßung & Höflichkeit",
+  "TL-01-2": "1.2 Begrüßung & Höflichkeit",
+  "TL-01-3": "1.3 Begrüßung & Höflichkeit",
+  "TL-01-4": "1.4 Begrüßung & Höflichkeit",
+  "TL-01-5": "1.5 Begrüßung & Höflichkeit",
+  "TL-02-1": "2.1 Familie & Verwandte",
+  "TL-02-2": "2.2 Familie & Verwandte",
+  "TL-02-3": "2.3 Familie & Verwandte",
+  "TL-02-4": "2.4 Familie & Verwandte",
+  "TL-02-5": "2.5 Familie & Verwandte",
+  "TL-03-1": "3.1 Sich vorstellen",
+  "TL-03-2": "3.2 Sich vorstellen",
+  "TL-03-3": "3.3 Sich vorstellen",
+  "TL-03-4": "3.4 Sich vorstellen",
+  "TL-03-5": "3.5 Sich vorstellen",
+  "TL-04-1": "4.1 Zuhause & Alltag",
+  "TL-04-2": "4.2 Zuhause & Alltag",
+  "TL-04-3": "4.3 Zuhause & Alltag",
+  "TL-04-4": "4.4 Zuhause & Alltag",
+  "TL-04-5": "4.5 Zuhause & Alltag",
+  "TL-05-1": "5.1 Essen & Trinken",
+  "TL-05-2": "5.2 Essen & Trinken",
+  "TL-05-3": "5.3 Essen & Trinken",
+  "TL-05-4": "5.4 Essen & Trinken",
+  "TL-05-5": "5.5 Essen & Trinken",
+  "TL-06-1": "6.1 Zahlen & Geld",
+  "TL-06-2": "6.2 Zahlen & Geld",
+  "TL-06-3": "6.3 Zahlen & Geld",
+  "TL-06-4": "6.4 Zahlen & Geld",
+  "TL-06-5": "6.5 Zahlen & Geld",
+  "TL-07-1": "7.1 Zeit & Tage",
+  "TL-07-2": "7.2 Zeit & Tage",
+  "TL-07-3": "7.3 Zeit & Tage",
+  "TL-07-4": "7.4 Zeit & Tage",
+  "TL-07-5": "7.5 Zeit & Tage",
+  "TL-08-1": "8.1 Unterwegs",
+  "TL-08-2": "8.2 Unterwegs",
+  "TL-08-3": "8.3 Unterwegs",
+  "TL-08-4": "8.4 Unterwegs",
+  "TL-08-5": "8.5 Unterwegs",
+  "TL-09-1": "9.1 Einkaufen & Markt",
+  "TL-09-2": "9.2 Einkaufen & Markt",
+  "TL-09-3": "9.3 Einkaufen & Markt",
+  "TL-09-4": "9.4 Einkaufen & Markt",
+  "TL-09-5": "9.5 Einkaufen & Markt",
+  "TL-10-1": "10.1 Feste & Traditionen",
+  "TL-10-2": "10.2 Feste & Traditionen",
+  "TL-10-3": "10.3 Feste & Traditionen",
+  "TL-10-4": "10.4 Feste & Traditionen",
+  "TL-10-5": "10.5 Feste & Traditionen",
+  "TL-11-1": "11.1 Gesundheit & Wetter",
+  "TL-11-2": "11.2 Gesundheit & Wetter",
+  "TL-11-3": "11.3 Gesundheit & Wetter",
+  "TL-11-4": "11.4 Gesundheit & Wetter",
+  "TL-11-5": "11.5 Gesundheit & Wetter",
+  "TL-12-1": "12.1 Gefühle & nützliche Sätze",
+  "TL-12-2": "12.2 Gefühle & nützliche Sätze",
+  "TL-12-3": "12.3 Gefühle & nützliche Sätze",
+  "TL-12-4": "12.4 Gefühle & nützliche Sätze",
+  "TL-12-5": "12.5 Gefühle & nützliche Sätze"
 };
 
 function formatPageLabel(pageId){
@@ -10967,13 +11112,24 @@ function countReviewUnitDone(prof){
 }
 /* Dringendste zuerst: niedriges Fach (zuletzt falsch / neu), dann am
    längsten überfällig. */
+// neue Sprache, kurze Portionen: höchstens so viele Wörter je Session
+const REVIEW_UNIT_LANG_CAP = { tl: 5 };
 function pickReviewUnit(prof){
   const schedule = ensureWordSchedule(prof);
-  return collectDueWords(prof)
+  const sorted = collectDueWords(prof)
     .map(w=>({w, e:schedule[w.key]||{}}))
-    .sort((a,b)=>(a.e.box||1)-(b.e.box||1) || String(a.e.dueDate).localeCompare(String(b.e.dueDate)))
-    .slice(0, REVIEW_UNIT_SIZE)
-    .map(x=>x.w);
+    .sort((a,b)=>(a.e.box||1)-(b.e.box||1) || String(a.e.dueDate).localeCompare(String(b.e.dueDate)));
+  const perLang = {};
+  const unit = [];
+  for(const {w} of sorted){
+    if(unit.length>=REVIEW_UNIT_SIZE) break;
+    const lang = String(w.key||"").split("|")[0];
+    const cap = REVIEW_UNIT_LANG_CAP[lang];
+    if(cap!=null && (perLang[lang]||0)>=cap) continue;
+    perLang[lang] = (perLang[lang]||0)+1;
+    unit.push(w);
+  }
+  return unit;
 }
 function reviewUnitMinutes(n){
   return Math.max(1, Math.round(n*REVIEW_SECONDS_PER_WORD/60));
@@ -12277,13 +12433,25 @@ function renderLanguageScreen(){
    offered for a profile that has never started a round yet, and it's
    re-validated against the book's current pages every time in case a
    custom page was deleted since. */
+/* Gespeicherte Seiten-Auswahl auf den aktuellen Buchstand abbilden:
+   Tagalog-Kapitel ("TL-01") sind inzwischen in Lektionen ("TL-01-1" …)
+   geteilt -- ein alter Schnellstart springt dann in die erste Lektion. */
+function resolveSessionPages(book, pages){
+  const out = [];
+  (pages||[]).forEach(pid=>{
+    const id = book.pages[pid] ? pid : (book.pages[pid+"-1"] ? pid+"-1" : null);
+    if(id && !out.includes(id)) out.push(id);
+  });
+  return out;
+}
+
 function renderQuickStartBlock(){
   const btn = document.getElementById("btnQuickStart");
   const newRoundBtn = document.getElementById("btnStartToLanguage");
   const prof = getCurrentProfileObj();
   const last = prof && prof.lastSession;
   const book = last && getBookDef(last.bookKey);
-  const validPages = book ? last.selectedPages.filter(pid=>book.pages[pid]) : [];
+  const validPages = book ? resolveSessionPages(book, last.selectedPages) : [];
   if(!book || validPages.length===0){
     // no previous round to resume -> starting a new one is THE action
     btn.style.display="none";
@@ -12294,7 +12462,7 @@ function renderQuickStartBlock(){
   }
   const pageLabel = validPages.length===1
     ? formatPageLabel(validPages[0])
-    : `${validPages.length} Seiten`;
+    : `${validPages.length} ${book.lessons ? "Lektionen" : "Seiten"}`;
   const dirLabel = last.direction==="mixed" ? "gemischt"
     : last.direction==="deToEn" ? `Deutsch → ${getLangDisplayName(book.lang)}`
     : `${getLangDisplayName(book.lang)} → Deutsch`;
@@ -12315,7 +12483,7 @@ function startQuickRound(){
   const last = prof && prof.lastSession;
   const book = last && getBookDef(last.bookKey);
   if(!book) return;
-  const validPages = last.selectedPages.filter(pid=>book.pages[pid]);
+  const validPages = resolveSessionPages(book, last.selectedPages);
   if(validPages.length===0) return;
   state.currentLang = book.lang;
   state.currentBookKey = last.bookKey;
@@ -12403,7 +12571,9 @@ function buildBookTile(key, book, custom){
     bCountDiv.className="small-note";
     const pageIds = Object.keys(book.pages);
     const unit = pageIds.length>0 && pageIds.every(id=>PAGE_TITLES[id]) ? "Kapitel" : "Seiten";
-    bCountDiv.textContent = `(${pageIds.length} ${unit})`;
+    bCountDiv.textContent = book.lessons
+      ? `(${new Set(pageIds.map(id=>id.replace(/-\d+$/,""))).size} Kapitel · ${pageIds.length} Lektionen)`
+      : `(${pageIds.length} ${unit})`;
     if(!custom && book.extra && !book.family){
       const tag=document.createElement("span");
       tag.className="book-tag";
@@ -13011,7 +13181,7 @@ function showSummaryScreen(){
     const dueLeft = prof ? collectDueWords(prof).length : 0;
     const doneToday = prof ? reviewUnitsDoneToday(prof) : 0;
     if(dueLeft>0 && doneToday<REVIEW_UNITS_PER_DAY){
-      const n = Math.min(REVIEW_UNIT_SIZE, dueLeft);
+      const n = pickReviewUnit(prof).length;
       const nextBtn = document.createElement("button");
       nextBtn.type = "button";
       nextBtn.className = "btn next-unit-btn";
@@ -14140,7 +14310,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-27.8";
+const APP_BUILD = "2026-10-28.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
