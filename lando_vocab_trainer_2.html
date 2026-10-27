@@ -2250,6 +2250,46 @@ body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   width:auto;
   padding:0 0.05em;
 }
+/* Buchauswahl: Gruppen, gleich breite Kacheln, Erwachsenenbücher abgesetzt */
+:root { --adult-bg:#eef2fa; --adult-border:#2b4a80; --adult-ink:#1f3a6b; }
+body.dark-theme { --adult-bg:#14203a; --adult-border:#5b7fc4; --adult-ink:#a9c1ee; }
+.book-list { display:flex; flex-direction:column; gap:var(--space-3); }
+.book-group { display:flex; flex-direction:column; gap:0.5rem; }
+.book-group-title {
+  font-size:var(--text-xs);
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:var(--muted);
+}
+.book-tile-wrap { position:relative; width:100%; }
+.book-tile-wrap > .select-pill { width:100%; min-width:0; text-align:left; }
+/* Archiv-Knopf eigener Bücher sitzt IN der Kachel, damit alle gleich breit bleiben */
+.book-tile-wrap.has-action > .select-pill { padding-right:3rem; }
+.book-tile-wrap > .book-tile-action { position:absolute; right:0.4rem; top:50%; transform:translateY(-50%); }
+.book-group.adult {
+  /* Rahmen ragt nach außen, damit die Kacheln so breit bleiben wie oben */
+  margin:var(--space-2) calc(-1 * (var(--space-3) + 2px)) 0;
+  padding:var(--space-3);
+  border-radius:var(--radius);
+  background:var(--adult-bg);
+  border:2px solid var(--adult-border);
+}
+.book-group.adult .book-group-title { color:var(--adult-ink); }
+.book-group.adult .select-pill:not(.active) { background:var(--card); border-color:var(--adult-border); }
+.book-tag {
+  display:inline-block;
+  font-size:0.65rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+  color:#fff;
+  background:var(--adult-border);
+  border-radius:999px;
+  padding:0.05rem 0.45rem;
+  vertical-align:middle;
+}
+body.dark-theme .book-tag { color:#0a1020; }
 /* Sprach-Plakette auf der Lernkarte */
 .learn-lang-chip {
   display:inline-flex;
@@ -2576,7 +2616,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
 
     <div class="section-block">
       <div class="section-title">Buch</div>
-      <div id="bookList" class="flex-row-wrap"></div>
+      <div id="bookList" class="book-list"></div>
       <div style="margin-top:0.6rem;">
         <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
           <input type="checkbox" id="chkShowArchivedBooks" /> Archivierte Bücher anzeigen
@@ -11564,11 +11604,31 @@ function renderBookList(){
   blist.innerHTML="";
   const showArchived = document.getElementById("chkShowArchivedBooks").checked;
   const books = getBooksForLang(state.currentLang, showArchived);
-  for(const {key, book, custom} of books){
+  // Schulbücher / eigene Bücher / Erwachsenenbücher als getrennte Gruppen,
+  // jede Kachel volle Breite (siehe .book-group)
+  const groups = [
+    {title:"🎒 Schulbücher", cls:"", items:books.filter(b=>!b.custom && !b.book.extra)},
+    {title:"✏️ Eigene Bücher", cls:"", items:books.filter(b=>b.custom)},
+    {title:"💼 Für Erwachsene", cls:"adult", items:books.filter(b=>!b.custom && b.book.extra)}
+  ];
+  for(const g of groups){
+    if(g.items.length===0) continue;
+    const groupDiv=document.createElement("div");
+    groupDiv.className="book-group" + (g.cls ? " "+g.cls : "");
+    const head=document.createElement("div");
+    head.className="book-group-title";
+    head.textContent=g.title;
+    groupDiv.appendChild(head);
+    for(const {key, book, custom} of g.items) groupDiv.appendChild(buildBookTile(key, book, custom));
+    blist.appendChild(groupDiv);
+  }
+}
+
+/* Eine Buchkachel (Cover, Name, Seiten-/Kapitelzahl, bei eigenen Büchern
+   der Archiv-Button) -- Teil von renderBookList(). */
+function buildBookTile(key, book, custom){
     const wrap=document.createElement("div");
-    wrap.style.display="flex";
-    wrap.style.alignItems="center";
-    wrap.style.gap="0.3rem";
+    wrap.className="book-tile-wrap";
 
     const bBtn=document.createElement("button");
     bBtn.className="select-pill";
@@ -11601,6 +11661,12 @@ function renderBookList(){
     const pageIds = Object.keys(book.pages);
     const unit = pageIds.length>0 && pageIds.every(id=>PAGE_TITLES[id]) ? "Kapitel" : "Seiten";
     bCountDiv.textContent = `(${pageIds.length} ${unit})`;
+    if(!custom && book.extra){
+      const tag=document.createElement("span");
+      tag.className="book-tag";
+      tag.textContent="Erwachsene";
+      bCountDiv.append(" ", tag);
+    }
     bInner.appendChild(bNameDiv);
     bInner.appendChild(bCountDiv);
     bBtn.appendChild(bInner);
@@ -11624,11 +11690,12 @@ function renderBookList(){
         toggleArchiveBook(key, !book.archived);
         renderBookPageScreen();
       });
+      archBtn.classList.add("book-tile-action");
+      wrap.classList.add("has-action");
       wrap.appendChild(archBtn);
     }
 
-    blist.appendChild(wrap);
-  }
+    return wrap;
 }
 
 /* Part of renderBookPageScreen(): the right-hand page list for the
@@ -13329,7 +13396,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-27.4";
+const APP_BUILD = "2026-10-27.5";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
