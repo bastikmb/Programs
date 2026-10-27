@@ -2240,6 +2240,16 @@ body.dark-theme .btn:not(.btn-secondary):not(.btn-ghost):not(:disabled) {
   box-shadow:0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .next-unit-btn { width:100%; margin-bottom:var(--space-3); }
+/* vorausgefüllte Satz-/Sonderzeichen in den Antwort-Kästchen */
+.letter-box.letter-given {
+  border-color:transparent;
+  background:transparent;
+  color:var(--muted);
+  font-weight:800;
+  min-width:0.9em;
+  width:auto;
+  padding:0 0.05em;
+}
 /* Sprach-Plakette auf der Lernkarte */
 .learn-lang-chip {
   display:inline-flex;
@@ -9077,11 +9087,13 @@ function normalizeForMatch(str){
 function pickDisplayAlternative(correctRaw, currentInput){
   const alts = getAlternatives(correctRaw);
   if(alts.length<=1) return correctRaw;
-  const normInput = normalizeAnswer(currentInput);
+  // nur Buchstaben vergleichen -- Satzzeichen tippt das Kind nicht
+  // (sie sind vorausgefüllt, siehe isPrefillChar)
+  const normInput = typedLettersOnly(normalizeAnswer(currentInput));
   let best = alts[0];
   let bestScore = -1;
   for(const a of alts){
-    const normA = normalizeAnswer(a);
+    const normA = typedLettersOnly(normalizeAnswer(a));
     let score = 0;
     const len = Math.min(normA.length, normInput.length);
     for(let ci=0; ci<len; ci++){
@@ -9099,6 +9111,32 @@ function pickDisplayAlternative(correctRaw, currentInput){
 /* Highlight correct/wrong letters in boxes. Positions the child hasn't
    typed yet but that were revealed via the hint button (card.hintedChars,
    see applyHint) show that hinted letter instead of staying blank. */
+/* Satz- und Sonderzeichen der Lösung (. , ! ? ' - : „ “ = ( ) usw.) sind
+   in den Antwort-Kästchen vorausgefüllt -- getippt werden nur Buchstaben
+   und Ziffern. Die Anzeige überspringt diese Kästchen, und beim Prüfen
+   werden die getippten Buchstaben in die Lösung eingesetzt
+   (fillAnswerTemplate), damit z.B. "dont" als "don't" zählt. */
+function isPrefillChar(ch){
+  return !/[\p{L}\p{N}\s]/u.test(ch);
+}
+function typedLettersOnly(str){
+  return String(str||"").replace(/[^\p{L}\p{N}]/gu, "");
+}
+function fillAnswerTemplate(template, input){
+  const letters = typedLettersOnly(input);
+  const slots = template.split("").filter(ch=>!/\s/.test(ch) && !isPrefillChar(ch)).length;
+  if(letters.length!==slots) return null;
+  let i = 0;
+  return template.split("").map(ch=>(/\s/.test(ch) || isPrefillChar(ch)) ? ch : letters[i++]).join("");
+}
+function makeGivenBox(ch){
+  const box=document.createElement("div");
+  box.className="letter-box letter-given";
+  box.textContent=ch;
+  box.setAttribute("aria-hidden","true");
+  return box;
+}
+
 function markAnswerComparison(card, userAns){
   const correctAns = card.hintTarget || pickDisplayAlternative(card.answer, userAns);
   const expWrap = document.getElementById("expectedAnswerBoxes");
@@ -9114,7 +9152,7 @@ function markAnswerComparison(card, userAns){
   // other words stayed empty. The word BLOCKS still follow the correct
   // answer's own word lengths -- only which typed character lands in
   // which box ignores where the child put their spaces.
-  const userFlat = userAns.replace(/ /g, "");
+  const userFlat = typedLettersOnly(userAns);
   let flatIdx = 0;
 
   for(let wi=0; wi<correctWords.length; wi++){
@@ -9123,6 +9161,7 @@ function markAnswerComparison(card, userAns){
     const cWord=correctWords[wi];
     for(let ci=0; ci<cWord.length; ci++){
       const cChar=cWord[ci];
+      if(isPrefillChar(cChar)){ wordBlock.appendChild(makeGivenBox(cChar)); continue; }
       const uChar=userFlat[flatIdx]||"";
       const box=document.createElement("div");
       box.className="letter-box";
@@ -9174,7 +9213,7 @@ function renderAnswerBoxesLive(card, currentInput){
   // see markAnswerComparison: compare a flattened (space-free) stream so a
   // missing/extra space while typing doesn't shove every later character
   // into the wrong word's boxes.
-  const inputFlat = currentInput.replace(/ /g, "");
+  const inputFlat = typedLettersOnly(currentInput);
   let flatIdx = 0;
 
   for(let wi=0; wi<expWords.length; wi++){
@@ -9183,6 +9222,7 @@ function renderAnswerBoxesLive(card, currentInput){
     const expW=expWords[wi];
 
     for(let ci=0; ci<expW.length; ci++){
+      if(isPrefillChar(expW[ci])){ wordBlock.appendChild(makeGivenBox(expW[ci])); continue; }
       const box=document.createElement("div");
       box.className="letter-box";
       const ch = inputFlat[flatIdx] || "";
@@ -11545,6 +11585,7 @@ function applyHint(){
     const iWord = inputWords[wi] || "";
     for(let ci=0; ci<tWord.length; ci++){
       const key = `${wi}:${ci}`;
+      if(isPrefillChar(tWord[ci])) continue; // Satzzeichen sind ohnehin vorausgefüllt
       if(card.hintedChars.has(key)) continue;
       const typedChar = iWord[ci] || "";
       const alreadyCorrect = typedChar && sameLetter(typedChar, tWord[ci]);
@@ -11554,7 +11595,7 @@ function applyHint(){
   if(candidates.length===0) return; // nothing left to reveal
 
   // more letters per press for longer answers
-  const totalLen = targetWords.reduce((sum,w)=>sum+w.length, 0);
+  const totalLen = typedLettersOnly(card.hintTarget).length;
   const revealCount = Math.min(candidates.length, Math.max(1, Math.ceil(totalLen/4)));
 
   // Fisher-Yates shuffle, then take the first revealCount as the random positions
@@ -11770,8 +11811,19 @@ const ANSWER_CLOSE_THRESHOLD_RATIO = 0.3;
 
 function checkAnswer(){
   const card = state.roundCards[state.roundIndex];
-  const inputVal=document.getElementById("answerInput").value;
+  const rawInput=document.getElementById("answerInput").value;
   const correct=card.answer;
+  // Satzzeichen sind vorausgefüllt (siehe fillAnswerTemplate): passt die
+  // getippte Buchstabenfolge genau in die angezeigte Lösung, zählt sie mit
+  // deren Zeichen -- "dont" = "don't", "SchulFach" = "Schul-Fach"
+  let filledInput = null;
+  if(!answerMatches(rawInput, correct)){
+    for(const tmpl of [card.hintTarget, pickDisplayAlternative(correct, rawInput), ...getAlternatives(correct)]){
+      const f = tmpl ? fillAnswerTemplate(tmpl, rawInput) : null;
+      if(f && answerMatches(f, correct)){ filledInput = f; break; }
+    }
+  }
+  const inputVal = filledInput || rawInput;
   // another item's translation with the same meaning counts fully, see findSynonymMatch
   const synonym = answerMatches(inputVal, correct) ? null : findSynonymMatch(card, inputVal);
   const good = answerMatches(inputVal, correct) || !!synonym;
@@ -12537,7 +12589,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-17.3";
+const APP_BUILD = "2026-10-27.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
