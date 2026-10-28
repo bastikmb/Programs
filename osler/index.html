@@ -7,8 +7,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Osler Tracker">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1d2226" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff">
+<script>
+/* Colour scheme follows the clock, not the system setting: light 7:00–19:59, dark otherwise */
+(function(){
+  function apply(){const h=new Date().getHours();const dark=h<7||h>=20;
+    document.documentElement.dataset.theme=dark?"dark":"light";
+    const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dark?"#1d2226":"#ffffff"}
+  apply();setInterval(apply,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)apply()});
+})();
+</script>
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -30,7 +38,8 @@
   --tabh:56px;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+/* dark palette, switched on by the clock script in <head> */
+:root[data-theme="dark"]{
   --bg:#14181b; --panel:#1d2226; --fg:#eef2f4; --muted:#9aa6ae; --line:#2c343a; --fill:#262d32;
   --accent:#5ccfc9; --accent-ink:#0c2423; --accent-soft:#1c3634;
   --i0:#7d7550; --i1:#d4a63a; --i2:#e57d3a; --i3:#f0627a;
@@ -38,7 +47,7 @@
   --ok:#6fd19c; --warn:#f0b75a; --bad:#ff8a98;
   --band1:#1a2e25; --band2:#30281a; --band3:#36202a;
   --head:#1d2226; --head-ink:#eef2f4; --shadow:rgba(0,0,0,.25);
-  color-scheme:dark}}
+  color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 var(--font);-webkit-text-size-adjust:100%}
