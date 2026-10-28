@@ -19,7 +19,7 @@
 :root{
   --bg:#f6f8f9; --panel:#ffffff; --fg:#22292f; --muted:#66727b; --line:#e8edf0; --fill:#f1f4f6;
   --accent:#0f7c7e; --accent-ink:#ffffff; --accent-soft:#e4f3f2;
-  --i1:#ffd58f; --i2:#f6a26f; --i3:#e2606f;
+  --i0:#e6d8b4; --i1:#ffd58f; --i2:#f6a26f; --i3:#e2606f;
   --h0:#edf1f3; --h1:#fde6c4; --h2:#f9c08e; --h3:#f08f72; --h4:#dc5a6c;
   --ok:#1a7a50; --warn:#9a6008; --bad:#c43c50;
   --band1:#e3f6ec; --band2:#fdf1dc; --band3:#fde8ea;
@@ -33,7 +33,7 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#14181b; --panel:#1d2226; --fg:#eef2f4; --muted:#9aa6ae; --line:#2c343a; --fill:#262d32;
   --accent:#5ccfc9; --accent-ink:#0c2423; --accent-soft:#1c3634;
-  --i1:#a8844a; --i2:#d98a5c; --i3:#f08a96;
+  --i0:#5e5748; --i1:#a8844a; --i2:#d98a5c; --i3:#f08a96;
   --h0:#262d32; --h1:#4a3d2a; --h2:#7a5536; --h3:#b4644f; --h4:#f08a96;
   --ok:#6fd19c; --warn:#f0b75a; --bad:#ff8a98;
   --band1:#1a2e25; --band2:#30281a; --band3:#36202a;
@@ -67,6 +67,7 @@ textarea{min-height:64px;resize:vertical}
 .pillbtn{border:0;background:var(--fill);border-radius:10px;padding:0 14px;min-height:44px;font-weight:600;font-size:15px;cursor:pointer}
 .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .big{border:2px solid transparent;background:var(--fill);border-radius:12px;min-height:60px;padding:8px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;line-height:1.15}
 .big b{font:700 17px var(--font-round)}
 .big span{font-size:11.5px;color:var(--muted)}
@@ -193,7 +194,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 
   <div class="card">
     <div class="lbl">Stärke</div>
-    <div class="grid3" id="f-int">
+    <div class="grid2" id="f-int">
+      <button type="button" class="big" data-v="0"><i class="sw" style="background:var(--i0)"></i><b>Schmierblutung</b><span>nur Spuren</span></button>
       <button type="button" class="big" data-v="1"><i class="sw" style="background:var(--i1)"></i><b>Tropfen</b><span>1 Taschentuch</span></button>
       <button type="button" class="big" data-v="2"><i class="sw" style="background:var(--i2)"></i><b>Rinnsal</b><span>läuft stetig</span></button>
       <button type="button" class="big" data-v="3"><i class="sw" style="background:var(--i3)"></i><b>Strom</b><span>Schwall</span></button>
@@ -271,7 +273,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
     </div>
     <div id="wk"></div>
     <div class="readout" id="wk-read">Tippe auf eine Woche.</div>
-    <div class="legend"><span><i style="background:var(--i1)"></i>Tropfen</span><span><i style="background:var(--i2)"></i>Rinnsal</span><span><i style="background:var(--i3)"></i>Strom</span></div>
+    <div class="legend"><span><i style="background:var(--i0)"></i>Schmierblutung</span><span><i style="background:var(--i1)"></i>Tropfen</span><span><i style="background:var(--i2)"></i>Rinnsal</span><span><i style="background:var(--i3)"></i>Strom</span></div>
   </div>
 
   <div class="card">
@@ -339,8 +341,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 "use strict";
 const $=s=>document.querySelector(s);
 const KEY="nasenbluten_v1";
-const INT={1:"Tropfen",2:"Rinnsal",3:"Strom"};
-const ICOL={1:"var(--i1)",2:"var(--i2)",3:"var(--i3)"};
+const INT={0:"Schmierblutung",1:"Tropfen",2:"Rinnsal",3:"Strom"};
+const ICOL={0:"var(--i0)",1:"var(--i1)",2:"var(--i2)",3:"var(--i3)"};
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
@@ -396,7 +398,7 @@ function paintForm(){
   document.querySelectorAll("#f-trig .chip").forEach(b=>b.setAttribute("aria-pressed",String(form.triggers.includes(b.dataset.v))));
   $("#f-note").value=form.note;
   const parts=[form.dtAuto?"":form.daytime,form.side,...form.triggers,...form.stopped].filter(Boolean);$("#more-sum").textContent=parts.length?parts.length+" gewählt":"";
-  $("#f-save").disabled=!(form.dur!=null&&form.intensity);
+  $("#f-save").disabled=!(form.dur!=null&&form.intensity!=null);
   $("#f-save").textContent=editingId?"Änderung speichern":"Speichern";
   $("#editbar").hidden=!editingId; $("#f-hint").textContent="";
 }
@@ -456,16 +458,16 @@ function renderStats(){
 function niceMax(m){if(m<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(m)));const s=[1,2,2.5,5,10].find(k=>k*p>=m/4);return Math.ceil(m/(s*p))*s*p}
 function renderWeeks(){
   const box=$("#wk");const end=monday(new Date());const data=[];
-  for(let i=weeks-1;i>=0;i--){const s=new Date(end);s.setDate(s.getDate()-7*i);data.push({start:s,key:iso(s),v:{1:0,2:0,3:0},n:0,min:0})}
+  for(let i=weeks-1;i>=0;i--){const s=new Date(end);s.setDate(s.getDate()-7*i);data.push({start:s,key:iso(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}
   const idx=Object.fromEntries(data.map((w,i)=>[w.key,i]));
-  store.episodes.forEach(e=>{const w=data[idx[iso(monday(parse(e.date)))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity||1]+=metric==="n"?1:m;w.n++;w.min+=m});
+  store.episodes.forEach(e=>{const w=data[idx[iso(monday(parse(e.date)))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity in INT?e.intensity:1]+=metric==="n"?1:m;w.n++;w.min+=m});
   const W=Math.max(280,box.clientWidth||340),H=180,L=28,R=4,T=8,B=22,iw=W-L-R,ih=H-T-B;
   const maxV=niceMax(Math.max(1,...data.map(d=>d.v[1]+d.v[2]+d.v[3])));const bw=iw/data.length,gap=Math.min(3,bw*.25);const y=v=>T+ih-v/maxV*ih;
   let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Episoden pro Woche">`;
   for(let k=0;k<=4;k++){const v=maxV*k/4;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${y(v)+3}" text-anchor="end">${fmt1(v)}</text>`}
   const step=Math.ceil(data.length/(W<420?4:7));
   data.forEach((d,i)=>{let acc=0;const x=L+i*bw+gap/2,w=Math.max(1,bw-gap);
-    [1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;const y0=y(acc),y1=y(acc+v);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0,y0-y1)}" fill="${ICOL[k]}" rx="1.5"/>`;acc+=v});
+    [0,1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;const y0=y(acc),y1=y(acc+v);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0,y0-y1)}" fill="${ICOL[k]}" rx="1.5"/>`;acc+=v});
     s+=`<rect data-i="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ih}" fill="transparent"/>`;
     if((data.length-1-i)%step===0)s+=`<text x="${L+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${dm(d.start)}</text>`});
   s+=`<line x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}" stroke="var(--muted)"/></svg>`;box.innerHTML=s;
@@ -512,7 +514,7 @@ function renderList(){
       if(m!==mon){mon=m;const h=document.createElement("div");h.className="month";const cnt=rows.filter(x=>x.date.slice(0,7)===e.date.slice(0,7));
         h.textContent=`${m} · ${cnt.length} Episode${cnt.length===1?"":"n"}, ${fmt1(cnt.reduce((a,x)=>a+(+x.duration_min||0),0))} min`;box.append(h);grp=document.createElement("div");grp.className="group";box.append(grp)}
       const b=document.createElement("button");b.type="button";b.className="ep";
-      const bar=document.createElement("i");bar.className="bar";bar.style.background=ICOL[e.intensity]||ICOL[1];
+      const bar=document.createElement("i");bar.className="bar";bar.style.background=ICOL[e.intensity]??ICOL[1];
       const mid=document.createElement("div");const t=document.createElement("div");t.className="t";t.textContent=fmtD(e.date)+(e.time?" · "+e.time:"");
       const d=document.createElement("div");d.className="d";d.textContent=[INT[e.intensity],e.daytime,e.side,(e.triggers||[]).join(", "),e.stopped].filter(Boolean).join(" · ");mid.append(t,d);
       const mm=document.createElement("span");mm.className="m";mm.textContent=(+e.duration_min<1?"<1":fmt1(+e.duration_min))+" min";
@@ -543,7 +545,7 @@ $("#b-backup").addEventListener("click",async()=>{const ok=await deliver(`nasenb
   if(ok){store.lastBackup=new Date().toISOString();persist();renderList()}});
 $("#b-csv").addEventListener("click",()=>{const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
   const L=[["Datum","Uhrzeit","Dauer_min","Staerke","Tageszeit","Seite","Ausloeser","Gestoppt","Notiz"].join(";")];
-  [...sorted()].reverse().forEach(e=>L.push([e.date,e.time,String(e.duration_min).replace(".",","),INT[e.intensity]||"",e.daytime||"",e.side,(e.triggers||[]).join(", "),e.stopped,e.note].map(q).join(";")));
+  [...sorted()].reverse().forEach(e=>L.push([e.date,e.time,String(e.duration_min).replace(".",","),INT[e.intensity]??"",e.daytime||"",e.side,(e.triggers||[]).join(", "),e.stopped,e.note].map(q).join(";")));
   deliver(`nasenbluten-${iso(new Date())}.csv`,"﻿"+L.join("\r\n"),"text/csv")});
 $("#b-import").addEventListener("click",()=>$("#imp-file").click());
 $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const txt=(await f.text()).replace(/^﻿/,"");
@@ -551,16 +553,16 @@ $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.t
   try{if(txt.trim().startsWith("{")){const j=JSON.parse(txt);eps=Array.isArray(j.episodes)?j.episodes:[];ess=Array.isArray(j.ess)?j.ess:[]}else eps=parseCsv(txt)}
   catch(err){toast("Datei konnte nicht gelesen werden.");return}
   const key=x=>x.date+"|"+(x.time||"")+"|"+x.duration_min+"|"+x.intensity;const have=new Set(store.episodes.map(key));let added=0;
-  eps.forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!(+x.duration_min>=0)||![1,2,3].includes(+x.intensity))return;
+  eps.forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!(+x.duration_min>=0)||![0,1,2,3].includes(+x.intensity))return;
     const r={id:x.id||uid(),created:x.created||new Date().toISOString(),date:x.date,time:x.time||"",duration_min:+x.duration_min,intensity:+x.intensity,daytime:x.daytime||"",side:x.side||"",triggers:Array.isArray(x.triggers)?x.triggers:[],stopped:normStop(x.stopped),note:x.note||""};
     if(have.has(key(r)))return;have.add(key(r));store.episodes.push(r);added++});
   const hk=new Set(store.ess.map(x=>x.date+"|"+x.score));let addE=0;ess.forEach(x=>{if(x&&typeof x.score==="number"&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&!hk.has(x.date+"|"+x.score)){store.ess.push({id:x.id||uid(),date:x.date,score:x.score,answers:x.answers||{}});addE++}});
   persist();render();toast(`${added} Episode${added===1?"":"n"}${addE?` und ${addE} ESS`:""} importiert`)});
 function parseCsv(t){const lines=t.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
   const split=l=>{const out=[];let cur="",q=false;for(let i=0;i<l.length;i++){const c=l[i];if(q){if(c==='"'&&l[i+1]==='"'){cur+='"';i++}else if(c==='"')q=false;else cur+=c}else if(c==='"')q=true;else if(c===";"){out.push(cur);cur=""}else cur+=c}out.push(cur);return out};
-  const head=split(lines[0]).map(h=>h.trim().toLowerCase());const col=n=>head.indexOf(n);const rev={tropfen:1,rinnsal:2,strom:3};
+  const head=split(lines[0]).map(h=>h.trim().toLowerCase());const col=n=>head.indexOf(n);const rev={schmierblutung:0,tropfen:1,rinnsal:2,strom:3};
   return lines.slice(1).map(l=>{const c=split(l);const g=n=>col(n)>=0?(c[col(n)]||"").trim():"";
-    return{date:g("datum"),time:g("uhrzeit"),duration_min:Number(g("dauer_min").replace(",",".")),intensity:rev[g("staerke").toLowerCase()]||0,daytime:g("tageszeit"),side:g("seite"),
+    return{date:g("datum"),time:g("uhrzeit"),duration_min:Number(g("dauer_min").replace(",",".")),intensity:rev[g("staerke").toLowerCase()]??-1,daytime:g("tageszeit"),side:g("seite"),
       triggers:g("ausloeser")?g("ausloeser").split(",").map(s=>s.trim()).filter(Boolean):[],stopped:g("gestoppt"),note:g("notiz")}})}
 
 /* ---------- ESS ---------- */
