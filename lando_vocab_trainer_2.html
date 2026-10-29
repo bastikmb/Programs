@@ -2302,6 +2302,25 @@ body.dark-theme { --adult-bg:#14203a; --adult-border:#5b7fc4; --adult-ink:#a9c1e
   vertical-align:middle;
 }
 body.dark-theme .book-tag { color:#0a1020; }
+/* Trainings-Session: Bücher priorisieren (showTrainingPicker) */
+.training-picker-box { text-align:left; max-width:380px; }
+.training-picker-heading { font-family:var(--font-display); font-weight:800; font-size:var(--text-lg); }
+.training-picker-sub { color:var(--muted); font-size:var(--text-sm); margin-bottom:var(--space-3); }
+.training-picker-list { display:flex; flex-direction:column; gap:0.4rem; max-height:45vh; overflow:auto; margin-bottom:var(--space-3); }
+.training-picker-row {
+  display:flex; align-items:center; gap:0.5rem;
+  padding:0.55rem 0.65rem;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--surface);
+  cursor:pointer;
+}
+.training-picker-row.on { border:2px solid var(--accent); background:var(--accent-bg); }
+.training-picker-row input { width:1.15rem; height:1.15rem; accent-color:var(--accent); flex-shrink:0; }
+.training-picker-name { flex:1; min-width:0; font-weight:700; font-size:var(--text-sm); }
+.training-picker-count { font-size:var(--text-xs); font-weight:700; color:var(--muted); white-space:nowrap; }
+.training-picker-preview { font-weight:700; font-size:var(--text-sm); margin-bottom:0.3rem; }
+.training-picker-hint { font-size:var(--text-xs); color:var(--muted); margin-bottom:var(--space-4); }
 /* Sprach-Plakette auf der Lernkarte */
 .learn-lang-chip {
   display:inline-flex;
@@ -9337,14 +9356,126 @@ function renderDueReviewTile(prof){
   const done = reviewUnitsDoneToday(prof);
   if(dueCount>0 && done<REVIEW_UNITS_PER_DAY){
     const n = pickReviewUnit(prof).length;
+    const prio = getTrainingPriorityBooks(prof);
+    const prioNote = prio.length===1 ? ` · ⭐ ${getBookDef(prio[0]).name} zuerst`
+      : prio.length>1 ? ` · ⭐ ${prio.length} Bücher zuerst` : "";
     setListItem(tile, {icon:"📅", title:`Training bereit · ${n} ${n===1?"Wort":"Wörter"} · ca. ${reviewUnitMinutes(n)} Min.`,
-      desc:`Trainings-Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %`, hot:true, onClick:startDueReviewRound,
+      desc:`Trainings-Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %${prioNote}`, hot:true, onClick:openTrainingStart,
       aria:`Trainings-Session mit ${n} Wörtern starten, Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
   } else if(dueCount>0){
     setListItem(tile, {icon:"✅", title:`Training für heute geschafft (${done}/${REVIEW_UNITS_PER_DAY})`, desc:"Morgen geht's weiter – stark!"});
   } else {
     setListItem(tile, {icon:"📅", title:"Kein Training fällig", desc:"Wiederholungen kommen von selbst wieder"});
   }
+}
+
+/* Einstieg ins Training (Kachel, Formkurve): Haben mehrere Bücher fällige
+   Wörter, erst kurz fragen, welche Vorrang haben (showTrainingPicker),
+   sonst direkt starten. */
+function openTrainingStart(){
+  const prof = getCurrentProfileObj();
+  if(!prof) return;
+  // Hauptbuch je Wort -- steht ein Wort zusätzlich in einem anderen Buch,
+  // soll das allein noch keine Auswahl erzwingen
+  const books = new Set(collectDueWords(prof).map(w=>w.bookKey).filter(Boolean));
+  if(books.size>1) showTrainingPicker(prof);
+  else startDueReviewRound();
+}
+
+/* Auswahl-Fenster vor der Trainings-Session: Bücher mit fälligen Wörtern
+   ankreuzen -- ihre Wörter kommen zuerst (pickReviewUnit), der Rest füllt
+   auf. Die Auswahl wird pro Profil gemerkt. */
+function showTrainingPicker(prof){
+  const counts = {};
+  collectDueWords(prof).forEach(w=>(w.bookKeys||[w.bookKey]).forEach(k=>{ if(k) counts[k] = (counts[k]||0)+1; }));
+  const bookKeys = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  const selected = new Set(getTrainingPriorityBooks(prof).filter(k=>counts[k]));
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay training-picker-overlay";
+  const box = document.createElement("div");
+  box.className = "confirm-overlay-box training-picker-box";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-label", "Trainings-Session: Bücher auswählen");
+
+  const heading = document.createElement("div");
+  heading.className = "training-picker-heading";
+  heading.textContent = "📅 Trainings-Session";
+  const sub = document.createElement("div");
+  sub.className = "training-picker-sub";
+  sub.textContent = "Welche Bücher zuerst?";
+  box.append(heading, sub);
+
+  const list = document.createElement("div");
+  list.className = "training-picker-list";
+  const preview = document.createElement("div");
+  preview.className = "training-picker-preview";
+  function updatePreview(){
+    const unit = pickReviewUnit(prof, [...selected]);
+    const fromSel = unit.filter(w=>(w.bookKeys||[w.bookKey]).some(k=>selected.has(k))).length;
+    preview.textContent = `Diese Session: ${unit.length} ${unit.length===1?"Wort":"Wörter"}`
+      + (selected.size ? ` (${fromSel} aus deiner Auswahl)` : " (die dringendsten aus allen Büchern)");
+  }
+  bookKeys.forEach(key=>{
+    const book = getBookDef(key);
+    if(!book) return;
+    const row = document.createElement("label");
+    row.className = "training-picker-row";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selected.has(key);
+    cb.addEventListener("change", ()=>{
+      if(cb.checked) selected.add(key); else selected.delete(key);
+      row.classList.toggle("on", cb.checked);
+      updatePreview();
+    });
+    row.classList.toggle("on", cb.checked);
+    const icon = document.createElement("span");
+    icon.className = "training-picker-icon";
+    icon.innerHTML = langIconImg(book.lang, "lang-icon-inline tiny");
+    const name = document.createElement("span");
+    name.className = "training-picker-name";
+    name.textContent = book.name;
+    const count = document.createElement("span");
+    count.className = "training-picker-count";
+    count.textContent = `${counts[key]} fällig`;
+    row.append(cb, icon, name, count);
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+
+  const hint = document.createElement("div");
+  hint.className = "training-picker-hint";
+  hint.textContent = "Nichts angekreuzt = die dringendsten Wörter aus allen Büchern. Reichen die gewählten Bücher nicht für eine volle Session, wird aufgefüllt.";
+  box.append(preview, hint);
+
+  const btns = document.createElement("div");
+  btns.className = "confirm-overlay-btns";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn-secondary btn";
+  cancelBtn.textContent = "Abbrechen";
+  const goBtn = document.createElement("button");
+  goBtn.type = "button";
+  goBtn.className = "btn";
+  goBtn.textContent = "▶️ Los";
+  btns.append(cancelBtn, goBtn);
+  box.appendChild(btns);
+
+  function close(){ overlay.remove(); }
+  cancelBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e)=>{ if(e.target===overlay) close(); });
+  goBtn.addEventListener("click", ()=>{
+    prof.trainingPriorityBooks = [...selected];
+    saveProfiles();
+    close();
+    startDueReviewRound();
+  });
+
+  updatePreview();
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  goBtn.focus();
 }
 
 /* Startet eine Runde direkt aus den fälligen Wiederholungen (siehe
@@ -10950,8 +11081,10 @@ function getVocabIndex(){
       for(const w of words || []){
         const key = vocabKey(book.lang, w.de, w.foreign);
         if(!byKey.has(key)){
-          byKey.set(key, {key, de:w.de, foreign:w.foreign, icon:w.icon, example:w.example||null, pageId,
-            lang:resolveSpeechLang(book.lang), onlyDirection:w.onlyDirection||null});
+          byKey.set(key, {key, de:w.de, foreign:w.foreign, icon:w.icon, example:w.example||null, pageId, bookKey,
+            bookKeys:[bookKey], lang:resolveSpeechLang(book.lang), onlyDirection:w.onlyDirection||null});
+        } else if(!byKey.get(key).bookKeys.includes(bookKey)){
+          byKey.get(key).bookKeys.push(bookKey); // gleiches Wort in mehreren Büchern
         }
         if(!byDe.has(w.de)) byDe.set(w.de, []);
         byDe.get(w.de).push({key, bookKey, pageId, bookLang:book.lang});
@@ -11114,11 +11247,20 @@ function countReviewUnitDone(prof){
    längsten überfällig. */
 // neue Sprache, kurze Portionen: höchstens so viele Wörter je Session
 const REVIEW_UNIT_LANG_CAP = { tl: 5 };
-function pickReviewUnit(prof){
+/* Vom Kind/Elternteil vor der Session gewählte Bücher (showTrainingPicker),
+   pro Profil gemerkt -- nur noch vorhandene, nicht archivierte Bücher. */
+function getTrainingPriorityBooks(prof){
+  return (Array.isArray(prof.trainingPriorityBooks) ? prof.trainingPriorityBooks : [])
+    .filter(k=>{ const b = getBookDef(k); return b && !b.archived; });
+}
+function pickReviewUnit(prof, priorityOverride){
   const schedule = ensureWordSchedule(prof);
+  // Wörter aus priorisierten Büchern zuerst -- nur sortieren, nicht
+  // filtern: reichen sie nicht für eine volle Session, wird aufgefüllt
+  const prio = new Set(priorityOverride || getTrainingPriorityBooks(prof));
   const sorted = collectDueWords(prof)
-    .map(w=>({w, e:schedule[w.key]||{}}))
-    .sort((a,b)=>(a.e.box||1)-(b.e.box||1) || String(a.e.dueDate).localeCompare(String(b.e.dueDate)));
+    .map(w=>({w, e:schedule[w.key]||{}, p:(w.bookKeys||[w.bookKey]).some(k=>prio.has(k)) ? 0 : 1}))
+    .sort((a,b)=>a.p-b.p || (a.e.box||1)-(b.e.box||1) || String(a.e.dueDate).localeCompare(String(b.e.dueDate)));
   const perLang = {};
   const unit = [];
   for(const {w} of sorted){
@@ -14219,7 +14361,7 @@ function setupEventListeners(){
     if(prof) renderProgressCalendar(ensureDailyLog(prof), todayKey());
   };
   document.getElementById("btnCalPrev").addEventListener("click", ()=>shiftProgressMonth(-1));
-  document.getElementById("btnProgressReview").addEventListener("click", startDueReviewRound);
+  document.getElementById("btnProgressReview").addEventListener("click", openTrainingStart);
   document.getElementById("btnCalNext").addEventListener("click", ()=>shiftProgressMonth(1));
   document.getElementById("btnFreezeHelp").addEventListener("click", ()=>{
     const help = document.getElementById("progFreezeHelp");
@@ -14310,7 +14452,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-28.1";
+const APP_BUILD = "2026-10-29.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
