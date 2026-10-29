@@ -13175,7 +13175,10 @@ function renderCurrentCard(){
   chip.setAttribute("aria-label", card.direction==="enToDe" ? `${foreignName} nach Deutsch` : `Deutsch nach ${foreignName}`);
 
   // card info
-  document.getElementById("learnIcon").textContent=card.icon||"❓";
+  const learnIconEl = document.getElementById("learnIcon");
+  learnIconEl.textContent=card.icon||"❓";
+  // Trainings-Session: kein Hilfsbild -- abgefragt wird nur das Wort selbst
+  learnIconEl.style.display = state.isDueReviewRound ? "none" : "";
   document.getElementById("learnPromptText").textContent=card.prompt;
   document.getElementById("cardScore").textContent=String(card.score);
 
@@ -14452,7 +14455,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-29.1";
+const APP_BUILD = "2026-10-29.2";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
