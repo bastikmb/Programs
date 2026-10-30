@@ -2319,6 +2319,14 @@ body.dark-theme .book-tag { color:#0a1020; }
 .training-picker-row input { width:1.15rem; height:1.15rem; accent-color:var(--accent); flex-shrink:0; }
 .training-picker-name { flex:1; min-width:0; font-weight:700; font-size:var(--text-sm); }
 .training-picker-count { font-size:var(--text-xs); font-weight:700; color:var(--muted); white-space:nowrap; }
+.training-picker-section { font-size:var(--text-xs); font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--heading); margin:var(--space-2) 0 0.35rem; }
+.training-picker-dirs { display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:var(--space-2); }
+.training-picker-dir {
+  font:inherit; font-size:var(--text-xs); font-weight:700; color:var(--ink);
+  padding:0.5rem 0.4rem; border-radius:var(--radius-sm);
+  border:1px solid var(--border); background:var(--surface); cursor:pointer;
+}
+.training-picker-dir.on { border:2px solid var(--accent); background:var(--accent-bg); }
 .training-picker-preview { font-weight:700; font-size:var(--text-sm); margin-bottom:0.3rem; }
 .training-picker-hint { font-size:var(--text-xs); color:var(--muted); margin-bottom:var(--space-4); }
 /* Sprach-Plakette auf der Lernkarte */
@@ -9357,8 +9365,9 @@ function renderDueReviewTile(prof){
   if(dueCount>0 && done<REVIEW_UNITS_PER_DAY){
     const n = pickReviewUnit(prof).length;
     const prio = getTrainingPriorityBooks(prof);
-    const prioNote = prio.length===1 ? ` · ⭐ ${getBookDef(prio[0]).name} zuerst`
-      : prio.length>1 ? ` · ⭐ ${prio.length} Bücher zuerst` : "";
+    const prioNote = (prio.length===1 ? ` · ⭐ ${getBookDef(prio[0]).name} zuerst`
+      : prio.length>1 ? ` · ⭐ ${prio.length} Bücher zuerst` : "")
+      + (getTrainingDirection(prof)!=="original" ? ` · 🔄 ${trainingDirectionLabel(getTrainingDirection(prof), dueLangName(prof))}` : "");
     setListItem(tile, {icon:"📅", title:`Training bereit · ${n} ${n===1?"Wort":"Wörter"} · ca. ${reviewUnitMinutes(n)} Min.`,
       desc:`Trainings-Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute · alle gelöst = +50 %${prioNote}`, hot:true, onClick:openTrainingStart,
       aria:`Trainings-Session mit ${n} Wörtern starten, Session ${done+1} von ${REVIEW_UNITS_PER_DAY} heute`});
@@ -9375,11 +9384,27 @@ function renderDueReviewTile(prof){
 function openTrainingStart(){
   const prof = getCurrentProfileObj();
   if(!prof) return;
-  // Hauptbuch je Wort -- steht ein Wort zusätzlich in einem anderen Buch,
-  // soll das allein noch keine Auswahl erzwingen
-  const books = new Set(collectDueWords(prof).map(w=>w.bookKey).filter(Boolean));
-  if(books.size>1) showTrainingPicker(prof);
-  else startDueReviewRound();
+  // immer fragen: Lernrichtung ist immer wählbar, die Bücher-Auswahl
+  // erscheint darin nur, wenn mehrere Bücher fällige Wörter haben
+  if(collectDueWords(prof).length>0) showTrainingPicker(prof);
+}
+
+/* Lernrichtung im Training: "original" = jedes Wort in der Richtung, in
+   der es gelernt wurde (bisheriges Verhalten), sonst fest oder gemischt.
+   Pro Profil gemerkt (prof.trainingDirection). */
+const TRAINING_DIRECTIONS = ["original", "deToEn", "enToDe", "mixed"];
+function getTrainingDirection(prof){
+  return TRAINING_DIRECTIONS.includes(prof.trainingDirection) ? prof.trainingDirection : "original";
+}
+function trainingDirectionLabel(dir, langName){
+  return dir==="deToEn" ? `Deutsch → ${langName}`
+    : dir==="enToDe" ? `${langName} → Deutsch`
+    : dir==="mixed" ? "Gemischt" : "Wie gelernt";
+}
+// "Englisch", wenn alle fälligen Wörter eine Sprache haben, sonst "Fremdsprache"
+function dueLangName(prof){
+  const langs = new Set(collectDueWords(prof).map(w=>String(w.key||"").split("|")[0]));
+  return langs.size===1 ? (LANG_DISPLAY_NAMES[[...langs][0]] || "Fremdsprache") : "Fremdsprache";
 }
 
 /* Auswahl-Fenster vor der Trainings-Session: Bücher mit fälligen Wörtern
@@ -9403,9 +9428,46 @@ function showTrainingPicker(prof){
   heading.textContent = "📅 Trainings-Session";
   const sub = document.createElement("div");
   sub.className = "training-picker-sub";
-  sub.textContent = "Welche Bücher zuerst?";
+  sub.textContent = "Kurz einstellen, dann geht's los.";
   box.append(heading, sub);
 
+  // Lernrichtung (immer)
+  let direction = getTrainingDirection(prof);
+  const langName = dueLangName(prof);
+  const dirTitle = document.createElement("div");
+  dirTitle.className = "training-picker-section";
+  dirTitle.textContent = "Lernrichtung";
+  const dirSeg = document.createElement("div");
+  dirSeg.className = "training-picker-dirs";
+  dirSeg.setAttribute("role", "radiogroup");
+  dirSeg.setAttribute("aria-label", "Lernrichtung");
+  TRAINING_DIRECTIONS.forEach(d=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "training-picker-dir" + (d===direction ? " on" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", d===direction ? "true" : "false");
+    b.dataset.dir = d;
+    b.textContent = trainingDirectionLabel(d, langName);
+    b.addEventListener("click", ()=>{
+      direction = d;
+      dirSeg.querySelectorAll(".training-picker-dir").forEach(x=>{
+        const on = x.dataset.dir===d;
+        x.classList.toggle("on", on);
+        x.setAttribute("aria-checked", on ? "true" : "false");
+      });
+    });
+    dirSeg.appendChild(b);
+  });
+  box.append(dirTitle, dirSeg);
+
+  const multiBook = new Set(collectDueWords(prof).map(w=>w.bookKey).filter(Boolean)).size > 1;
+  if(multiBook){
+    const bookTitle = document.createElement("div");
+    bookTitle.className = "training-picker-section";
+    bookTitle.textContent = "Welche Bücher zuerst?";
+    box.appendChild(bookTitle);
+  }
   const list = document.createElement("div");
   list.className = "training-picker-list";
   const preview = document.createElement("div");
@@ -9414,7 +9476,7 @@ function showTrainingPicker(prof){
     const unit = pickReviewUnit(prof, [...selected]);
     const fromSel = unit.filter(w=>(w.bookKeys||[w.bookKey]).some(k=>selected.has(k))).length;
     preview.textContent = `Diese Session: ${unit.length} ${unit.length===1?"Wort":"Wörter"}`
-      + (selected.size ? ` (${fromSel} aus deiner Auswahl)` : " (die dringendsten aus allen Büchern)");
+      + (!multiBook ? "" : selected.size ? ` (${fromSel} aus deiner Auswahl)` : " (die dringendsten aus allen Büchern)");
   }
   bookKeys.forEach(key=>{
     const book = getBookDef(key);
@@ -9442,11 +9504,13 @@ function showTrainingPicker(prof){
     row.append(cb, icon, name, count);
     list.appendChild(row);
   });
-  box.appendChild(list);
+  if(multiBook) box.appendChild(list);
 
   const hint = document.createElement("div");
   hint.className = "training-picker-hint";
-  hint.textContent = "Nichts angekreuzt = die dringendsten Wörter aus allen Büchern. Reichen die gewählten Bücher nicht für eine volle Session, wird aufgefüllt.";
+  hint.textContent = multiBook
+    ? "Nichts angekreuzt = die dringendsten Wörter aus allen Büchern. Reichen die gewählten Bücher nicht für eine volle Session, wird aufgefüllt."
+    : "„Wie gelernt“ fragt jedes Wort in der Richtung ab, in der du es geübt hast.";
   box.append(preview, hint);
 
   const btns = document.createElement("div");
@@ -9466,7 +9530,8 @@ function showTrainingPicker(prof){
   cancelBtn.addEventListener("click", close);
   overlay.addEventListener("click", (e)=>{ if(e.target===overlay) close(); });
   goBtn.addEventListener("click", ()=>{
-    prof.trainingPriorityBooks = [...selected];
+    if(multiBook) prof.trainingPriorityBooks = [...selected];
+    prof.trainingDirection = direction;
     saveProfiles();
     close();
     startDueReviewRound();
@@ -9490,10 +9555,14 @@ function startDueReviewRound(){
   if(!prof) return;
   const due = pickReviewUnit(prof);
   if(due.length===0) return;
+  // gewählte Lernrichtung (showTrainingPicker); "original" = wie gelernt.
+  // Wörter mit onlyDirection bleiben in ihrer einzig sinnvollen Richtung
+  // (buildRoundCardsFromVocab prüft onlyDirection zuerst).
+  const trainDir = getTrainingDirection(prof);
   state.vocabPool = due.map(w=>({
     key:w.key, onlyDirection:w.onlyDirection||null,
     de:w.de, foreign:w.foreign, icon:w.icon, example:w.example, active:true, pageId:w.pageId, lang:w.lang,
-    direction:w.direction || null
+    direction: trainDir==="original" ? (w.direction || null) : trainDir
   }));
   state.direction = "mixed";
   state.isHardWordsOnlyRound = true; // deckt nie eine volle Seiten-Auswahl ab -- kein Seiten-Set-Bonus, siehe isRoundFullyCorrect()
@@ -14455,7 +14524,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-29.2";
+const APP_BUILD = "2026-10-30.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
