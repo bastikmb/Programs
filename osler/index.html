@@ -356,6 +356,7 @@ const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const monday=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-(x.getDay()+6)%7);return x};
+const kw=d=>{const t=new Date(d.getFullYear(),d.getMonth(),d.getDate());t.setDate(t.getDate()+3-(t.getDay()+6)%7);const y1=new Date(t.getFullYear(),0,4);return 1+Math.round(((t-y1)/864e5-3+(y1.getDay()+6)%7)/7)};
 const fmt1=n=>(Math.round(n*10)/10).toLocaleString("de-DE");
 const dm=d=>d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
 const fmtD=s=>parse(s).toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"2-digit"});
@@ -471,17 +472,17 @@ function renderWeeks(){
   const idx=Object.fromEntries(data.map((w,i)=>[w.key,i]));
   store.episodes.forEach(e=>{const w=data[idx[iso(monday(parse(e.date)))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity in INT?e.intensity:1]+=metric==="n"?1:m;w.n++;w.min+=m});
   const W=Math.max(280,box.clientWidth||340),H=180,L=28,R=4,T=8,B=22,iw=W-L-R,ih=H-T-B;
-  const maxV=niceMax(Math.max(1,...data.map(d=>d.v[1]+d.v[2]+d.v[3])));const bw=iw/data.length,gap=Math.min(3,bw*.25);const y=v=>T+ih-v/maxV*ih;
+  const maxV=niceMax(Math.max(1,...data.map(d=>d.v[0]+d.v[1]+d.v[2]+d.v[3])));const bw=iw/data.length,gap=Math.min(3,bw*.25);const y=v=>T+ih-v/maxV*ih;
   let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Episoden pro Woche">`;
   for(let k=0;k<=4;k++){const v=maxV*k/4;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${y(v)+3}" text-anchor="end">${fmt1(v)}</text>`}
   const step=Math.ceil(data.length/(W<420?4:7));
   data.forEach((d,i)=>{let acc=0;const x=L+i*bw+gap/2,w=Math.max(1,bw-gap);
     [0,1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;const y0=y(acc),y1=y(acc+v);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0,y0-y1)}" fill="${ICOL[k]}" rx="1.5"/>`;acc+=v});
     s+=`<rect data-i="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ih}" fill="transparent"/>`;
-    if((data.length-1-i)%step===0)s+=`<text x="${L+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${dm(d.start)}</text>`});
+    if((data.length-1-i)%step===0)s+=`<text x="${L+i*bw+bw/2}" y="${H-6}" text-anchor="middle">KW ${kw(d.start)}</text>`});
   s+=`<line x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}" stroke="var(--muted)"/></svg>`;box.innerHTML=s;
   box.querySelectorAll("rect[data-i]").forEach(r=>r.addEventListener("click",()=>{const d=data[+r.dataset.i];const e=new Date(d.start);e.setDate(e.getDate()+6);
-    $("#wk-read").textContent=`${dm(d.start)}–${dm(e)}: ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`}));
+    $("#wk-read").textContent=`KW ${kw(d.start)} (${dm(d.start)}–${dm(e)}): ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`}));
 }
 function renderCal(){
   const box=$("#cal");const end=monday(new Date());const start=new Date(end);start.setDate(start.getDate()-7*(weeks-1));
