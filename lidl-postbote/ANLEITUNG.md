@@ -23,6 +23,7 @@ Lege einen festen Ordner an, zum Beispiel:
 Kopiere aus diesem Repo-Ordner `lidl-postbote/` diese Dateien hinein:
 - `lidl_postbote.py`
 - `test_postbote.py`
+- `token_holen.py`
 - `config.example.ini`
 - `ANLEITUNG.md`
 
@@ -30,28 +31,26 @@ Kopiere aus diesem Repo-Ordner `lidl-postbote/` diese Dateien hinein:
 
 1. Installiere Python 3.9 oder neuer von [python.org](https://www.python.org/downloads/). Setze unter Windows bei der Installation den Haken bei **„Add python.exe to PATH“**.
 2. Öffne ein Terminal: unter Windows die *Eingabeaufforderung*, auf dem Mac das *Terminal*.
-3. Installiere das Paket:
+3. Installiere das Paket und zwei passende Hilfspakete:
 
 ```
-pip install "lidl-plus[auth]"
+pip install "lidl-plus[auth]" "blinker<1.8" "setuptools<81"
 ```
 
-Auf dem Mac heißt der Befehl eventuell `pip3`. Für die Anmeldung muss Chrome, Edge oder Firefox installiert sein.
+Die beiden Zusätze sind nötig, weil die neuesten Versionen von `blinker` und `setuptools` nicht mehr zu einem Teil von `lidl-plus` passen. Auf dem Mac heißt der Befehl eventuell `pip3`. Für die Anmeldung muss Chrome, Edge oder Firefox installiert sein.
 
 ## 3. Lidl-Token holen (einmalig)
 
+1. Kopiere `config.example.ini` und nenne die Kopie `config.ini`.
+2. Starte im Programmordner:
+
 ```
-lidl-plus auth
+python token_holen.py
 ```
 
-Gib nacheinander ein:
-- Sprache: `de`
-- Land: `DE`
-- deine Lidl-Plus-Telefonnummer im Format `+49…`
-- dein Passwort
-- den Code aus der SMS
+Gib deine Lidl-Plus-Telefonnummer im Format `+49…`, dein Passwort und den Code aus der SMS ein. Das Skript trägt den **Refresh-Token** danach selbst in `config.ini` ein.
 
-Am Ende zeigt das Tool einen langen **Refresh-Token**. Kopiere ihn.
+`token_holen.py` ersetzt den Befehl `lidl-plus auth`, der unter neueren Python-Versionen wie 3.14 abstürzt. Klappt die Anmeldung nicht, zeigt `python token_holen.py --browser-zeigen` das Browserfenster, in dem die Anmeldung abläuft.
 
 ## 4. Gmail-App-Passwort anlegen (einmalig)
 
@@ -63,9 +62,8 @@ Gmail lässt Programme nicht mit deinem normalen Passwort senden. Du brauchst da
 
 ## 5. config.ini ausfüllen
 
-1. Kopiere `config.example.ini` und nenne die Kopie `config.ini`.
-2. Trage diese Werte ein:
-   - `refresh_token` → den Token aus Schritt 3
+Öffne `config.ini` mit dem Editor und trage diese Werte ein:
+   - `refresh_token` → steht schon drin, wenn Schritt 3 geklappt hat
    - `adresse` → deine Gmail-Adresse
    - `app_passwort` → das App-Passwort aus Schritt 4
 
@@ -179,9 +177,10 @@ Alle Meldungen stehen in `postbote.log` im Programmordner.
 
 | Meldung | Lösung |
 | --- | --- |
-| „Abruf bei Lidl fehlgeschlagen“ | Führe `lidl-plus auth` erneut aus und trage den neuen Token in `config.ini` ein. |
+| „Abruf bei Lidl fehlgeschlagen“ | Führe `python token_holen.py` erneut aus. |
 | „Gmail-Anmeldung fehlgeschlagen“ | Prüfe das App-Passwort, nicht dein Google-Passwort. Lege notfalls ein neues an. |
-| „Paket fehlt“ | Führe `pip install lidl-plus` aus. |
+| „Paket fehlt“ | Führe `pip install "lidl-plus[auth]" "blinker<1.8" "setuptools<81"` aus. |
+| `No module named 'blinker._saferef'` oder `'pkg_resources'` | Wie bei „Paket fehlt“: die Installation mit den beiden Zusätzen wiederholen. |
 
 **Hinweis zum Token:** Lidl vergibt bei jeder Anmeldung einen neuen Token. Das Programm trägt ihn selbst in `config.ini` ein. Verwende deshalb die Datei nicht parallel auf zwei Rechnern.
 

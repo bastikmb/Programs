@@ -224,8 +224,7 @@ def ausfuehren(args, cfg_pfad=CONFIG_DATEI, state_pfad=STATE_DATEI) -> int:
         liste = api.tickets()
     except Exception as exc:  # noqa: BLE001 – inoffizielle API, Fehlerbild unbekannt
         log.error("Abruf bei Lidl fehlgeschlagen: %s", exc)
-        log.error("Ist der Token abgelaufen? Dann 'lidl-plus auth' erneut ausführen und den neuen "
-                  "Token in config.ini eintragen.")
+        log.error("Ist der Token abgelaufen? Dann 'python token_holen.py' erneut ausführen.")
         return 2
     finally:
         token_sichern(api, cfg, cfg_pfad)
