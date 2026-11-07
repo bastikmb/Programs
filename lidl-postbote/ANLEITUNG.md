@@ -22,6 +22,7 @@ Lege einen festen Ordner an, zum Beispiel:
 
 Kopiere aus diesem Repo-Ordner `lidl-postbote/` diese Dateien hinein:
 - `lidl_postbote.py`
+- `test_postbote.py`
 - `config.example.ini`
 - `ANLEITUNG.md`
 
@@ -70,26 +71,55 @@ Gmail lässt Programme nicht mit deinem normalen Passwort senden. Du brauchst da
 
 > `config.ini` enthält Zugangsdaten. Gib sie nie weiter und lade sie nirgends hoch. Im Repo ist sie über `.gitignore` ausgeschlossen.
 
-## 6. Testen
+## 6. Testen in Stufen
 
-Wechsle im Terminal in den Ordner aus Schritt 1, zum Beispiel mit `cd C:\Users\<du>\lidl-postbote`. Führe dann nacheinander aus:
+Teste Schritt für Schritt. So siehst du bei einem Fehler sofort, ob es an Gmail oder an Lidl liegt. Wechsle dazu im Terminal in den Ordner aus Schritt 1, zum Beispiel mit `cd C:\Users\<du>\lidl-postbote`.
+
+**Stufe 1: Selbsttest ohne Zugangsdaten**
 
 ```
-python lidl_postbote.py --trocken
+python test_postbote.py
 ```
-Dieser Lauf zeigt nur an, welche Bons das Programm senden würde. Er schickt nichts.
+
+Lidl und Gmail werden dabei nachgebaut. Der Test prüft, ob Python und das Programm auf deinem Rechner laufen. Er kann direkt nach Schritt 2 laufen, ohne Token und ohne App-Passwort. Am Ende muss „Alle Prüfungen bestanden“ stehen.
+
+**Stufe 2: Nur Gmail**
 
 ```
 python lidl_postbote.py --test-mail
 ```
-Dieser Lauf schickt eine Testmail an dich.
+
+Dieser Lauf schickt eine Testmail an dich. Lidl wird dabei nicht angesprochen. In `config.ini` reicht als `refresh_token` vorerst ein Platzhalter wie `x`.
+
+**Stufe 3: Nur Lidl**
+
+```
+python lidl_postbote.py --trocken
+```
+
+Dafür muss der echte Token eingetragen sein. Das Programm zeigt deine Bons an und schickt nichts.
+
+**Stufe 4: Ein echter Bon**
+
+```
+python lidl_postbote.py --max 1
+```
+
+Dieser Lauf schickt genau einen Bon, den ältesten. Prüfe in Gmail Betreff, Positionen und den JSON-Anhang.
+
+**Stufe 5: Erster vollständiger Lauf**
 
 ```
 python lidl_postbote.py --seit 2025-04-30
 ```
-Dieser Lauf ist der erste echte. Er sendet höchstens 40 Mails, der Rest kommt an den folgenden Tagen. Mit `--seit` lässt du ältere Bons weg. Ohne `--seit` holt das Programm alle Bons, die Lidl Plus gespeichert hat.
 
-Die Datei `state.json` merkt sich, welche Bons schon verschickt sind. Jeder Bon kommt deshalb nur einmal.
+Dieser Lauf sendet höchstens 40 Mails, der Rest kommt an den folgenden Tagen. Mit `--seit` lässt du ältere Bons weg. Ohne `--seit` holt das Programm alle Bons, die Lidl Plus gespeichert hat.
+
+Die Datei `state.json` merkt sich, welche Bons schon verschickt sind. Jeder Bon kommt deshalb nur einmal. Lösche sie nur, wenn du wirklich alle Bons noch einmal bekommen willst.
+
+Nach Schritt 7 kannst du den täglichen Start einmal von Hand auslösen und danach in `postbote.log` nachsehen:
+- Windows: Aufgabenplanung, Rechtsklick auf die Aufgabe, *Ausführen*
+- Mac: `launchctl start de.lidl-postbote`
 
 ## 7. Täglich automatisch starten
 
