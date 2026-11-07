@@ -1593,6 +1593,16 @@ body.dark-theme .daily-goal-mini-banner {
   font-weight:700;
   padding:0.9rem 1.5rem;
 }
+.new-word-tag {
+  display:inline-block;
+  margin-left:0.4rem;
+  font-size:var(--text-xs);
+  font-weight:800;
+  color:var(--heading);
+  background:var(--accent-bg);
+  border-radius:999px;
+  padding:0.1rem 0.5rem;
+}
 .learn-score-row {
   font-size:0.9rem;
   color:var(--ink);
@@ -2830,6 +2840,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
 
       <div class="learn-score-row">
         Punkte für dieses Wort: <span id="cardScore">10</span>
+        <span id="newWordTag" class="new-word-tag" style="display:none;">🆕 Neu – Fehler kosten nichts</span>
       </div>
     </div>
 
@@ -2872,6 +2883,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
         <div><span class="muted">Durchgespielt-Bonus:</span> <span id="sumPerfectBonus" class="bold">+0</span></div>
         <div><span class="muted">Trainings-Bonus:</span> <span id="sumReviewBonus" class="bold">+0</span></div>
         <div><span class="muted">Sicher gelernt (Fach 6):</span> <span id="sumMasteredBonus" class="bold">+0</span></div>
+        <div><span class="muted">Kennenlern-Bonus:</span> <span id="sumNewWordBonus" class="bold">+0</span></div>
       </div>
     </div>
 
@@ -7616,7 +7628,7 @@ function saveProfiles() {
    Serie, Punkte, Fächer ...) -- nur "Wiedereinstieg" hängt an einem
    einmaligen Rundenereignis und lässt sich nicht nachträglich prüfen.
    Läuft beim App-Start still, ohne Banner (siehe retrofitRetroactiveAchievements). */
-const RETROFIT_EXCLUDED_IDS = ["comeback_pause"];
+const RETROFIT_EXCLUDED_IDS = ["comeback_pause", "newwords_25", "newwords_100", "newwords_250", "newwords_500", "newwords_1000"];
 function retrofitRetroactiveAchievements(){
   let anyChanged = false;
   for(const prof of Object.values(state.profiles)){
@@ -8302,6 +8314,9 @@ function computeLeagueScore(stats){
    der Eintrag eines Kindes, das die App gar nicht mehr öffnet.
    =========================================================== */
 const SEASON_VERSION = 1;
+// fester Nenner für den Sammlungs-Anteil der Abzeichen-Wertung: neue
+// Abzeichen sollen bestehende Saisonpunkte nicht nachträglich verschieben
+const SEASON_BADGE_TOTAL = 129;
 const SEASON_DAYS = 28;
 const SEASON_ACTIVE_DAYS = 14;      // "aktiv" für die Team-Wertung
 const SEASON_RECENT_ROUNDS = 10;    // Genauigkeit = Schnitt der letzten Runden
@@ -8365,14 +8380,14 @@ function computeSeasonFromRow(row, today){
   const active = !!row.lastActiveDay && row.lastActiveDay >= addDaysToDateKey(today, -(SEASON_ACTIVE_DAYS-1));
   const playedInSeason = correct>0 || flameDays>0;
   const newBadges = (row.sBadgeDays || []).filter(d=>d>=from && d<=today).length;
-  const totalBadges = Math.min(ACHIEVEMENTS.length, row.achievementsUnlocked||0);
+  const totalBadges = Math.min(SEASON_BADGE_TOTAL, row.achievementsUnlocked||0);
   const parts = {
     fleiss: Math.round(SEASON_MAX.fleiss * Math.min(1, Math.sqrt(correct/SEASON_FULL.correct))),
     genau: playedInSeason ? Math.round(SEASON_MAX.genau * Math.max(0, Math.min(100, Number(row.sAcc)||0)) / 100) : 0,
     konstanz: Math.round(SEASON_MAX.konstanz * Math.min(1, flameDays/SEASON_FULL.flameDays)),
     gelernt: Math.round(SEASON_MAX.gelernt * Math.min(1, mastered/SEASON_FULL.mastered)),
     abzeichen: Math.min(SEASON_MAX.abzSeason, Math.round(newBadges*SEASON_MAX.abzSeason/SEASON_FULL.newBadges))
-      + Math.round(SEASON_MAX.abzTotal * Math.sqrt(totalBadges/ACHIEVEMENTS.length))
+      + Math.round(SEASON_MAX.abzTotal * Math.sqrt(totalBadges/SEASON_BADGE_TOTAL))
   };
   const score = parts.fleiss + parts.genau + parts.konstanz + parts.gelernt + parts.abzeichen;
   return {...parts, teamBonus:0, score, correct, flameDays, mastered, newBadges, weekGoals, active};
@@ -10450,7 +10465,13 @@ const ACHIEVEMENTS = [
     progress:p=>({current:masteredWordsValue(p), target:500})},
   {id:"mastered_1000", icon:"🦉", title:"Trainerlegende", desc:"1.000 Wörter sicher gelernt (Fach 6)",
     check:(p,ctx)=>masteredWordsValue(p)>=1000,
-    progress:p=>({current:masteredWordsValue(p), target:1000})}
+    progress:p=>({current:masteredWordsValue(p), target:1000})},
+  // "Neuzugang"-Familie: neu kennengelernte Wörter (siehe NEW_WORD_BONUS),
+  // zählt erst ab Einführung -- keine nachträgliche Vergabe
+  ...[[25,"🆕","Neuzugang"],[100,"🔄","Transferkönig"],[250,"📋","Kaderplaner"],[500,"🔭","Scout-Legende"],[1000,"🏭","Talentschmiede"]].map(([n,icon,title])=>({
+    id:`newwords_${n}`, icon, title, desc:`${n.toLocaleString("de-DE")} neue Wörter kennengelernt`,
+    check:(p,ctx)=>(p.stats.newWordsLearned||0)>=n,
+    progress:p=>({current:(p.stats.newWordsLearned||0), target:n})}))
 ];
 
 /* Fasst Abzeichen, die eine aufsteigende Stufenreihe auf derselben
@@ -10472,6 +10493,8 @@ const ACHIEVEMENT_FAMILIES = [
     tierIds:["perfect_streak_2", "hattrick", "weisse_weste", "perfect_streak_10", "perfect_streak_20"] },
   { id:"gedaechtnis", icon:"🧠", name:"Gedächtnis-Familie",
     tierIds:["mastered_25", "mastered_100", "mastered_250", "mastered_500", "mastered_1000"] },
+  { id:"neuzugang", icon:"🆕", name:"Neuzugang-Familie",
+    tierIds:["newwords_25", "newwords_100", "newwords_250", "newwords_500", "newwords_1000"] },
   { id:"kroenung", icon:"👑", name:"Krönung-Familie",
     tierIds:["full_book_mastery", "ballon_dor"] },
   { id:"meisterschaft", icon:"🏅", name:"Meisterschafts-Familie",
@@ -10599,6 +10622,7 @@ function buildRoundCardsFromVocab(){
     }
 
     state.roundCards.push({
+      isNew: isWordNewForProfile(getCurrentProfileObj(), v.key), // Kennenlern-Schutz, siehe NEW_WORD_BONUS
       key:v.key, // vocabKey(), identity for all per-word stats
       onlyDirection:v.onlyDirection||null,
       icon:v.icon,
@@ -11498,6 +11522,8 @@ function updateWordCounters(prof, originalCards){
     // canonical key = vocabKey() of the item, stable no matter which direction was tested
     const key = card.key;
     if(card.attemptedWrong){
+      // Kennenlern-Fehler machen ein Wort noch nicht zum "Problemwort"
+      if(card.isNew) continue;
       if(!prof.stats.wrongCounts[key]) prof.stats.wrongCounts[key]=0;
       prof.stats.wrongCounts[key]+=1;
     } else if(card.done && card.firstTry){
@@ -11756,11 +11782,15 @@ function finalizeRoundAndUpdateProfile(){
 
   // calc first try % -- computed up front (not just at the end) since
   // updateRecords() below needs it to judge the "best Trefferquote" record
+  // Kennenlern-Fehler (neues Wort, nicht auf Anhieb richtig) zählen nicht
+  // gegen die Quote -- sie fließt in Rekord, Saison-Genauigkeit und Tempo-Abzeichen
+  const quoteCards = playedCards.filter(c=>!(c.isNew && !c.firstTry));
   let firstTryCorrectCount=0;
-  for(const card of playedCards){
+  for(const card of quoteCards){
     if(card.done && card.firstTry) firstTryCorrectCount++;
   }
-  const firstTryPct = totalCards>0 ? Math.round(firstTryCorrectCount/totalCards*100) : 0;
+  const quoteCount = quoteCards.length;
+  const firstTryPct = quoteCount>0 ? Math.round(firstTryCorrectCount/quoteCount*100) : 0;
 
   // profile update
   const prof=getCurrentProfileObj();
@@ -11774,7 +11804,7 @@ function finalizeRoundAndUpdateProfile(){
   let newlyUnlockedBonusCards=[];
   let pageSetBonusAwarded = {amount:0, isNewPageSet:false, catchUpCount:0, viaProgress:false};
   let perfectRoundBonusAwarded = false;
-  let reviewBonus = 0, masteredBonus = 0, masteredWordsCount = 0;
+  let reviewBonus = 0, masteredBonus = 0, masteredWordsCount = 0, newWordBonus = 0, newWordsLearned = 0;
   if(prof){
     const levelBefore = computeLevel(prof.stats.totalPoints);
     const today = todayKey();
@@ -11833,9 +11863,19 @@ function finalizeRoundAndUpdateProfile(){
       prof.stats.reviewRoundsCount = (prof.stats.reviewRoundsCount||0) + 1; // "Doublesieger" = abgeschlossene Einheiten
       countReviewUnitDone(prof);
     }
-    if(masteredBonus + reviewBonus > 0){
-      state.roundTotalPoints += masteredBonus + reviewBonus;
-      prof.stats.totalPoints += masteredBonus + reviewBonus;
+    // Kennenlern-Bonus: neue Wörter, die am Ende gelöst wurden (auch nach
+    // Fehlern, direkt oder über die Wiederholungskarte)
+    newWordsLearned = originalCards.filter(c=>c.isNew && (c.resolvedCorrectly
+      || state.roundCards.some(r=>r.isRequeue && r.key===c.key && r.resolvedCorrectly))).length;
+    newWordBonus = newWordsLearned * NEW_WORD_BONUS;
+    if(newWordsLearned>0){
+      prof.stats.newWordsLearned = (prof.stats.newWordsLearned||0) + newWordsLearned;
+      const dayEntry = dailyLogEntry(ensureDailyLog(prof), today);
+      dayEntry.newWords = (dayEntry.newWords||0) + newWordsLearned;
+    }
+    if(masteredBonus + reviewBonus + newWordBonus > 0){
+      state.roundTotalPoints += masteredBonus + reviewBonus + newWordBonus;
+      prof.stats.totalPoints += masteredBonus + reviewBonus + newWordBonus;
       levelInfo = getLevelInfo(prof.stats.totalPoints);
       leveledUp = levelInfo.level > levelBefore;
     }
@@ -11856,7 +11896,8 @@ function finalizeRoundAndUpdateProfile(){
       }
     }
 
-    newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct});
+    // Quote-Rekord nur, wenn genug Wörter tatsächlich in die Quote eingingen
+    newRecords = updateRecords(prof, {durationSec, totalCards, firstTryPct: quoteCount>=MIN_WORDS_FOR_RECORD ? firstTryPct : -1});
 
     ({dailyGoalJustMet, streakChanged, streakFreezeUsed, newlyUnlockedBonusCards} = evaluateDailyGoalAndStreak(prof, today));
 
@@ -11871,7 +11912,7 @@ function finalizeRoundAndUpdateProfile(){
       const dayEntry = dailyLogEntry(ensureDailyLog(prof), today);
       dayEntry.mastered = (dayEntry.mastered||0) + newlyMastered;
     }
-    if(roundWasFullyPlayed) recordRecentFirstTry(prof, firstTryPct, totalCards);
+    if(roundWasFullyPlayed && quoteCount>0) recordRecentFirstTry(prof, firstTryPct, quoteCount);
 
     // a word that had already gone wrong 3+ times (before this round) and
     // got answered right on the first try this round counts as "mastered"
@@ -11966,7 +12007,10 @@ function finalizeRoundAndUpdateProfile(){
     perfectRoundBonusAwarded,
     reviewBonus,
     masteredBonus,
-    masteredWordsCount
+    masteredWordsCount,
+    newWordBonus,
+    newWordsLearned,
+    quoteCount
   };
 }
 
@@ -13250,6 +13294,7 @@ function renderCurrentCard(){
   learnIconEl.style.display = state.isDueReviewRound ? "none" : "";
   document.getElementById("learnPromptText").textContent=card.prompt;
   document.getElementById("cardScore").textContent=String(card.score);
+  document.getElementById("newWordTag").style.display = card.isNew ? "" : "none";
 
   // Liest exakt den gerade sichtbaren Prompt vor -- nie die (noch
   // verborgene) Antwort, siehe Design-Entscheidung in der Session-Planung.
@@ -13330,7 +13375,7 @@ function showConfirmOverlay(message, onConfirm, opts){
 }
 
 function showSummaryScreen(){
-  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded, perfectRoundBonusAwarded, reviewBonus, masteredBonus, masteredWordsCount} = finalizeRoundAndUpdateProfile();
+  const {durationSec, firstTryPct, hardWords, streak, streakChanged, streakFreezeUsed, leveledUp, levelInfo, newRecords, dailyGoalJustMet, newlyUnlockedAchievements, newlyUnlockedBonusCards, pageSetBonusAwarded, perfectRoundBonusAwarded, reviewBonus, masteredBonus, masteredWordsCount, newWordBonus, newWordsLearned, quoteCount} = finalizeRoundAndUpdateProfile();
   syncProfileToLeaderboard(getCurrentProfileObj());
 
   // Details-Bereich bei jedem neuen Rundenergebnis wieder einklappen, statt
@@ -13341,7 +13386,8 @@ function showSummaryScreen(){
 
   document.getElementById("sumTotalPoints").textContent=String(state.roundTotalPoints);
   document.getElementById("sumDuration").textContent=String(durationSec);
-  document.getElementById("sumFirstTry").textContent=String(firstTryPct)+"%";
+  // nur neue Wörter mit Kennenlern-Fehlern: keine Quote, statt 0 %
+  document.getElementById("sumFirstTry").textContent = quoteCount>0 ? String(firstTryPct)+"%" : "🆕";
 
   const streakEl = document.getElementById("sumStreak");
   const streakNoteEl = document.getElementById("sumStreakNote");
@@ -13360,6 +13406,7 @@ function showSummaryScreen(){
   document.getElementById("sumComboBonus").textContent = `+${state.roundComboBonus}`;
   document.getElementById("sumPerfectBonus").textContent = perfectRoundBonusAwarded ? `+${PERFECT_ROUND_BONUS}` : "+0";
   document.getElementById("sumReviewBonus").textContent = `+${reviewBonus}`;
+  document.getElementById("sumNewWordBonus").textContent = newWordsLearned>0 ? `+${newWordBonus} (${newWordsLearned} ${newWordsLearned===1?"neues Wort":"neue Wörter"})` : "+0";
   document.getElementById("sumMasteredBonus").textContent = masteredWordsCount>0 ? `+${masteredBonus} (${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"})` : "+0";
 
   const levelBanner = document.getElementById("levelUpBanner");
@@ -13435,6 +13482,9 @@ function showSummaryScreen(){
   if(reviewBonus>0){
     addHighlightBanner(extraDiv, "pageset", `📅 Trainings-Session komplett gelöst! +${reviewBonus} Trainings-Bonus`);
   }
+  if(newWordsLearned>0){
+    addHighlightBanner(extraDiv, "pageset", `🆕 ${newWordsLearned} ${newWordsLearned===1?"neues Wort":"neue Wörter"} kennengelernt! +${newWordBonus} Kennenlern-Bonus`);
+  }
   if(masteredWordsCount>0){
     addHighlightBanner(extraDiv, "record", `🎓 ${masteredWordsCount} ${masteredWordsCount===1?"Wort":"Wörter"} jetzt sicher gelernt (Fach 6)! +${masteredBonus} Punkte`);
   }
@@ -13469,6 +13519,20 @@ function showSummaryScreen(){
    a lower score and is flagged isRequeue so it's excluded from
    firstTryPct/hardWords/wrongCounts -- those already reflect this word
    via the original card. */
+/* "Kennenlern-Schutz": ein Wort, das dieses Profil noch nie abgefragt
+   hat, darf beim ersten Kennenlernen Fehler haben -- keine Abzüge, keine
+   Combo-Pause, Wiederholungskarte voll wert, +NEW_WORD_BONUS wenn es am
+   Ende gelöst ist; zählt nicht gegen Quote/Problemwörter. Gilt nur in der
+   ersten Runde mit dem Wort (danach steht es in correct/wrongCounts bzw.
+   wordSchedule) und nur für Runden ab diesem Update -- bestehende
+   Punktestände bleiben unverändert. */
+const NEW_WORD_BONUS = 3;
+function isWordNewForProfile(prof, key){
+  if(!prof || !key) return false;
+  const st = prof.stats || {};
+  return !((st.correctCounts||{})[key] || (st.wrongCounts||{})[key] || (st.wordSchedule||{})[key]);
+}
+
 function maybeRequeueCard(card){
   if(!card.attemptedWrong || card.isRequeue) return;
   const key = card.key;
@@ -13482,8 +13546,8 @@ function maybeRequeueCard(card){
     example:card.example, direction:card.direction,
     prompt:card.prompt, answer:card.answer,
     speechLang:card.speechLang,
-    score:5, firstTry:true, done:false, attemptedWrong:false,
-    resolvedCorrectly:false,
+    score:card.isNew ? 10 : 5, firstTry:true, done:false, attemptedWrong:false,
+    resolvedCorrectly:false, isNew:!!card.isNew,
     isRequeue:true
   });
 }
@@ -13542,7 +13606,7 @@ function applyHint(){
     card.hintedChars.add(candidates[k]);
   }
 
-  if(card.score>0) card.score = card.score-1;
+  if(card.score>0 && !card.isNew) card.score = card.score-1;
   document.getElementById("cardScore").textContent=String(card.score);
   renderAnswerBoxesLive(card, currentVal);
 }
@@ -13862,15 +13926,17 @@ function checkAnswer(){
       return; // bewusst VOR den Straf-Zeilen unten raus
     }
 
-    // wrong -> combo breaks
-    state.currentCombo = 0;
-    updateComboIndicator();
+    // wrong -> combo breaks (bei neuen Wörtern pausiert sie nur, siehe isWordNewForProfile)
+    if(!card.isNew){
+      state.currentCombo = 0;
+      updateComboIndicator();
+    }
     playSound("wrong");
 
     card.firstTry=false;
     card.attemptedWrong=true;
     card.typoPending=false; // ein echter Fehler danach ist keine Tippfehler-Korrektur mehr
-    if(card.score>0) card.score=card.score-1;
+    if(card.score>0 && !card.isNew) card.score=card.score-1;
     document.getElementById("cardScore").textContent=String(card.score);
     markAnswerComparison(card, inputVal);
 
@@ -14524,7 +14590,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-10-30.1";
+const APP_BUILD = "2026-11-07.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
