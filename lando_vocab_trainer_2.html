@@ -2938,7 +2938,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       <summary>Wie werden die Punkte berechnet?</summary>
       Gezählt werden nur die letzten 28 Tage (max. 1000 Punkte):<br>
       ⚽ Fleiß bis 300 – richtige Antworten (voll ab 700)<br>
-      🎯 Genauigkeit bis 250 – Erstversuch-Quote deiner letzten 10 Runden<br>
+      🎯 Genauigkeit bis 250 – Erstversuch-Quote deiner letzten 10 Runden (eine schwächere Runde zählt erst ab dem nächsten Tag)<br>
       🔥 Konstanz bis 200 – Tage mit geschafftem Tagesziel (voll ab 20)<br>
       📦 Gelernt bis 150 – Wörter, die in Fach 6 angekommen sind (voll ab 40)<br>
       🏅 Abzeichen bis 100 – neue Abzeichen in 28 Tagen und deine ganze Sammlung<br>
@@ -9664,8 +9664,14 @@ const TEAM_CHANGE_COOLDOWN_DAYS = 30;
 function recordRecentFirstTry(prof, pct, totalCards){
   if(totalCards<5) return;
   const arr = Array.isArray(prof.stats.recentFirstTry) ? prof.stats.recentFirstTry : [];
+  // Datum je Runde: eine schwächere Runde soll die Tabelle erst ab dem
+  // nächsten Tag senken (alte Einträge ohne Datum gelten als "vor heute")
+  const days = Array.isArray(prof.stats.recentFirstTryDays) ? prof.stats.recentFirstTryDays.slice(-arr.length) : [];
+  while(days.length<arr.length) days.unshift("");
   arr.push(Math.max(0, Math.min(100, Math.round(pct))));
+  days.push(todayKey());
   prof.stats.recentFirstTry = arr.slice(-SEASON_RECENT_ROUNDS);
+  prof.stats.recentFirstTryDays = days.slice(-SEASON_RECENT_ROUNDS);
 }
 
 /* Was ein Gerät für die Saison-Wertung hochlädt: nur Tageswerte der
@@ -9693,7 +9699,21 @@ function buildSeasonPayload(prof, today){
   // noch keine Runde seit dem Update gespielt: Bestwert etwas abgeschlagen
   // als Schätzung, bis echte Runden-Werte vorliegen
   const best = (prof.stats.records && prof.stats.records.bestFirstTryPct) || 0;
-  const sAcc = recent.length ? Math.round(recent.reduce((a,b)=>a+b,0)/recent.length) : Math.round(best*0.9);
+  // Eine heute gespielte Runde senkt die Genauigkeit nie am selben Tag:
+  // gute Runden zählen sofort, schwächere erst ab morgen
+  const avg = list=>list.reduce((a,b)=>a+b,0)/list.length;
+  let sAcc = Math.round(best*0.9);
+  if(recent.length){
+    const rDays = Array.isArray(prof.stats.recentFirstTryDays) ? prof.stats.recentFirstTryDays.slice(-recent.length) : [];
+    while(rDays.length<recent.length) rDays.unshift("");
+    // Höchster Stand, den es heute schon einmal gab: Schnitt aus den
+    // Runden vor heute plus den ersten n heutigen Runden (n = 0 … alle)
+    const before = recent.filter((_,i)=>!(rDays[i] && rDays[i]>=today));
+    const todays = recent.filter((_,i)=>rDays[i] && rDays[i]>=today);
+    let bestAvg = before.length ? avg(before) : -1;
+    for(let n=1; n<=todays.length; n++) bestAvg = Math.max(bestAvg, avg(before.concat(todays.slice(0,n))));
+    sAcc = Math.round(bestAvg);
+  }
   return {sDays, sBadgeDays, sAcc, lastActiveDay: lastActiveDay || "", seasonVersion: SEASON_VERSION};
 }
 
@@ -15970,7 +15990,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-11-07.2";
+const APP_BUILD = "2026-11-08.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
