@@ -2938,7 +2938,7 @@ body.dark-theme .feedback-overlay-inner { border:1px solid var(--border); }
       <summary>Wie werden die Punkte berechnet?</summary>
       Gezählt werden nur die letzten 28 Tage (max. 1000 Punkte):<br>
       ⚽ Fleiß bis 300 – richtige Antworten (voll ab 700)<br>
-      🎯 Genauigkeit bis 250 – Erstversuch-Quote deiner letzten 10 Runden (eine schwächere Runde zählt erst ab dem nächsten Tag)<br>
+      🎯 Genauigkeit bis 250 – Erstversuch-Quote deiner letzten 10 Runden (eine schwächere Runde zählt erst ab dem nächsten Tag, Trainings-Sessions zählen nur, wenn sie die Quote heben)<br>
       🔥 Konstanz bis 200 – Tage mit geschafftem Tagesziel (voll ab 20)<br>
       📦 Gelernt bis 150 – Wörter, die in Fach 6 angekommen sind (voll ab 40)<br>
       🏅 Abzeichen bis 100 – neue Abzeichen in 28 Tagen und deine ganze Sammlung<br>
@@ -10009,12 +10009,15 @@ function recordRecentFirstTry(prof, pct, totalCards){
 
 /* Genauigkeit für die Saison: Schnitt der letzten 10 Runden, am selben
    Tag aber nie unter dem heute schon erreichten Stand. */
-function seasonAccuracy(prof, today){
+function seasonRealAccuracy(prof){
   const recent = Array.isArray(prof.stats.recentFirstTry) ? prof.stats.recentFirstTry : [];
   // noch keine Runde seit dem Update gespielt: Bestwert etwas abgeschlagen
   // als Schätzung, bis echte Runden-Werte vorliegen
   const best = (prof.stats.records && prof.stats.records.bestFirstTryPct) || 0;
-  const real = recent.length ? Math.round(recent.reduce((x,y)=>x+y,0)/recent.length) : Math.round(best*0.9);
+  return recent.length ? Math.round(recent.reduce((x,y)=>x+y,0)/recent.length) : Math.round(best*0.9);
+}
+function seasonAccuracy(prof, today){
+  const real = seasonRealAccuracy(prof);
   const hold = prof.stats.seasonAccHold;
   return (hold && hold.day===today) ? Math.max(real, Number(hold.value)||0) : real;
 }
@@ -13651,7 +13654,11 @@ function finalizeRoundAndUpdateProfile(){
       const dayEntry = dailyLogEntry(ensureDailyLog(prof), today);
       dayEntry.mastered = (dayEntry.mastered||0) + newlyMastered;
     }
-    if(roundWasFullyPlayed && quoteCount>0) recordRecentFirstTry(prof, firstTryPct, quoteCount);
+    // Trainings-Sessions (fällige, oft schwierige Wörter) zählen nur, wenn
+    // sie die Genauigkeit heben -- sie dürfen die Tabelle nie senken,
+    // weder sofort noch am nächsten Tag
+    const trainingWouldLower = state.isDueReviewRound && firstTryPct < seasonRealAccuracy(prof);
+    if(roundWasFullyPlayed && quoteCount>0 && !trainingWouldLower) recordRecentFirstTry(prof, firstTryPct, quoteCount);
 
     // a word that had already gone wrong 3+ times (before this round) and
     // got answered right on the first try this round counts as "mastered"
@@ -16329,7 +16336,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-11-09.2";
+const APP_BUILD = "2026-11-09.3";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
