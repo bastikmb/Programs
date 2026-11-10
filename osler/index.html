@@ -478,9 +478,11 @@ function renderStats(){
 function niceMax(m){if(m<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(m)));const s=[1,2,2.5,5,10].find(k=>k*p>=m/4);return Math.ceil(m/(s*p))*s*p}
 function renderWeeks(){
   const box=$("#wk");const data=[];
-  $("#wk-title").textContent=allMode?"Pro Monat":"Pro Woche";$("#wk-read").textContent=allMode?"Tippe auf einen Monat.":"Tippe auf eine Woche.";
-  const bucket=allMode?d=>iso(d).slice(0,7):d=>iso(monday(d));
-  if(allMode){const now=new Date();const nm=Math.ceil(weeks*7/30.44);for(let i=nm-1;i>=0;i--){const s=new Date(now.getFullYear(),now.getMonth()-i,1);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
+  // 12 Monate and Gesamt show one bar per month, 3/6 Monate one bar per week
+  const monthly=allMode||weeks>=52;
+  $("#wk-title").textContent=monthly?"Pro Monat":"Pro Woche";$("#wk-read").textContent=monthly?"Tippe auf einen Monat.":"Tippe auf eine Woche.";
+  const bucket=monthly?d=>iso(d).slice(0,7):d=>iso(monday(d));
+  if(monthly){const now=new Date();const nm=allMode?Math.ceil(weeks*7/30.44):12;for(let i=nm-1;i>=0;i--){const s=new Date(now.getFullYear(),now.getMonth()-i,1);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
   else{const end=monday(new Date());for(let i=weeks-1;i>=0;i--){const s=new Date(end);s.setDate(s.getDate()-7*i);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
   const idx=Object.fromEntries(data.map((w,i)=>[w.key,i]));
   store.episodes.forEach(e=>{const w=data[idx[bucket(parse(e.date))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity in INT?e.intensity:1]+=metric==="n"?1:m;w.n++;w.min+=m});
@@ -490,16 +492,17 @@ function renderWeeks(){
   for(let k=0;k<=4;k++){const v=maxV*k/4;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${y(v)+3}" text-anchor="end">${fmt1(v)}</text>`}
   // x-axis: 3 Monate = every KW, 6/12 Monate = month names, Gesamt = years
   const lab=(d,i)=>{if(allMode)return d.start.getMonth()===0||(i===0&&d.start.getMonth()<9)?String(d.start.getFullYear()):"";
+    if(monthly)return MON[d.start.getMonth()];
     if(weeks<=13)return String(kw(d.start));const e=new Date(d.start);e.setDate(e.getDate()+6);
     return d.start.getDate()===1?MON[d.start.getMonth()]:e.getMonth()!==d.start.getMonth()?MON[e.getMonth()]:""};
   if(!allMode&&weeks<=13)s+=`<text x="${L-5}" y="${H-6}" text-anchor="end">KW</text>`;
   data.forEach((d,i)=>{let acc=0;const x=L+i*bw+gap/2,w=Math.max(1,bw-gap);
     [0,1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;const y0=y(acc),y1=y(acc+v);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0,y0-y1)}" fill="${ICOL[k]}" rx="1.5"/>`;acc+=v});
     s+=`<rect data-i="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ih}" fill="transparent"/>`;
-    const t=lab(d,i);if(t)s+=`<text x="${L+i*bw+(allMode||weeks<=13?bw/2:0)}" y="${H-6}" text-anchor="${allMode||weeks<=13?"middle":"start"}">${t}</text>`});
+    const t=lab(d,i);if(t)s+=`<text x="${L+i*bw+(monthly||weeks<=13?bw/2:0)}" y="${H-6}" text-anchor="${monthly||weeks<=13?"middle":"start"}">${t}</text>`});
   s+=`<line x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}" stroke="var(--muted)"/></svg>`;box.innerHTML=s;
   box.querySelectorAll("rect[data-i]").forEach(r=>r.addEventListener("click",()=>{const d=data[+r.dataset.i];const e=new Date(d.start);e.setDate(e.getDate()+6);
-    $("#wk-read").textContent=allMode?`${MONL[d.start.getMonth()]} ${d.start.getFullYear()}: ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`:`KW ${kw(d.start)} (${dm(d.start)}–${dm(e)}): ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`}));
+    $("#wk-read").textContent=monthly?`${MONL[d.start.getMonth()]} ${d.start.getFullYear()}: ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`:`KW ${kw(d.start)} (${dm(d.start)}–${dm(e)}): ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`}));
 }
 function renderCal(){
   const box=$("#cal");const end=monday(new Date());const start=new Date(end);start.setDate(start.getDate()-7*(weeks-1));
