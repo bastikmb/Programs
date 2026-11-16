@@ -1,0 +1,6 @@
+# Zugangsdaten und Verlauf bleiben lokal
+config.ini
+state.json
+postbote.log
+*.tmp
+__pycache__/
