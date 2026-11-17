@@ -11287,6 +11287,35 @@ function showTrainingPicker(prof){
   });
   box.append(dirTitle, dirSeg);
 
+  // Emoji-Hilfe (Hilfsbild auf der Karte), Standard: aus
+  let emojiHelp = prof.trainingEmojiHelp===true;
+  const emoTitle = document.createElement("div");
+  emoTitle.className = "training-picker-section";
+  emoTitle.textContent = "Emoji-Hilfe";
+  const emoSeg = document.createElement("div");
+  emoSeg.className = "training-picker-dirs";
+  emoSeg.setAttribute("role", "radiogroup");
+  emoSeg.setAttribute("aria-label", "Emoji-Hilfe");
+  [[false,"🙈 Aus"],[true,"🖼️ An"]].forEach(([val,label])=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "training-picker-dir training-picker-emoji" + (val===emojiHelp ? " on" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", val===emojiHelp ? "true" : "false");
+    b.dataset.emoji = val ? "on" : "off";
+    b.textContent = label;
+    b.addEventListener("click", ()=>{
+      emojiHelp = val;
+      emoSeg.querySelectorAll(".training-picker-dir").forEach(x=>{
+        const on = x.dataset.emoji===(val ? "on" : "off");
+        x.classList.toggle("on", on);
+        x.setAttribute("aria-checked", on ? "true" : "false");
+      });
+    });
+    emoSeg.appendChild(b);
+  });
+  box.append(emoTitle, emoSeg);
+
   const multiBook = new Set(collectDueWords(prof).map(w=>w.bookKey).filter(Boolean)).size > 1;
   if(multiBook){
     const bookTitle = document.createElement("div");
@@ -11358,6 +11387,7 @@ function showTrainingPicker(prof){
   goBtn.addEventListener("click", ()=>{
     if(multiBook) prof.trainingPriorityBooks = [...selected];
     prof.trainingDirection = direction;
+    prof.trainingEmojiHelp = emojiHelp;
     saveProfiles();
     close();
     startDueReviewRound();
@@ -15165,8 +15195,10 @@ function renderCurrentCard(){
   // card info
   const learnIconEl = document.getElementById("learnIcon");
   learnIconEl.textContent=card.icon||"❓";
-  // Trainings-Session: kein Hilfsbild -- abgefragt wird nur das Wort selbst
-  learnIconEl.style.display = state.isDueReviewRound ? "none" : "";
+  // Trainings-Session: Hilfsbild nur, wenn im Auswahl-Fenster "Emoji-Hilfe an"
+  // gewählt wurde (Standard aus) -- sonst wird nur das Wort selbst abgefragt
+  const trainingProf = state.isDueReviewRound ? getCurrentProfileObj() : null;
+  learnIconEl.style.display = (state.isDueReviewRound && !(trainingProf && trainingProf.trainingEmojiHelp===true)) ? "none" : "";
   document.getElementById("learnPromptText").textContent=card.prompt;
   document.getElementById("cardScore").textContent=String(card.score);
   document.getElementById("newWordTag").style.display = card.isNew ? "" : "none";
@@ -16465,7 +16497,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-11-09.6";
+const APP_BUILD = "2026-11-17.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
