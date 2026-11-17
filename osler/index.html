@@ -71,7 +71,7 @@ h2{margin:0;font:700 17px/1.25 var(--font-round)}
 
 /* ---------- entry ---------- */
 .when{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
-input[type=date],input[type=time],input[type=number],textarea{font:16px var(--font);color:var(--fg);background:var(--fill);border:0;border-radius:10px;padding:11px 12px;width:100%;min-width:0;-webkit-appearance:none;appearance:none;min-height:44px}
+input[type=date],input[type=time],input[type=number],input[type=text],textarea{font:16px var(--font);color:var(--fg);background:var(--fill);border:0;border-radius:10px;padding:11px 12px;width:100%;min-width:0;-webkit-appearance:none;appearance:none;min-height:44px}
 textarea{min-height:64px;resize:vertical}
 .pillbtn{border:0;background:var(--fill);border-radius:10px;padding:0 14px;min-height:44px;font-weight:600;font-size:15px;cursor:pointer}
 .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
@@ -322,6 +322,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
     <p class="small muted" style="margin:0 0 10px">Alles bleibt nur auf diesem iPhone. Sichere ab und zu ein Backup in „Dateien“ oder iCloud.</p>
     <div class="rowbtns">
       <button type="button" class="btn2" id="b-backup">Backup sichern</button>
+      <button type="button" class="btn2" id="b-pdf">PDF für den Arzt</button>
       <button type="button" class="btn2" id="b-csv">CSV für den Arzt</button>
       <button type="button" class="btn2" id="b-import">Importieren</button>
     </div>
@@ -381,8 +382,8 @@ const normStop=s=>stopList(s).join(", ");
 const daytimeFor=t=>{const h=parseInt(t,10);return isNaN(h)?"":h>=5&&h<11?"morgens":h>=11&&h<17?"mittags":h>=17&&h<22?"abends":"nachts"};
 
 /* ---------- storage ---------- */
-let store={episodes:[],ess:[],lastBackup:null};
-function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||"null");if(r&&Array.isArray(r.episodes))store=Object.assign({episodes:[],ess:[],lastBackup:null},r);store.episodes.forEach(e=>{e.stopped=normStop(e.stopped)})}catch(e){}}
+let store={episodes:[],ess:[],lastBackup:null,patient:{name:"",dob:""}};
+function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||"null");if(r&&Array.isArray(r.episodes))store=Object.assign({episodes:[],ess:[],lastBackup:null,patient:{name:"",dob:""}},r);store.episodes.forEach(e=>{e.stopped=normStop(e.stopped)})}catch(e){}}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(store));return true}catch(e){toast("Speichern fehlgeschlagen – Speicher voll?");return false}}
 load();
 if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{})}
@@ -472,8 +473,38 @@ let metric="n",weeks=26,allMode=false;
 const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 const MONL=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 // "Gesamt" spans from the first episode's week up to now (at least 12 months)
-function syncWeeks(){if(!allMode)return;const first=store.episodes.reduce((m,e)=>e.date<m?e.date:m,iso(new Date()));
-  weeks=Math.max(52,Math.round((monday(new Date())-monday(parse(first)))/(7*864e5))+1)}
+function allWeeks(){const first=store.episodes.reduce((m,e)=>e.date<m?e.date:m,iso(new Date()));
+  return Math.max(52,Math.round((monday(new Date())-monday(parse(first)))/(7*864e5))+1)}
+function syncWeeks(){if(allMode)weeks=allWeeks()}
+// period for a range selection (13/26/52 weeks or "all"); used by Verlauf and the PDF report
+function period(sel){const all=sel==="all";const w=all?allWeeks():+sel;const s=monday(new Date());s.setDate(s.getDate()-7*(w-1));
+  return{all,weeks:w,monthly:all||w>=52,from:iso(s)}}
+// bars per week (3/6 Monate) or per month (12 Monate, Gesamt), split by Stärke
+function chartBuckets(P,met){const data=[];const bucket=P.monthly?d=>iso(d).slice(0,7):d=>iso(monday(d));
+  if(P.monthly){const now=new Date();const nm=P.all?Math.ceil(P.weeks*7/30.44):12;for(let i=nm-1;i>=0;i--){const s=new Date(now.getFullYear(),now.getMonth()-i,1);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
+  else{const end=monday(new Date());for(let i=P.weeks-1;i>=0;i--){const s=new Date(end);s.setDate(s.getDate()-7*i);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
+  const idx=Object.fromEntries(data.map((w,i)=>[w.key,i]));
+  store.episodes.forEach(e=>{const w=data[idx[bucket(parse(e.date))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity in INT?e.intensity:1]+=met==="n"?1:m;w.n++;w.min+=m});
+  return data}
+// x-axis: 3 Monate = every KW, 6 Monate = month starts, 12 Monate = every month, Gesamt = years
+function chartLabel(P,d,i){if(P.all)return d.start.getMonth()===0||(i===0&&d.start.getMonth()<9)?String(d.start.getFullYear()):"";
+  if(P.monthly)return MON[d.start.getMonth()];
+  if(P.weeks<=13)return String(kw(d.start));const e=new Date(d.start);e.setDate(e.getDate()+6);
+  return d.start.getDate()===1?MON[d.start.getMonth()]:e.getMonth()!==d.start.getMonth()?MON[e.getMonth()]:""}
+const inRange=from=>store.episodes.filter(e=>e.date>=from);
+function countTriggers(from){const cnt={};inRange(from).forEach(e=>{const t=(e.triggers&&e.triggers.length)?e.triggers:["ohne Angabe"];t.forEach(x=>cnt[x]=(cnt[x]||0)+1)});
+  return Object.entries(cnt).sort((a,b)=>b[1]-a[1])}
+function countSides(from){const c={links:0,rechts:0,beide:0,"":0};inRange(from).forEach(e=>{c[e.side in c?e.side:""]++});
+  const n=c.links+c.rechts+c.beide;
+  // "beide" counts half for each side so the split adds up to 100 %
+  const l=n?Math.round((c.links+c.beide/2)/n*100):0;
+  const rows=[["links",c.links],["rechts",c.rechts],["beide",c.beide]];if(c[""])rows.push(["ohne Angabe",c[""]]);return{n,left:l,rows}}
+function countDaytimes(from){const keys=["morgens","mittags","abends","nachts"];
+  const b=[["morgens · 5–11 Uhr",0],["mittags · 11–17 Uhr",0],["abends · 17–22 Uhr",0],["nachts · 22–5 Uhr",0]];
+  // the chosen Tageszeit wins; otherwise it is derived from the clock time
+  inRange(from).forEach(e=>{const i=keys.indexOf(e.daytime||daytimeFor(e.time||""));if(i>=0)b[i][1]++});return b}
+function countStopped(from){const cnt={};inRange(from).forEach(e=>{const t=stopList(e.stopped);(t.length?t:["ohne Angabe"]).forEach(x=>cnt[x]=(cnt[x]||0)+1)});
+  return Object.entries(cnt).sort((a,b)=>b[1]-a[1])}
 function renderStats(){
   const t=new Date(),a=new Date(t);a.setDate(a.getDate()-29);const b=new Date(a);b.setDate(b.getDate()-30);const c=new Date(a);c.setDate(c.getDate()-1);
   const cur=win(iso(a),iso(t)),prev=win(iso(b),iso(c));const has=store.episodes.length>0;
@@ -483,29 +514,19 @@ function renderStats(){
 }
 function niceMax(m){if(m<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(m)));const s=[1,2,2.5,5,10].find(k=>k*p>=m/4);return Math.ceil(m/(s*p))*s*p}
 function renderWeeks(){
-  const box=$("#wk");const data=[];
+  const box=$("#wk");const P=period(allMode?"all":weeks);const data=chartBuckets(P,metric);
   // 12 Monate and Gesamt show one bar per month, 3/6 Monate one bar per week
-  const monthly=allMode||weeks>=52;
+  const monthly=P.monthly;
   $("#wk-title").textContent=monthly?"Pro Monat":"Pro Woche";$("#wk-read").textContent=monthly?"Tippe auf einen Monat.":"Tippe auf eine Woche.";
-  const bucket=monthly?d=>iso(d).slice(0,7):d=>iso(monday(d));
-  if(monthly){const now=new Date();const nm=allMode?Math.ceil(weeks*7/30.44):12;for(let i=nm-1;i>=0;i--){const s=new Date(now.getFullYear(),now.getMonth()-i,1);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
-  else{const end=monday(new Date());for(let i=weeks-1;i>=0;i--){const s=new Date(end);s.setDate(s.getDate()-7*i);data.push({start:s,key:bucket(s),v:{0:0,1:0,2:0,3:0},n:0,min:0})}}
-  const idx=Object.fromEntries(data.map((w,i)=>[w.key,i]));
-  store.episodes.forEach(e=>{const w=data[idx[bucket(parse(e.date))]];if(!w)return;const m=+e.duration_min||0;w.v[e.intensity in INT?e.intensity:1]+=metric==="n"?1:m;w.n++;w.min+=m});
   const W=Math.max(280,box.clientWidth||340),H=180,L=28,R=4,T=8,B=22,iw=W-L-R,ih=H-T-B;
   const maxV=niceMax(Math.max(1,...data.map(d=>d.v[0]+d.v[1]+d.v[2]+d.v[3])));const bw=iw/data.length,gap=Math.min(3,bw*.25);const y=v=>T+ih-v/maxV*ih;
   let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Episoden pro Woche">`;
   for(let k=0;k<=4;k++){const v=maxV*k/4;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${y(v)+3}" text-anchor="end">${fmt1(v)}</text>`}
-  // x-axis: 3 Monate = every KW, 6/12 Monate = month names, Gesamt = years
-  const lab=(d,i)=>{if(allMode)return d.start.getMonth()===0||(i===0&&d.start.getMonth()<9)?String(d.start.getFullYear()):"";
-    if(monthly)return MON[d.start.getMonth()];
-    if(weeks<=13)return String(kw(d.start));const e=new Date(d.start);e.setDate(e.getDate()+6);
-    return d.start.getDate()===1?MON[d.start.getMonth()]:e.getMonth()!==d.start.getMonth()?MON[e.getMonth()]:""};
   if(!allMode&&weeks<=13)s+=`<text x="${L-5}" y="${H-6}" text-anchor="end">KW</text>`;
   data.forEach((d,i)=>{let acc=0;const x=L+i*bw+gap/2,w=Math.max(1,bw-gap);
     [0,1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;const y0=y(acc),y1=y(acc+v);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0,y0-y1)}" fill="${ICOL[k]}" rx="1.5"/>`;acc+=v});
     s+=`<rect data-i="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ih}" fill="transparent"/>`;
-    const t=lab(d,i);if(t)s+=`<text x="${L+i*bw+(monthly||weeks<=13?bw/2:0)}" y="${H-6}" text-anchor="${monthly||weeks<=13?"middle":"start"}">${t}</text>`});
+    const t=chartLabel(P,d,i);if(t)s+=`<text x="${L+i*bw+(monthly||weeks<=13?bw/2:0)}" y="${H-6}" text-anchor="${monthly||weeks<=13?"middle":"start"}">${t}</text>`});
   s+=`<line x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}" stroke="var(--muted)"/></svg>`;box.innerHTML=s;
   box.querySelectorAll("rect[data-i]").forEach(r=>r.addEventListener("click",()=>{const d=data[+r.dataset.i];const e=new Date(d.start);e.setDate(e.getDate()+6);
     $("#wk-read").textContent=monthly?`${MONL[d.start.getMonth()]} ${d.start.getFullYear()}: ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`:`KW ${kw(d.start)} (${dm(d.start)}–${dm(e)}): ${d.n} Episode${d.n===1?"":"n"}, ${fmt1(d.min)} min`}));
@@ -531,20 +552,11 @@ function hbars(box,rows,emptyText){if(!rows.some(r=>r[1])){box.innerHTML=`<div c
   rows.forEach(([k,n])=>{const el=document.createElement("div");el.className="hbar";const a=document.createElement("span");a.textContent=k;
     const tr=document.createElement("div");tr.className="track";const i=document.createElement("i");i.style.width=(n/max*100)+"%";tr.append(i);
     const c=document.createElement("span");c.className="n";c.textContent=n;el.append(a,tr,c);box.append(el)})}
-function renderTrig(){const from=rangeStart();const cnt={};store.episodes.filter(e=>e.date>=from).forEach(e=>{const t=(e.triggers&&e.triggers.length)?e.triggers:["ohne Angabe"];t.forEach(x=>cnt[x]=(cnt[x]||0)+1)});
-  hbars($("#trig"),Object.entries(cnt).sort((a,b)=>b[1]-a[1]),"Noch keine Episoden in diesem Zeitraum.")}
-function renderSide(){const from=rangeStart();const c={links:0,rechts:0,beide:0,"":0};
-  store.episodes.filter(e=>e.date>=from).forEach(e=>{c[e.side in c?e.side:""]++});
-  const n=c.links+c.rechts+c.beide;const sum=$("#side-sum");
-  if(!n){sum.textContent="";$("#side").innerHTML='<div class="empty">Noch keine Episoden mit Seitenangabe in diesem Zeitraum.</div>';return}
-  // "beide" counts half for each side so the split adds up to 100 %
-  const l=Math.round((c.links+c.beide/2)/n*100);
-  sum.textContent=`Links ${l} % · Rechts ${100-l} % · aus ${n} Episode${n===1?"":"n"} mit Seitenangabe`;
-  const rows=[["links",c.links],["rechts",c.rechts],["beide",c.beide]];if(c[""])rows.push(["ohne Angabe",c[""]]);hbars($("#side"),rows,"")}
-function renderTod(){const from=rangeStart();const keys=["morgens","mittags","abends","nachts"];
-  const b=[["morgens · 5–11 Uhr",0],["mittags · 11–17 Uhr",0],["abends · 17–22 Uhr",0],["nachts · 22–5 Uhr",0]];
-  // the chosen Tageszeit wins; otherwise it is derived from the clock time
-  store.episodes.filter(e=>e.date>=from).forEach(e=>{const i=keys.indexOf(e.daytime||daytimeFor(e.time||""));if(i>=0)b[i][1]++});hbars($("#tod"),b,"Noch keine Episoden mit Tageszeit in diesem Zeitraum.")}
+function renderTrig(){hbars($("#trig"),countTriggers(rangeStart()),"Noch keine Episoden in diesem Zeitraum.")}
+function renderSide(){const S=countSides(rangeStart());const sum=$("#side-sum");
+  if(!S.n){sum.textContent="";$("#side").innerHTML='<div class="empty">Noch keine Episoden mit Seitenangabe in diesem Zeitraum.</div>';return}
+  sum.textContent=`Links ${S.left} % · Rechts ${100-S.left} % · aus ${S.n} Episode${S.n===1?"":"n"} mit Seitenangabe`;hbars($("#side"),S.rows,"")}
+function renderTod(){hbars($("#tod"),countDaytimes(rangeStart()),"Noch keine Episoden mit Tageszeit in diesem Zeitraum.")}
 $("#m-n").addEventListener("click",()=>{metric="n";$("#m-n").setAttribute("aria-pressed","true");$("#m-min").setAttribute("aria-pressed","false");renderWeeks()});
 $("#m-min").addEventListener("click",()=>{metric="min";$("#m-min").setAttribute("aria-pressed","true");$("#m-n").setAttribute("aria-pressed","false");renderWeeks()});
 $("#range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;allMode=b.dataset.w==="all";if(!allMode)weeks=+b.dataset.w;$("#range").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));renderStats()});
@@ -581,11 +593,11 @@ function openEp(id){const e=store.episodes.find(x=>x.id===id);if(!e)return;
 
 /* ---------- Export / Import ---------- */
 async function deliver(filename,text,mime){
-  const blob=new Blob([text],{type:mime});
+  const blob=text instanceof Blob?text:new Blob([text],{type:mime});
   try{const f=new File([blob],filename,{type:mime});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:filename});return true}}
   catch(e){if(e&&e.name==="AbortError")return false}
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);return true}
-$("#b-backup").addEventListener("click",async()=>{const ok=await deliver(`nasenbluten-backup-${iso(new Date())}.json`,JSON.stringify({app:"nasenbluten",version:1,exported:new Date().toISOString(),episodes:store.episodes,ess:store.ess},null,1),"application/json");
+$("#b-backup").addEventListener("click",async()=>{const ok=await deliver(`nasenbluten-backup-${iso(new Date())}.json`,JSON.stringify({app:"nasenbluten",version:1,exported:new Date().toISOString(),episodes:store.episodes,ess:store.ess,patient:store.patient},null,1),"application/json");
   if(ok){store.lastBackup=new Date().toISOString();persist();renderList()}});
 $("#b-csv").addEventListener("click",()=>{const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
   const L=[["Datum","Uhrzeit","Dauer_min","Staerke","Tageszeit","Seite","Ausloeser","Gestoppt","Notiz"].join(";")];
@@ -594,7 +606,7 @@ $("#b-csv").addEventListener("click",()=>{const q=v=>'"'+String(v??"").replace(/
 $("#b-import").addEventListener("click",()=>$("#imp-file").click());
 $("#imp-file").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const txt=(await f.text()).replace(/^﻿/,"");
   let eps=[],ess=[];
-  try{if(txt.trim().startsWith("{")){const j=JSON.parse(txt);eps=Array.isArray(j.episodes)?j.episodes:[];ess=Array.isArray(j.ess)?j.ess:[]}else eps=parseCsv(txt)}
+  try{if(txt.trim().startsWith("{")){const j=JSON.parse(txt);eps=Array.isArray(j.episodes)?j.episodes:[];ess=Array.isArray(j.ess)?j.ess:[];if(j.patient&&!store.patient.name&&!store.patient.dob)store.patient={name:String(j.patient.name||""),dob:String(j.patient.dob||"")}}else eps=parseCsv(txt)}
   catch(err){toast("Datei konnte nicht gelesen werden.");return}
   const key=x=>x.date+"|"+(x.time||"")+"|"+x.duration_min+"|"+x.intensity;const have=new Set(store.episodes.map(key));let added=0;
   eps.forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!(+x.duration_min>=0)||![0,1,2,3].includes(+x.intensity))return;
@@ -608,6 +620,127 @@ function parseCsv(t){const lines=t.split(/\r?\n/).filter(l=>l.trim());if(!lines.
   return lines.slice(1).map(l=>{const c=split(l);const g=n=>col(n)>=0?(c[col(n)]||"").trim():"";
     return{date:g("datum"),time:g("uhrzeit"),duration_min:Number(g("dauer_min").replace(",",".")),intensity:rev[g("staerke").toLowerCase()]??-1,daytime:g("tageszeit"),side:g("seite"),
       triggers:g("ausloeser")?g("ausloeser").split(",").map(s=>s.trim()).filter(Boolean):[],stopped:g("gestoppt"),note:g("notiz")}})}
+
+/* ---------- PDF-Bericht für den Arzt ---------- */
+// jsPDF + autotable live in vendor/ and are loaded only when the sheet opens (then cached by the service worker)
+let pdfLibs=null;
+function loadPdfLibs(){if(pdfLibs)return pdfLibs;
+  const add=src=>new Promise((ok,bad)=>{const sc=document.createElement("script");sc.src=src;sc.onload=ok;sc.onerror=bad;document.head.append(sc)});
+  pdfLibs=add("vendor/jspdf.umd.min.js").then(()=>add("vendor/jspdf.plugin.autotable.min.js")).then(()=>window.jspdf.jsPDF);
+  pdfLibs.catch(()=>{pdfLibs=null});return pdfLibs}
+const RANGES=[["13","3 Monate"],["26","6 Monate"],["52","12 Monate"],["all","Gesamt"]];
+$("#b-pdf").addEventListener("click",()=>{loadPdfLibs().catch(()=>{});let sel="26";
+  sheet((sh,close)=>{
+    sh.innerHTML=`<h3>PDF für den Arzt</h3>
+      <div><div class="lbl">Name</div><input type="text" id="pdf-name" autocomplete="name" placeholder="Vor- und Nachname"></div>
+      <div><div class="lbl">Geburtsdatum</div><input type="date" id="pdf-dob"></div>
+      <div><div class="lbl">Zeitraum</div><div class="seg" id="pdf-range" style="display:grid;grid-template-columns:repeat(4,1fr)">${RANGES.map(([v,t])=>`<button type="button" data-w="${v}" style="padding:7px 4px;white-space:nowrap" aria-pressed="${v===sel}">${t}</button>`).join("")}</div></div>
+      <p class="small muted" style="margin:0">Name und Geburtsdatum bleiben nur auf diesem iPhone.</p>
+      <button type="button" class="save" id="pdf-go" style="position:static;width:100%">PDF erstellen</button>`;
+    const nm=sh.querySelector("#pdf-name"),db=sh.querySelector("#pdf-dob");nm.value=store.patient.name||"";db.value=store.patient.dob||"";
+    sh.querySelector("#pdf-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sel=b.dataset.w;sh.querySelectorAll("#pdf-range button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)))});
+    sh.querySelector("#pdf-go").addEventListener("click",async()=>{store.patient={name:nm.value.trim(),dob:db.value};persist();
+      const fn=`osler-bericht-${iso(new Date())}.pdf`;let jsPDF;const ready=!!window.jspdf;
+      try{jsPDF=await loadPdfLibs()}catch(err){toast("PDF-Funktion konnte nicht geladen werden – bitte einmal mit Internet öffnen.");return}
+      let blob;try{blob=buildReport(jsPDF,sel)}catch(err){console.error(err);toast("PDF konnte nicht erstellt werden.");return}
+      close();
+      // sharing needs a fresh tap if the libraries had to be downloaded first
+      if(ready)deliver(fn,blob,"application/pdf");else toast("PDF ist fertig","Teilen",()=>deliver(fn,blob,"application/pdf"))})})});
+
+function buildReport(jsPDF,sel){
+  const P=period(sel),eps=inRange(P.from).sort((a,b)=>(a.date+a.time)<(b.date+b.time)?1:-1);
+  const doc=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15,CW=W-2*M,BOT=282;
+  const C={fg:[34,41,47],mu:[102,114,123],line:[222,228,232],fill:[241,244,246],acc:[15,124,126],
+    i:{0:[239,226,168],1:[246,191,58],2:[238,129,51],3:[214,58,85]}};
+  const col=(c,t)=>t==="f"?doc.setFillColor(...c):t==="d"?doc.setDrawColor(...c):doc.setTextColor(...c);
+  const font=(sz,st)=>{doc.setFont("helvetica",st||"normal");doc.setFontSize(sz)};
+  const dfull=d=>d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+  const dur=m=>+m<1?"< 1":fmt1(+m);
+  let y=M;const need=h=>{if(y+h>BOT){doc.addPage();y=M}};
+  const h2=t=>{need(14);font(12,"bold");col(C.acc);doc.text(t,M,y+5);y+=9};
+
+  // Kopf
+  font(17,"bold");col(C.acc);doc.text("Bericht Nasenbluten",M,y+6);
+  font(10);col(C.mu);doc.text("Morbus Osler (HHT) · Osler Tracker",M,y+11.5);
+  font(9);doc.text("Erstellt am "+dfull(new Date()),W-M,y+6,{align:"right"});y+=16;
+  const pt=store.patient||{};const per=(sel==="all"?"Gesamt":RANGES.find(r=>r[0]===sel)[1])+": "+dfull(parse(P.from))+" – "+dfull(new Date());
+  col(C.fill,"f");doc.roundedRect(M,y,CW,19,2,2,"F");
+  font(8);col(C.mu);doc.text("Patient/in",M+4,y+5);doc.text("Geburtsdatum",M+92,y+5);doc.text("Zeitraum",M+130,y+5);
+  font(10,"bold");col(C.fg);doc.text(pt.name||"–",M+4,y+11.5,{maxWidth:84});doc.text(pt.dob?dfull(parse(pt.dob)):"–",M+92,y+11.5);
+  font(9,"bold");doc.text(doc.splitTextToSize(per,CW-130-2),M+130,y+11.5);y+=26;
+
+  // Kennzahlen
+  h2("Kennzahlen im Zeitraum");
+  const n=eps.length,min=eps.reduce((a,e)=>a+(+e.duration_min||0),0),longest=eps.reduce((a,e)=>Math.max(a,+e.duration_min||0),0);
+  const tiles=[["Episoden",String(n)],["Ø pro Woche",fmt1(n/P.weeks)],["Minuten gesamt",fmt1(min)],["Ø Dauer",n?fmt1(min/n)+" min":"–"],["Längste Episode",n?dur(longest)+" min":"–"],["ESS-Werte im Zeitraum",String(store.ess.filter(r=>r.date>=P.from).length)]];
+  const tw=(CW-10)/3;tiles.forEach(([k,v],i)=>{const x=M+(i%3)*(tw+5),yy=y+Math.floor(i/3)*17;col(C.fill,"f");doc.roundedRect(x,yy,tw,14,2,2,"F");
+    font(8);col(C.mu);doc.text(k,x+3,yy+4.8);font(13,"bold");col(C.fg);doc.text(v,x+3,yy+11.2)});y+=36;
+
+  // Stärke-Verteilung
+  need(34);font(10,"bold");col(C.fg);doc.text("Stärke",M,y+4);y+=7;
+  const DESC={0:"1 Taschentuch",1:"2–5 Taschentücher",2:"6–10 Taschentücher, läuft stetig",3:"über 10 Taschentücher, Schwall"};
+  const ic=[0,1,2,3].map(k=>eps.filter(e=>e.intensity===k).length);
+  if(n){let x=M;ic.forEach((c,k)=>{if(!c)return;const w=CW*c/n;col(C.i[k],"f");doc.rect(x,y,w,5,"F");x+=w});}else{col(C.fill,"f");doc.rect(M,y,CW,5,"F")}
+  y+=9;[0,1,2,3].forEach(k=>{const x=M+(k%2)*(CW/2),yy=y+Math.floor(k/2)*5.5;col(C.i[k],"f");doc.rect(x,yy-2.6,3,3,"F");
+    font(9,"bold");col(C.fg);doc.text(INT[k],x+5,yy);const lw=doc.getTextWidth(INT[k]);font(9);col(C.mu);doc.text(`(${DESC[k]}): ${ic[k]}${n?` · ${Math.round(ic[k]/n*100)} %`:""}`,x+5+lw+1.5,yy)});
+  y+=14;
+
+  // Diagramm
+  const data=chartBuckets(P,"n");h2(P.monthly?"Episoden pro Monat":"Episoden pro Woche");need(62);
+  const L=M+8,iw=CW-8,ih=48,top=y;const maxV=niceMax(Math.max(1,...data.map(d=>d.n)));const yv=v=>top+ih-v/maxV*ih;
+  font(7);for(let k=0;k<=4;k++){const v=maxV*k/4;col(C.line,"d");doc.setLineWidth(.2);doc.line(L,yv(v),L+iw,yv(v));col(C.mu);doc.text(fmt1(v),L-2,yv(v)+1,{align:"right"})}
+  const bw=iw/data.length,gap=Math.min(1.2,bw*.25);
+  data.forEach((d,i)=>{let acc=0;[0,1,2,3].forEach(k=>{const v=d.v[k];if(!v)return;col(C.i[k],"f");doc.rect(L+i*bw+gap/2,yv(acc+v),Math.max(.3,bw-gap),yv(acc)-yv(acc+v),"F");acc+=v});
+    const t=chartLabel(P,d,i);if(t){col(C.mu);doc.text(t,L+i*bw+(P.monthly||P.weeks<=13?bw/2:0),top+ih+4,{align:P.monthly||P.weeks<=13?"center":"left"})}});
+  if(!P.monthly&&P.weeks<=13){col(C.mu);doc.text("KW",L-2,top+ih+4,{align:"right"})}
+  col(C.mu,"d");doc.setLineWidth(.3);doc.line(L,top+ih,L+iw,top+ih);y=top+ih+8;
+  font(8);let lx=M;[0,1,2,3].forEach(k=>{col(C.i[k],"f");doc.rect(lx,y-2.4,3,3,"F");col(C.mu);doc.text(INT[k],lx+4,y);lx+=doc.getTextWidth(INT[k])+11});y+=8;
+
+  // Verteilungen (zweispaltig)
+  const bars=(x,y0,w,title,rows,sub)=>{let yy=y0;font(10,"bold");col(C.fg);doc.text(title,x,yy+4);yy+=6;
+    if(sub){font(8.5);col(C.mu);doc.text(sub,x,yy+3);yy+=5.5}
+    if(!rows.some(r=>r[1])){font(8.5);col(C.mu);doc.text("keine Angaben im Zeitraum",x,yy+3.5);return yy+8}
+    const max=Math.max(...rows.map(r=>r[1])),lw=w*.42;
+    rows.forEach(([k,v])=>{font(8.5);col(C.fg);doc.text(doc.splitTextToSize(k,lw-1)[0],x,yy+3.2);col(C.fill,"f");doc.rect(x+lw,yy+.6,w-lw-9,3,"F");
+      col(C.acc,"f");if(v)doc.rect(x+lw,yy+.6,(w-lw-9)*v/max,3,"F");col(C.mu);doc.text(String(v),x+w,yy+3.2,{align:"right"});yy+=5});return yy+3};
+  const S=countSides(P.from),tr=countTriggers(P.from),st=countStopped(P.from),tod=countDaytimes(P.from);
+  const hL=6+Math.max(1,tr.length)*5+3+6+Math.max(1,st.length)*5+3,hR=6+5.5+S.rows.length*5+3+6+20+3;need(Math.min(BOT-M,9+Math.max(hL,hR)));
+  h2("Verteilungen im Zeitraum");
+  const cw=(CW-10)/2,y0=y;let yl=bars(M,y0,cw,"Auslöser",tr);yl=bars(M,yl+2,cw,"Wie gestoppt",st);
+  let yr=bars(M+cw+10,y0,cw,"Seite",S.rows,S.n?`Links ${S.left} % · Rechts ${100-S.left} % (aus ${S.n} mit Angabe)`:"");yr=bars(M+cw+10,yr+2,cw,"Tageszeit",tod);
+  y=Math.max(yl,yr)+4;
+
+  // ESS
+  h2("Epistaxis Severity Score (ESS)");
+  const ess=[...store.ess].sort((a,b)=>a.date<b.date?1:-1);
+  if(!ess.length){font(9);col(C.mu);doc.text("Noch kein ESS erfasst.",M,y+3);y+=8}
+  else{const last=ess[0],[bd]=band(last.score);need(12);font(9);col(C.mu);doc.text("Letzter Wert",M,y+3);
+    font(14,"bold");col(C.fg);doc.text(fmt1(last.score),M,y+9.5);const sw=doc.getTextWidth(fmt1(last.score));
+    font(9);col(C.mu);doc.text(`von 10 · ${bd} · ${dfull(parse(last.date))}`,M+sw+2,y+9.5);y+=14;
+    const rows=ess.filter(r=>r.date>=P.from);const all=rows.length?rows:ess.slice(0,1);
+    doc.autoTable({startY:y,margin:{left:M,right:M},head:[["Datum","ESS (0–10)","Einstufung","Änderung zum vorherigen"]],
+      body:all.map(r=>{const i=ess.indexOf(r),prev=ess[i+1];const d=prev?r.score-prev.score:null;
+        return[dfull(parse(r.date)),fmt1(r.score),band(r.score)[0],d===null?"–":(d>0?"+":d<0?"-":"±")+fmt1(Math.abs(d))+(Math.abs(d)>=0.71?" (spürbar)":"")]}),
+      styles:{fontSize:8.5,cellPadding:1.6,textColor:C.fg,lineColor:C.line,lineWidth:.1},headStyles:{fillColor:C.acc,textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[248,250,251]},theme:"grid"});
+    y=doc.lastAutoTable.finalY+4;font(8);col(C.mu);
+    doc.text(doc.splitTextToSize("Einstufung: unter 4 leicht, 4 bis unter 7 mittel, ab 7 schwer. Eine Änderung ab 0,71 Punkten gilt als klinisch spürbar (ESS nach Hoag et al., Laryngoscope 2010).",CW),M,y+3);y+=10}
+
+  // Episodenliste
+  h2(`Episodenliste (${n})`);
+  if(!n){font(9);col(C.mu);doc.text("Keine Episoden im Zeitraum.",M,y+3)}
+  else doc.autoTable({startY:y,margin:{left:M,right:M,bottom:18},
+    head:[["Datum","Uhrzeit","Dauer (min)","Stärke","Tageszeit","Seite","Auslöser","Gestoppt","Notiz"]],
+    body:eps.map(e=>[parse(e.date).toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"2-digit"}),e.time||"",dur(e.duration_min),INT[e.intensity]??"",
+      e.daytime||daytimeFor(e.time||""),e.side||"",(e.triggers||[]).join(", "),e.stopped||"",e.note||""]).map((r,i)=>Object.assign(r,{k:eps[i].intensity})),
+    styles:{fontSize:7.5,cellPadding:1.3,textColor:C.fg,lineColor:C.line,lineWidth:.1,overflow:"linebreak"},headStyles:{fillColor:C.acc,textColor:255,fontStyle:"bold"},
+    alternateRowStyles:{fillColor:[248,250,251]},theme:"grid",
+    columnStyles:{0:{cellWidth:19},1:{cellWidth:13},2:{cellWidth:12,halign:"right"},3:{cellWidth:21},4:{cellWidth:15},5:{cellWidth:12}},
+    didDrawCell:h=>{if(h.section==="body"&&h.column.index===3){const k=h.row.raw&&h.row.raw.k;if(C.i[k]){col(C.i[k],"f");doc.rect(h.cell.x,h.cell.y,1.2,h.cell.height,"F")}}}});
+
+  // Fußzeile
+  const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);font(7.5);col(C.mu);
+    doc.text("Selbst erfasste Daten der Patientin / des Patienten · Osler Tracker"+(pt.name?" · "+pt.name:""),M,290);doc.text(`Seite ${i}/${pages}`,W-M,290,{align:"right"})}
+  return doc.output("blob")}
 
 /* ---------- ESS ---------- */
 const ESSQ=[
