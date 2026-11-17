@@ -303,6 +303,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
   </div>
 
   <div class="card">
+    <h2 style="margin-bottom:8px">Seite</h2>
+    <div id="side-sum" class="small muted" style="margin-bottom:6px"></div>
+    <div id="side"></div>
+  </div>
+
+  <div class="card">
     <h2 style="margin-bottom:8px">Tageszeit</h2>
     <div id="tod"></div>
   </div>
@@ -473,7 +479,7 @@ function renderStats(){
   const cur=win(iso(a),iso(t)),prev=win(iso(b),iso(c));const has=store.episodes.length>0;
   $("#s-n").textContent=has?cur.n:"–";$("#s-min").textContent=has?fmt1(cur.min):"–";$("#s-avg").textContent=has&&cur.n?fmt1(cur.avg)+" min":"–";$("#s-hi").textContent=has?cur.hi:"–";
   setDelta($("#d-n"),cur.n,prev.n);setDelta($("#d-min"),cur.min,prev.min);setDelta($("#d-avg"),cur.avg,prev.avg," min");setDelta($("#d-hi"),cur.hi,prev.hi);
-  syncWeeks();renderWeeks();renderCal();renderTrig();renderTod();
+  syncWeeks();renderWeeks();renderCal();renderTrig();renderSide();renderTod();
 }
 function niceMax(m){if(m<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(m)));const s=[1,2,2.5,5,10].find(k=>k*p>=m/4);return Math.ceil(m/(s*p))*s*p}
 function renderWeeks(){
@@ -527,6 +533,14 @@ function hbars(box,rows,emptyText){if(!rows.some(r=>r[1])){box.innerHTML=`<div c
     const c=document.createElement("span");c.className="n";c.textContent=n;el.append(a,tr,c);box.append(el)})}
 function renderTrig(){const from=rangeStart();const cnt={};store.episodes.filter(e=>e.date>=from).forEach(e=>{const t=(e.triggers&&e.triggers.length)?e.triggers:["ohne Angabe"];t.forEach(x=>cnt[x]=(cnt[x]||0)+1)});
   hbars($("#trig"),Object.entries(cnt).sort((a,b)=>b[1]-a[1]),"Noch keine Episoden in diesem Zeitraum.")}
+function renderSide(){const from=rangeStart();const c={links:0,rechts:0,beide:0,"":0};
+  store.episodes.filter(e=>e.date>=from).forEach(e=>{c[e.side in c?e.side:""]++});
+  const n=c.links+c.rechts+c.beide;const sum=$("#side-sum");
+  if(!n){sum.textContent="";$("#side").innerHTML='<div class="empty">Noch keine Episoden mit Seitenangabe in diesem Zeitraum.</div>';return}
+  // "beide" counts half for each side so the split adds up to 100 %
+  const l=Math.round((c.links+c.beide/2)/n*100);
+  sum.textContent=`Links ${l} % · Rechts ${100-l} % · aus ${n} Episode${n===1?"":"n"} mit Seitenangabe`;
+  const rows=[["links",c.links],["rechts",c.rechts],["beide",c.beide]];if(c[""])rows.push(["ohne Angabe",c[""]]);hbars($("#side"),rows,"")}
 function renderTod(){const from=rangeStart();const keys=["morgens","mittags","abends","nachts"];
   const b=[["morgens · 5–11 Uhr",0],["mittags · 11–17 Uhr",0],["abends · 17–22 Uhr",0],["nachts · 22–5 Uhr",0]];
   // the chosen Tageszeit wins; otherwise it is derived from the clock time
