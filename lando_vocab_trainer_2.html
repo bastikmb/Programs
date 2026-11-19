@@ -2313,10 +2313,22 @@ body.dark-theme { --adult-bg:#14203a; --adult-border:#5b7fc4; --adult-ink:#a9c1e
 }
 body.dark-theme .book-tag { color:#0a1020; }
 /* Trainings-Session: Bücher priorisieren (showTrainingPicker) */
-.training-picker-box { text-align:left; max-width:380px; }
+.training-picker-overlay { padding:max(0.75rem, env(safe-area-inset-top)) 0.75rem max(0.75rem, env(safe-area-inset-bottom)); }
+.training-picker-box {
+  text-align:left; max-width:380px; box-sizing:border-box;
+  display:flex; flex-direction:column;
+  max-height:calc(100vh - 1.5rem); max-height:calc(100dvh - 1.5rem);
+  padding:var(--space-5) var(--space-4) var(--space-4);
+}
+.training-picker-scroll {
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y;
+  margin:0 calc(-1 * var(--space-2)); padding:0 var(--space-2);
+}
+.training-picker-box .confirm-overlay-btns { flex-shrink:0; padding-top:var(--space-3); border-top:1px solid var(--border); }
 .training-picker-heading { font-family:var(--font-display); font-weight:800; font-size:var(--text-lg); }
 .training-picker-sub { color:var(--muted); font-size:var(--text-sm); margin-bottom:var(--space-3); }
-.training-picker-list { display:flex; flex-direction:column; gap:0.4rem; max-height:45vh; overflow:auto; margin-bottom:var(--space-3); }
+.training-picker-list { display:flex; flex-direction:column; gap:0.4rem; margin-bottom:var(--space-3); }
 .training-picker-row {
   display:flex; align-items:center; gap:0.5rem;
   padding:0.55rem 0.65rem;
@@ -2338,7 +2350,7 @@ body.dark-theme .book-tag { color:#0a1020; }
 }
 .training-picker-dir.on { border:2px solid var(--accent); background:var(--accent-bg); }
 .training-picker-preview { font-weight:700; font-size:var(--text-sm); margin-bottom:0.3rem; }
-.training-picker-hint { font-size:var(--text-xs); color:var(--muted); margin-bottom:var(--space-4); }
+.training-picker-hint { font-size:var(--text-xs); color:var(--muted); margin-bottom:var(--space-2); }
 /* Sprach-Plakette auf der Lernkarte */
 .learn-lang-chip {
   display:inline-flex;
@@ -11255,7 +11267,12 @@ function showTrainingPicker(prof){
   const sub = document.createElement("div");
   sub.className = "training-picker-sub";
   sub.textContent = "Kurz einstellen, dann geht's los.";
-  box.append(heading, sub);
+  // Inhalt scrollt in einem eigenen Bereich, die Knöpfe bleiben unten
+  // immer sichtbar -- auch auf kleinen Bildschirmen
+  const scroll = document.createElement("div");
+  scroll.className = "training-picker-scroll";
+  box.appendChild(scroll);
+  scroll.append(heading, sub);
 
   // Lernrichtung (immer)
   let direction = getTrainingDirection(prof);
@@ -11285,7 +11302,7 @@ function showTrainingPicker(prof){
     });
     dirSeg.appendChild(b);
   });
-  box.append(dirTitle, dirSeg);
+  scroll.append(dirTitle, dirSeg);
 
   // Emoji-Hilfe (Hilfsbild auf der Karte), Standard: aus
   let emojiHelp = prof.trainingEmojiHelp===true;
@@ -11314,14 +11331,14 @@ function showTrainingPicker(prof){
     });
     emoSeg.appendChild(b);
   });
-  box.append(emoTitle, emoSeg);
+  scroll.append(emoTitle, emoSeg);
 
   const multiBook = new Set(collectDueWords(prof).map(w=>w.bookKey).filter(Boolean)).size > 1;
   if(multiBook){
     const bookTitle = document.createElement("div");
     bookTitle.className = "training-picker-section";
     bookTitle.textContent = "Welche Bücher zuerst?";
-    box.appendChild(bookTitle);
+    scroll.appendChild(bookTitle);
   }
   const list = document.createElement("div");
   list.className = "training-picker-list";
@@ -11359,14 +11376,14 @@ function showTrainingPicker(prof){
     row.append(cb, icon, name, count);
     list.appendChild(row);
   });
-  if(multiBook) box.appendChild(list);
+  if(multiBook) scroll.appendChild(list);
 
   const hint = document.createElement("div");
   hint.className = "training-picker-hint";
   hint.textContent = multiBook
     ? "Nichts angekreuzt = die dringendsten Wörter aus allen Büchern. Reichen die gewählten Bücher nicht für eine volle Session, wird aufgefüllt."
     : "„Wie gelernt“ fragt jedes Wort in der Richtung ab, in der du es geübt hast.";
-  box.append(preview, hint);
+  scroll.append(preview, hint);
 
   const btns = document.createElement("div");
   btns.className = "confirm-overlay-btns";
@@ -16497,7 +16514,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-11-17.1";
+const APP_BUILD = "2026-11-19.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
