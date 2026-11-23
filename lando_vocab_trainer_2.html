@@ -13545,6 +13545,12 @@ function updateWordSchedule(prof, originalCards, today){
     const originalDirection = (existing && existing.direction) || card.direction;
     if(card.attemptedWrong){
       schedule[key] = {box:1, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[0]), direction:originalDirection};
+    } else if(card.done && card.firstTry && (card.hintCount||0)>=2){
+      // richtig, aber erst nach 2+ Tipps: Wort bleibt in seinem Fach (ein
+      // einzelner Tipp zählt weiter als gelernt). Neue Wörter kommen in
+      // Fach 1, damit sie überhaupt ins Training kommen.
+      const box = existing && existing.box ? existing.box : 1;
+      schedule[key] = {box, dueDate:addDaysToDateKey(today, LEITNER_BOX_INTERVALS_DAYS[box-1]), direction:originalDirection};
     } else if(card.done && card.firstTry){
       // neues Wort, sofort richtig: Fach 2 (in 2 Tagen) statt Fach 1
       // (morgen) -- sonst kommt jede gespielte Seite komplett am nächsten
@@ -15529,6 +15535,8 @@ function applyHint(){
   for(let k=0; k<revealCount; k++){
     card.hintedChars.add(candidates[k]);
   }
+  // ab dem 2. Tipp steigt das Wort nicht mehr ins nächste Fach, siehe updateWordSchedule
+  card.hintCount = (card.hintCount||0) + 1;
 
   if(card.score>0 && !card.isNew) card.score = card.score-1;
   document.getElementById("cardScore").textContent=String(card.score);
@@ -16514,7 +16522,7 @@ function initHeroBanner(){
 /* Sichtbar unten auf der Kader-Seite -- damit sich prüfen lässt, ob ein
    Gerät (v.a. die iPhone-Homescreen-App) schon die neueste Version lädt.
    Bei jeder veröffentlichten Änderung hochzählen. */
-const APP_BUILD = "2026-11-19.1";
+const APP_BUILD = "2026-11-23.1";
 
 function initApp(){
   const versionEl = document.getElementById("appVersionLabel");
